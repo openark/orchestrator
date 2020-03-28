@@ -145,10 +145,13 @@ const (
 	Completed
 	Error
 	Failed
+	Aborting
 )
 
+var SeedStatuses = []SeedStatus{Scheduled, Running, Completed, Error, Failed, Aborting}
+
 func (s SeedStatus) String() string {
-	return [...]string{"Scheduled", "Running", "Completed", "Error", "Failed"}[s]
+	return [...]string{"Scheduled", "Running", "Completed", "Error", "Failed", "Aborting"}[s]
 }
 
 func (s SeedStatus) MarshalJSON() ([]byte, error) {
@@ -164,16 +167,17 @@ func (s *SeedStatus) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	*s = toSeedStatus[value]
+	*s = ToSeedStatus[value]
 	return nil
 }
 
-var toSeedStatus = map[string]SeedStatus{
+var ToSeedStatus = map[string]SeedStatus{
 	"Scheduled": Scheduled,
 	"Running":   Running,
 	"Completed": Completed,
 	"Error":     Error,
 	"Failed":    Failed,
+	"Aborting":  Aborting,
 }
 
 type SeedStage int
@@ -411,40 +415,56 @@ func ReadActiveSeeds() ([]*Seed, error) {
 	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String()), "")
 }
 
-// ReadFailedSeeds reads failed seeds
-func ReadFailedSeeds() ([]*Seed, error) {
+// ReadSeeds reads seeds from backend table.
+func ReadSeeds() ([]*Seed, error) {
+	return readSeeds(``, sqlutils.Args(), "")
+}
+
+// ReadSeedsPaged returns a list of seeds with pagination
+func ReadSeedsPaged(page int) ([]*Seed, error) {
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	return readSeeds(``, sqlutils.Args(), limit)
+}
+
+// ReadSeedsForTargetAgentPaged returns a list of seeds for specified targetagent with pagination
+func ReadSeedsForTargetAgentPaged(targetAgent *Agent, page int) ([]*Seed, error) {
+	whereCondition := `
+		where
+			target_hostname = ?	
+	`
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	return readSeeds(whereCondition, sqlutils.Args(targetAgent.Info.Hostname), limit)
+}
+
+// ReadSeedsForSourceAgentPaged returns a list of seeds for specified sourceagent with pagination
+func ReadSeedsForSourceAgentPaged(sourceAgent *Agent, page int) ([]*Seed, error) {
+	whereCondition := `
+		where
+			source_hostname = ?	
+	`
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	return readSeeds(whereCondition, sqlutils.Args(sourceAgent.Info.Hostname), limit)
+}
+
+// ReadSeedsInStatusPaged returns seeds in specified status with pagination
+func ReadSeedsInStatusPaged(status SeedStatus, page int) ([]*Seed, error) {
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
 	whereCondition := `
 		where
 			status = ?
-		`
-	return readSeeds(whereCondition, sqlutils.Args(Failed.String()), "")
+	`
+	return readSeeds(whereCondition, sqlutils.Args(status.String()), limit)
 }
 
-// ReadErroredSeeds reads seeds in status error
-func ReadErroredSeeds() ([]*Seed, error) {
+// ReadSeedsForAgent reads seeds where agent participates either as source or target in given status
+func ReadSeedsForAgent(agent *Agent, limit string) ([]*Seed, error) {
 	whereCondition := `
 		where
-			status = ?
-		`
-	return readSeeds(whereCondition, sqlutils.Args(Error.String()), "")
-}
-
-// ReadRecentSeeds reads recent seeds from backend table.
-func ReadRecentSeeds() ([]*Seed, error) {
-	return readSeeds(``, sqlutils.Args(), "limit 100")
-}
-
-// ReadRecentSeedsForAgentInStatus reads active seeds where agent participates either as source or target in given status
-func ReadRecentSeedsForAgentInStatus(agent *Agent, status SeedStatus, limit string) ([]*Seed, error) {
-	whereCondition := `
-		where
-			status = ?
-			and (
-				target_hostname = ?
-				or source_hostname = ?
-			)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(status.String(), agent.Info.Hostname, agent.Info.Hostname), "limit 10")
+			target_hostname = ?
+			or source_hostname = ?
+			
+	`
+	return readSeeds(whereCondition, sqlutils.Args(agent.Info.Hostname, agent.Info.Hostname), limit)
 }
 
 // ReadActiveSeedsForAgent reads active seeds where agent participates either as source or target
@@ -479,6 +499,8 @@ func ProcessSeeds() []*Seed {
 				go seed.processRunning(&wg)
 			case Error:
 				go seed.processErrored(&wg)
+			case Aborting:
+				go seed.processAborting(&wg)
 			}
 		}
 		wg.Wait()
@@ -516,6 +538,11 @@ func (s *Seed) readSeadAgents(updateAgentsData bool) (targetAgent *Agent, source
 		}
 	}
 	return targetAgent, sourceAgent, nil
+}
+
+func (s *Seed) processAborting(wg *sync.WaitGroup) {
+	defer wg.Done()
+	s.AbortSeed()
 }
 
 func (s *Seed) processScheduled(wg *sync.WaitGroup) {
@@ -1018,13 +1045,27 @@ func (s *Seed) updateSeedState(hostname string, details string) error {
 	return submitSeedStageState(seedStageState)
 }
 
+// AbortSeed aborts seed operation
 func (s *Seed) AbortSeed() error {
+	previousStatus := s.Status
+	if previousStatus != Aborting {
+		s.Status = Aborting
+		s.updateSeedData()
+	}
 	targetAgent, sourceAgent, err := s.readSeadAgents(false)
 	if err != nil {
 		return err
 	}
-	s.Status = Failed
-	s.EndTimestamp = time.Now()
+	if previousStatus == Scheduled || previousStatus == Error {
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
+			s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage", s.Stage.String()))
+		}
+		s.Status = Failed
+		s.EndTimestamp = time.Now()
+		return s.updateSeedData()
+	} else if previousStatus == Failed || previousStatus == Completed {
+		return fmt.Errorf("Unable to abort seed in %s status", previousStatus.String())
+	}
 	switch s.Stage {
 	case Prepare, Cleanup:
 		for _, agent := range []*Agent{targetAgent, sourceAgent} {
@@ -1055,5 +1096,7 @@ func (s *Seed) AbortSeed() error {
 			s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage", s.Stage.String()))
 		}
 	}
+	s.Status = Failed
+	s.EndTimestamp = time.Now()
 	return s.updateSeedData()
 }

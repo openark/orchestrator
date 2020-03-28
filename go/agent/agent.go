@@ -29,14 +29,17 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
+//Agent describes an agent
 type Agent struct {
-	Info        *Info
-	Data        *Data
-	LastSeen    time.Time
-	Status      AgentStatus
-	ClusterName string
+	Info         *Info
+	Data         *Data
+	LastSeen     time.Time
+	Status       AgentStatus
+	ClusterAlias string
+	MySQLVersion string
 }
 
+// Info stores basic agent information
 type Info struct {
 	Hostname  string
 	Port      int
@@ -44,11 +47,12 @@ type Info struct {
 	MySQLPort int
 }
 
+// Data stores additional agent information
 type Data struct {
-	LocalSnapshotsHosts   []string         // AvailableLocalSnapshots in Orchestrator
-	SnaphostHosts         []string         // AvailableSnapshots in Orchestrator
-	LogicalVolumes        []*LogicalVolume // pass by reference ??
-	MountPoint            *Mount           // pass by reference ??
+	LocalSnapshotsHosts   []string
+	SnaphostHosts         []string
+	LogicalVolumes        []*LogicalVolume
+	MountPoint            *Mount
 	BackupDir             string
 	BackupDirDiskFree     int64
 	BackupDirDiskUsed     int64
@@ -58,6 +62,10 @@ type Data struct {
 	MySQLDatadirDiskFree  int64
 	MySQLDatabases        map[string]*MySQLDatabase
 	AvailiableSeedMethods map[SeedMethod]*SeedMethodOpts
+	AgentCommands         []string
+	NumCPU                int
+	MemTotal              int64
+	OsName                string
 }
 
 // MySQLDatabase describes a MySQL database
@@ -86,6 +94,7 @@ type Mount struct {
 	DiskUsage  int64
 }
 
+// SeedMethodOpts stores configuration options for SeedMethod
 type SeedMethodOpts struct {
 	BackupSide       SeedSide
 	SupportedEngines []Engine
@@ -110,10 +119,12 @@ func (a AgentStatus) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-var toAgentStatus = map[string]AgentStatus{
+var ToAgentStatus = map[string]AgentStatus{
 	"Active":   Active,
 	"Inactive": Inactive,
 }
+
+var AgentStatuses = []AgentStatus{Active, Inactive}
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
 func auditAgentOperation(auditType string, agent *Agent, message string) error {
@@ -142,16 +153,6 @@ func RegisterAgent(agentInfo *Info) (string, error) {
 	go agent.discoverAgentInstance()
 
 	return agentInfo.Hostname, err
-}
-
-// ReadAgents returns a list of all known agents with their data from database
-func ReadAgents() ([]*Agent, error) {
-	return readAgents(``, sqlutils.Args(), "")
-}
-
-// ReadAgentsInfo returns a list of all known agents without data from database
-func ReadAgentsInfo() ([]*Agent, error) {
-	return readAgentsInfo(``, sqlutils.Args(), "")
 }
 
 // ReadAgent returns an information about an agent and it's data from database
@@ -186,6 +187,16 @@ func ReadAgentInfo(hostname string) (*Agent, error) {
 	return res[0], nil
 }
 
+// ReadAgents returns a list of all known agents with their data from database
+func ReadAgents() ([]*Agent, error) {
+	return readAgents(``, sqlutils.Args(), "")
+}
+
+// ReadAgentsInfo returns a list of all known agents without data from database
+func ReadAgentsInfo() ([]*Agent, error) {
+	return readAgentsInfo(``, sqlutils.Args(), "")
+}
+
 // ReadOutdatedAgents returns agents that need to be updated
 func ReadOutdatedAgents() ([]*Agent, error) {
 	whereCondition := `
@@ -193,6 +204,40 @@ func ReadOutdatedAgents() ([]*Agent, error) {
 			IFNULL(last_checked < now() - interval ? minute, 1)
 	`
 	return readAgentsInfo(whereCondition, sqlutils.Args(config.Config.AgentPollMinutes), "")
+}
+
+// ReadAgentsHosts returns a list of agent hostnames
+func ReadAgentsHosts(hostname string) ([]string, error) {
+	if len(hostname) == 0 {
+		return readAgentsHosts(``, sqlutils.Args())
+	}
+	return readAgentsHosts(`WHERE hostname RLIKE ?`, sqlutils.Args(fmt.Sprintf("^"+hostname)))
+}
+
+// ReadAgentsPaged returns a list of all known agents with their data from database with pagination
+func ReadAgentsPaged(page int) ([]*Agent, error) {
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	return readAgents(``, sqlutils.Args(), limit)
+}
+
+// ReadAgentsForClusterPaged returns an agents for cluster with pagination
+func ReadAgentsForClusterPaged(clusterAlias string, page int) ([]*Agent, error) {
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	whereCondition := `
+		WHERE
+			di.suggested_cluster_alias = ?
+	`
+	return readAgents(whereCondition, sqlutils.Args(clusterAlias), limit)
+}
+
+// ReadAgentsInStatusPaged returns an agents in provided status with pagination
+func ReadAgentsInStatusPaged(status AgentStatus, page int) ([]*Agent, error) {
+	limit := fmt.Sprintf("limit %d offset %d", config.AuditPageSize, page*config.AuditPageSize)
+	whereCondition := `
+		WHERE
+			ha.status = ?
+	`
+	return readAgents(whereCondition, sqlutils.Args(status.String()), limit)
 }
 
 // executeAgentCommand requests an agent to execute a command via HTTP api
@@ -299,6 +344,18 @@ func (agent *Agent) AbortSeed(seedID int64, seedStage SeedStage) error {
 	return agent.executeAgentCommand(fmt.Sprintf("abort-seed-stage/%d/%s", seedID, seedStage), nil)
 }
 
+// ErrorLogTail returns tail of MySQL error log from agent
+func (agent *Agent) ErrorLogTail() (output string, err error) {
+	onResponse := func(body []byte) {
+		output = string(body)
+		log.Debugf("output: %v", output)
+	}
+	if err := agent.executeAgentCommand("mysql-error-log-tail", &onResponse); err != nil {
+		return "", err
+	}
+	return output, err
+}
+
 // CustomCommand executes specified command on agent
 func (agent *Agent) CustomCommand(cmd string) (output string, err error) {
 	onResponse := func(body []byte) {
@@ -347,7 +404,7 @@ func (agent *Agent) RemoveLV(lv string) error {
 			log.Errore(err)
 		}
 	}
-	if err := agent.executeAgentCommand(fmt.Sprintf("emovelv?lv=%s", lv), &onResponse); err != nil {
+	if err := agent.executeAgentCommand(fmt.Sprintf("removelv?lv=%s", lv), &onResponse); err != nil {
 		return err
 	}
 	return agent.updateAgentData()

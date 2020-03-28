@@ -595,6 +595,34 @@ func (s *AgentTestSuite) TestReadOutdatedAgents(c *C) {
 	c.Assert(outdatedOrchestratorAgents[0].Data, DeepEquals, &Data{})
 }
 
+func (s *AgentTestSuite) TestReadAgentsHosts(c *C) {
+	s.registerAgents(c)
+
+	agents, err := ReadAgentsHosts("agent1")
+
+	c.Assert(err, IsNil)
+	c.Assert(agents, HasLen, 1)
+	c.Assert(agents[0], Equals, "agent1")
+}
+
+func (s *AgentTestSuite) TestReadAgentsPaged(c *C) {
+	s.registerAgents(c)
+
+	agents, err := ReadAgentsPaged(0)
+
+	c.Assert(err, IsNil)
+	c.Assert(agents, HasLen, 4)
+}
+
+func (s *AgentTestSuite) TestReadAgentsInStatusPaged(c *C) {
+	s.registerAgents(c)
+
+	agents, err := ReadAgentsInStatusPaged(Active, 0)
+
+	c.Assert(err, IsNil)
+	c.Assert(agents, HasLen, 4)
+}
+
 func (s *AgentTestSuite) TestUpdateAgent(c *C) {
 	testAgent := s.testAgents["agent1"]
 
@@ -646,6 +674,124 @@ func (s *AgentTestSuite) TestForgetLongUnseenAgents(c *C) {
 
 	_, err = ReadAgentInfo(testAgent.agent.Info.Hostname)
 	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestReadSeeds(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	_, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+
+	_, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 2)
+}
+
+func (s *AgentTestSuite) TestReadSeedsPaged(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	_, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+
+	_, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeedsPaged(0)
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 2)
+}
+
+func (s *AgentTestSuite) TestReadSeedsForTargetAgentPaged(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeedsForTargetAgentPaged(targetAgent, 0)
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+	c.Assert(seeds[0].TargetHostname, Equals, targetAgent.Info.Hostname)
+}
+
+func (s *AgentTestSuite) TestReadSeedsForSourceAgentPaged(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeedsForSourceAgentPaged(sourceAgent, 0)
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+	c.Assert(seeds[0].SourceHostname, Equals, sourceAgent.Info.Hostname)
+}
+
+func (s *AgentTestSuite) TestReadSeedsInStatusPaged(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeedsInStatusPaged(Scheduled, 0)
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+	seeds, err = ReadSeedsInStatusPaged(Running, 0)
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 0)
+}
+
+func (s *AgentTestSuite) TestReadSeedsForAgent(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+
+	seeds, err := ReadSeedsForAgent(sourceAgent, "")
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+	c.Assert(seeds[0].SourceHostname, Equals, sourceAgent.Info.Hostname)
+	seeds, err = ReadSeedsForAgent(targetAgent, "")
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+	c.Assert(seeds[0].TargetHostname, Equals, targetAgent.Info.Hostname)
 }
 
 func (s *AgentTestSuite) TestNewSeed(c *C) {
@@ -799,153 +945,6 @@ func (s *AgentTestSuite) TestReadActiveSeeds(c *C) {
 	c.Assert(seeds[0].Status, Equals, Scheduled)
 	c.Assert(seeds[0].Stage, Equals, Prepare)
 	c.Assert(seeds[0].Retries, Equals, 0)
-}
-
-func (s *AgentTestSuite) TestReadFailedSeeds(c *C) {
-	targetTestAgent1 := s.testAgents["agent1"]
-	sourceTestAgent1 := s.testAgents["agent2"]
-	targetTestAgent2 := s.testAgents["agent3"]
-	sourceTestAgent2 := s.testAgents["agent4"]
-
-	// register agents to Orchestrator
-	s.registerAgents(c)
-
-	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
-	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
-
-	errorSeedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
-	c.Assert(err, IsNil)
-	c.Assert(errorSeedID, Equals, int64(1))
-
-	seedID, err := NewSeed("Mydumper", targetAgent2, sourceAgent2)
-	c.Assert(err, IsNil)
-	c.Assert(seedID, Equals, int64(2))
-
-	failedSeeds := s.readSeed(c, errorSeedID, targetAgent1.Info.Hostname, sourceAgent1.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
-	failedSeeds.Status = Failed
-	failedSeeds.updateSeedData()
-
-	seeds, err := ReadFailedSeeds()
-	c.Assert(err, IsNil)
-	c.Assert(seeds, HasLen, 1)
-
-	c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
-	c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
-	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
-	c.Assert(seeds[0].BackupSide, Equals, Target)
-	c.Assert(seeds[0].Status, Equals, Failed)
-	c.Assert(seeds[0].Stage, Equals, Prepare)
-	c.Assert(seeds[0].Retries, Equals, 0)
-}
-
-func (s *AgentTestSuite) TestReadErroredSeedss(c *C) {
-	targetTestAgent1 := s.testAgents["agent1"]
-	sourceTestAgent1 := s.testAgents["agent2"]
-	targetTestAgent2 := s.testAgents["agent3"]
-	sourceTestAgent2 := s.testAgents["agent4"]
-
-	// register agents to Orchestrator
-	s.registerAgents(c)
-
-	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
-	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
-
-	erroredSeedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
-	c.Assert(err, IsNil)
-	c.Assert(erroredSeedID, Equals, int64(1))
-
-	seedID, err := NewSeed("Mydumper", targetAgent2, sourceAgent2)
-	c.Assert(err, IsNil)
-	c.Assert(seedID, Equals, int64(2))
-
-	erroredSeeds := s.readSeed(c, erroredSeedID, targetAgent1.Info.Hostname, sourceAgent1.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
-	erroredSeeds.Status = Error
-	erroredSeeds.updateSeedData()
-
-	seeds, err := ReadErroredSeeds()
-	c.Assert(err, IsNil)
-	c.Assert(seeds, HasLen, 1)
-
-	c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
-	c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
-	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
-	c.Assert(seeds[0].BackupSide, Equals, Target)
-	c.Assert(seeds[0].Status, Equals, Error)
-	c.Assert(seeds[0].Stage, Equals, Prepare)
-	c.Assert(seeds[0].Retries, Equals, 0)
-}
-
-func (s *AgentTestSuite) TestReadRecentSeeds(c *C) {
-	targetTestAgent1 := s.testAgents["agent1"]
-	sourceTestAgent1 := s.testAgents["agent2"]
-	targetTestAgent2 := s.testAgents["agent3"]
-	sourceTestAgent2 := s.testAgents["agent4"]
-
-	// register agents to Orchestrator
-	s.registerAgents(c)
-
-	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
-	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
-
-	seedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
-	c.Assert(err, IsNil)
-	c.Assert(seedID, Equals, int64(1))
-
-	seedID, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
-	c.Assert(err, IsNil)
-	c.Assert(seedID, Equals, int64(2))
-
-	seeds, err := ReadRecentSeeds()
-	c.Assert(err, IsNil)
-	c.Assert(seeds, HasLen, 2)
-
-	for _, seed := range seeds {
-		if seed.SeedID == 1 {
-			c.Assert(seed.TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
-			c.Assert(seed.SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
-		} else {
-			c.Assert(seed.TargetHostname, Equals, targetTestAgent2.agent.Info.Hostname)
-			c.Assert(seed.SourceHostname, Equals, sourceTestAgent2.agent.Info.Hostname)
-		}
-		c.Assert(seed.SeedMethod, Equals, Mydumper)
-		c.Assert(seed.BackupSide, Equals, Target)
-		c.Assert(seed.Status, Equals, Scheduled)
-		c.Assert(seed.Stage, Equals, Prepare)
-		c.Assert(seed.Retries, Equals, 0)
-	}
-}
-
-func (s *AgentTestSuite) TestReadRecentSeedsForAgentInStatus(c *C) {
-	targetTestAgent := s.testAgents["agent1"]
-	sourceTestAgent := s.testAgents["agent2"]
-
-	// register agents to Orchestrator
-	s.registerAgents(c)
-
-	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	c.Assert(err, IsNil)
-	c.Assert(seedID, Equals, int64(1))
-
-	for _, agent := range []*Agent{targetAgent, sourceAgent} {
-		seeds, err := ReadRecentSeedsForAgentInStatus(agent, Scheduled, "limit 1")
-		c.Assert(err, IsNil)
-		c.Assert(seeds, HasLen, 1)
-		c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent.agent.Info.Hostname)
-		c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent.agent.Info.Hostname)
-		c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
-		c.Assert(seeds[0].BackupSide, Equals, Target)
-		c.Assert(seeds[0].Status, Equals, Scheduled)
-		c.Assert(seeds[0].Stage, Equals, Prepare)
-		c.Assert(seeds[0].Retries, Equals, 0)
-	}
-
-	for _, agent := range []*Agent{targetAgent, sourceAgent} {
-		seeds, err := ReadRecentSeedsForAgentInStatus(agent, Running, "limit 1")
-		c.Assert(err, IsNil)
-		c.Assert(seeds, HasLen, 0)
-	}
 }
 
 func (s *AgentTestSuite) TestReadActiveSeedsForAgent(c *C) {
@@ -1468,6 +1467,57 @@ func (s *AgentTestSuite) TestProcessSeedsFailed(c *C) {
 	c.Assert(activeSeeds, HasLen, 0)
 }
 
+func (s *AgentTestSuite) TestAbortSeedScheduled(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	err = seed.AbortSeed()
+	c.Assert(err, IsNil)
+
+	activeSeeds, err := ReadActiveSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(activeSeeds, HasLen, 0)
+}
+
+func (s *AgentTestSuite) TestAbortSeedCompleted(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// MaxRetriesForStage set to 0, so it will be failed after first error
+	config.Config.MaxRetriesForSeedStage = 0
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Completed and stage to Cleanup
+	seed.Status = Completed
+	seed.Stage = Cleanup
+	seed.updateSeedData()
+
+	err = seed.AbortSeed()
+	c.Assert(err, NotNil)
+}
+
 func (s *AgentTestSuite) TestAbortSeedRestore(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
@@ -1505,7 +1555,38 @@ func (s *AgentTestSuite) TestAbortSeedRestore(c *C) {
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Restore, 0)
 	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	seed.AbortSeed()
+	err = seed.AbortSeed()
+	c.Assert(err, IsNil)
+
+	activeSeeds, err := ReadActiveSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(activeSeeds, HasLen, 0)
+}
+
+func (s *AgentTestSuite) TestProcessAborting(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// MaxRetriesForStage set to 0, so it will be failed after first error
+	config.Config.MaxRetriesForSeedStage = 0
+
+	// register agents to Orchestrator
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Aborting and stage to Restore
+	seed.Status = Aborting
+	seed.Stage = Restore
+	seed.updateSeedData()
+	ProcessSeeds()
 
 	activeSeeds, err := ReadActiveSeeds()
 	c.Assert(err, IsNil)
@@ -1549,7 +1630,8 @@ func (s *AgentTestSuite) TestAbortSeedCleanup(c *C) {
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
 	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
 
-	seed.AbortSeed()
+	err = seed.AbortSeed()
+	c.Assert(err, IsNil)
 
 	activeSeeds, err := ReadActiveSeeds()
 	c.Assert(err, IsNil)

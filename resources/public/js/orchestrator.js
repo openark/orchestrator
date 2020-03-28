@@ -962,7 +962,6 @@ function onClusters(func) {
   onClustersListeners.push(func);
 }
 
-
 function getParameterByName(name) {
   name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
   var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
@@ -1053,8 +1052,8 @@ $(document).ready(function() {
     }
     updateCountdownDisplay();
   });
-  if (agentsHttpActive() == "true") {
-    $("#nav_agents").show();
+  if (agentsHttpActive() == "false") {
+    $("#agents_menu").remove();
   }
   if (contextMenuVisible() == "true") {
     showContextMenu();

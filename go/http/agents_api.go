@@ -38,13 +38,7 @@ var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 // RegisterAgent registeres an agent. It is initiated by an agent to register itself.
 func (this *HttpAgentsAPI) RegisterAgent(params martini.Params, r render.Render, req *http.Request) {
 	var agentInfo agent.Info
-	//port, err := strconv.Atoi(params["port"])
-	//if err != nil {
-	//	r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
-	//	return
-	//}
 	decoder := json.NewDecoder(req.Body)
-	//seedMethods := make(map[agent.SeedMethod]agent.SeedMethodOpts)
 	err := decoder.Decode(&agentInfo)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -84,27 +78,6 @@ func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params
 	r.JSON(200, output)
 }
 
-// AgentsHosts provides list of agent host names
-func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request) string {
-	agents, err := agent.ReadAgentsInfo()
-	hostnames := []string{}
-	for _, agent := range agents {
-		hostnames = append(hostnames, agent.Info.Hostname)
-	}
-
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return ""
-	}
-
-	if req.URL.Query().Get("format") == "txt" {
-		return strings.Join(hostnames, "\n")
-	} else {
-		r.JSON(200, hostnames)
-	}
-	return ""
-}
-
 // AgentsInstances provides list of assumed MySQL instances (host:port)
 func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Render, req *http.Request) string {
 	agents, err := agent.ReadAgentsInfo()
@@ -135,7 +108,6 @@ func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Post(this.URLPrefix+"/api/register-agent", this.RegisterAgent)
 	m.Get(this.URLPrefix+"/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
 	m.Get(this.URLPrefix+"/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
-	m.Get(this.URLPrefix+"/api/agents-hosts", this.AgentsHosts)
 	m.Get(this.URLPrefix+"/api/agents-instances", this.AgentsInstances)
 	m.Get(this.URLPrefix+"/api/agent-ping", this.AgentPing)
 }

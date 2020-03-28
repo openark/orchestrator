@@ -9,16 +9,7 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-/************************************************************** NEW FUNCS **************************************************************/
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-
-/** TO DO **/
-/** add ReadFailedSeedsForHost **/
-
-// registerSeedEntry register a new seed operation entry, returning seed with it's unique id
+// registerSeedEntry registers a new seed operation entry, returning seed with it's unique id
 func (seed *Seed) registerSeedEntry() error {
 	res, err := db.ExecOrchestrator(`
 			insert
@@ -48,6 +39,7 @@ func (seed *Seed) registerSeedEntry() error {
 	return nil
 }
 
+// updateSeedData updates an information about seed
 func (seed *Seed) updateSeedData() error {
 	_, err := db.ExecOrchestrator(`
 			update
@@ -73,7 +65,7 @@ func (seed *Seed) updateSeedData() error {
 	return nil
 }
 
-// setSeedStatusFailed sets status Failed for seed and increase retries counter
+// isSeedStageCompletedForAgent checks if current seed stage is already completed for current agent
 func (seed *Seed) isSeedStageCompletedForAgent(agent *Agent) (bool, error) {
 	var cnt int
 	query := `
@@ -153,7 +145,7 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 		seed.SeedMethod = toSeedMethod[m.GetString("seed_method")]
 		seed.BackupSide = toSeedSide[m.GetString("backup_side")]
 		seed.Stage = toSeedStage[m.GetString("stage")]
-		seed.Status = toSeedStatus[m.GetString("status")]
+		seed.Status = ToSeedStatus[m.GetString("status")]
 		seed.Retries = m.GetInt("retries")
 		seed.StartTimestamp = m.GetTime("start_timestamp")
 		seed.EndTimestamp = m.GetTime("end_timestamp")
@@ -169,7 +161,7 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 	return res, err
 }
 
-// ReadSeedStates reads states for a given seed operation
+// ReadSeedStageStates reads states for a given seed operation
 func (seed *Seed) ReadSeedStageStates() ([]SeedStageState, error) {
 	res := []SeedStageState{}
 	query := `
@@ -195,7 +187,7 @@ func (seed *Seed) ReadSeedStageStates() ([]SeedStageState, error) {
 		seedState.Stage = toSeedStage[m.GetString("stage")]
 		seedState.Hostname = m.GetString("agent_hostname")
 		seedState.Timestamp = m.GetTime("state_timestamp")
-		seedState.Status = toSeedStatus[m.GetString("status")]
+		seedState.Status = ToSeedStatus[m.GetString("status")]
 		seedState.Details = m.GetString("details")
 
 		res = append(res, seedState)

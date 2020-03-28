@@ -26,6 +26,27 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
+// readAgentsHosts reads agents hostnames from backend table applying filters
+func readAgentsHosts(whereCondition string, args []interface{}) ([]string, error) {
+	res := []string{}
+	query := fmt.Sprintf(`
+		select
+			hostname
+		from
+			host_agent
+		%s
+		`, whereCondition)
+
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		res = append(res, m.GetString("hostname"))
+		return nil
+	})
+	if err != nil {
+		return res, fmt.Errorf("Unable to read agents hostnames: %+v", err)
+	}
+	return res, nil
+}
+
 // readAgentsInfo reads agents information from backend table
 func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]*Agent, error) {
 	res := []*Agent{}
@@ -51,8 +72,7 @@ func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
-		agent.Status = toAgentStatus[m.GetString("status")]
-		// add to cache
+		agent.Status = ToAgentStatus[m.GetString("status")]
 		res = append(res, agent)
 		return nil
 	})
@@ -74,10 +94,11 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 			ha.mysql_port,
 			ha.status,
 			ha.data,
+			di.major_version,
 			di.suggested_cluster_alias
 		FROM
 			host_agent ha
-		LEFT JOIN database_instance di ON di.hostname = ha.hostname AND di.port = ha.port
+		LEFT JOIN database_instance di ON di.hostname = ha.hostname AND di.port = ha.mysql_port
 		%s
 		ORDER BY
 			di.suggested_cluster_alias ASC, ha.hostname ASC
@@ -90,8 +111,9 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
-		agent.Status = toAgentStatus[m.GetString("status")]
-		agent.ClusterName = m.GetString("suggested_cluster_alias")
+		agent.Status = ToAgentStatus[m.GetString("status")]
+		agent.ClusterAlias = m.GetString("suggested_cluster_alias")
+		agent.MySQLVersion = m.GetString("major_version")
 		err := json.Unmarshal([]byte(m.GetString("data")), agent.Data)
 		if err != nil {
 			return log.Errore(err)
@@ -146,6 +168,7 @@ func (agent *Agent) updateAgentLastChecked() error {
 	return err
 }
 
+// updateAgentStatus updates a status of an agent
 func (agent *Agent) updateAgentStatus() error {
 	_, err := db.ExecOrchestrator(`
         	update
