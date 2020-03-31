@@ -100,14 +100,20 @@ $(document).ready(function() {
     $("body").on("click", "#agent_execute_command_button", function(event) {
       var hostname = $(event.target).attr("data-hostname")
       var command = $("#agent_agent_commands").val()
-      showLoader();
-      $.get(appUrl("/api/agent-custom-command/"+hostname+"/"+command), function() {
-        hideLoader();
-        location.reload(true);
-      }, "json").fail(function(operationResult) {
-        hideLoader();
-        if (operationResult.responseJSON.Code == "ERROR") {
-          addAlert(operationResult.responseJSON.Message);
+      var message = "Are you sure you wish to run <code><strong>" +
+      command + "</strong></code> command on <code><strong>" + hostname + "</strong></code>?";
+      bootbox.confirm(message, function(confirm) {
+        if (confirm) {
+          showLoader();
+          $.get(appUrl("/api/agent-custom-command/"+hostname+"/"+command), function() {
+            hideLoader();
+            $("#agent_refresh_button").click();
+          }, "json").fail(function(operationResult) {
+            hideLoader();
+            if (operationResult.responseJSON.Code == "ERROR") {
+              addAlert(operationResult.responseJSON.Message);
+            }
+          });
         }
       });
     });
