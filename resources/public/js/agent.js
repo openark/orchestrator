@@ -118,6 +118,11 @@ $(document).ready(function() {
       });
     });
 
+    $("body").on("click", "#agent_discover_button", function(event) {
+      var hostname = $(event.target).attr("data-hostname")
+      var mySQLPort = $(event.target).attr("data-mysql-port")
+      discover(hostname, mySQLPort)
+    });
 
     $("body").on("click", "#agent_refresh_button", function(event) {
       var hostname = $(event.target).attr("data-hostname");
