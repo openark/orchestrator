@@ -671,7 +671,6 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			if s.Stage == Prepare {
 				s.Stage = s.Stage + 1
 				s.Status = Scheduled
-				s.Retries = 0
 				s.updateSeed(nil, "")
 			} else {
 				for _, agent := range []*Agent{targetAgent, sourceAgent} {
@@ -984,8 +983,12 @@ func (s *Seed) processErrored(wg *sync.WaitGroup) {
 		}
 		return
 	}
-	// prepare and cleanup stages are executed on both agents, so we need to check them and if it's running - stop it.
-	if s.Stage == Prepare || s.Stage == Cleanup {
+	// update set SeedStatus Scheduled and update seed according to stage
+	s.Status = Scheduled
+	s.Retries++
+	switch s.Stage {
+	case Prepare, Cleanup:
+		// prepare and cleanup stages are executed on both agents, so we need to check them and if it's running - stop it.
 		for _, agent := range []*Agent{targetAgent, sourceAgent} {
 			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 			if err != nil {
@@ -1002,12 +1005,6 @@ func (s *Seed) processErrored(wg *sync.WaitGroup) {
 				s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage due to error on another agent", s.Stage.String()))
 			}
 		}
-	}
-	// update set SeedStatus Scheduled and update seed according to stage
-	s.Status = Scheduled
-	s.Retries++
-	switch s.Stage {
-	case Prepare, Cleanup:
 		for _, agent := range []*Agent{targetAgent, sourceAgent} {
 			s.updateSeed(agent, fmt.Sprintf("Seed will be restarted from %s stage", s.Stage.String()))
 		}

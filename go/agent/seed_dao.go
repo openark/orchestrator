@@ -78,8 +78,19 @@ func (seed *Seed) isSeedStageCompletedForAgent(agent *Agent) (bool, error) {
 				AND stage = ?
 				AND agent_hostname = ?
 				AND status = ?
+				AND agent_seed_state_id > (
+					SELECT 
+						MAX(agent_seed_state_id)
+					FROM
+						agent_seed_state
+					WHERE
+					agent_seed_id = ?
+					AND stage = ?
+					AND agent_hostname = ?
+					AND status = ?
+				)
 			`
-	if err := db.QueryOrchestrator(query, sqlutils.Args(seed.SeedID, seed.Stage.String(), agent.Info.Hostname, Completed.String()), func(m sqlutils.RowMap) error {
+	if err := db.QueryOrchestrator(query, sqlutils.Args(seed.SeedID, seed.Stage.String(), agent.Info.Hostname, Completed.String(), seed.SeedID, seed.Stage.String(), agent.Info.Hostname, Scheduled.String()), func(m sqlutils.RowMap) error {
 		cnt = m.GetInt("cnt")
 		return nil
 	}); err != nil {
