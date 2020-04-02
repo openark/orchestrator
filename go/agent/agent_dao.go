@@ -95,13 +95,14 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 			ha.status,
 			ha.data,
 			di.major_version,
-			di.suggested_cluster_alias
+			ifnull(ca.alias, di.cluster_name) as cluster_alias
 		FROM
 			host_agent ha
 		LEFT JOIN database_instance di ON di.hostname = ha.hostname AND di.port = ha.mysql_port
+		LEFT JOIN cluster_alias ca on ca.cluster_name = di.cluster_name
 		%s
 		ORDER BY
-			di.suggested_cluster_alias ASC, ha.hostname ASC
+			cluster_alias ASC, ha.hostname ASC
 		%s
 		`, whereCondition, limit)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
@@ -112,7 +113,7 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
 		agent.Status = ToAgentStatus[m.GetString("status")]
-		agent.ClusterAlias = m.GetString("suggested_cluster_alias")
+		agent.ClusterAlias = m.GetString("cluster_alias")
 		agent.MySQLVersion = m.GetString("major_version")
 		err := json.Unmarshal([]byte(m.GetString("data")), agent.Data)
 		if err != nil {
