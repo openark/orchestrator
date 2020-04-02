@@ -85,7 +85,7 @@ $(document).ready(function () {
         
         agents.forEach(function (agent) {
             var row = '<tr>';
-            row += '<td><a href="' + appUrl('/web/cluster/alias/' + agent.ClusterAlias) + '">' + agent.ClusterAlias + '</a></td>';
+            row += '<td><a href="' + appUrl('/web/cluster/' + agent.ClusterAlias) + '">' + agent.ClusterAlias + '</a></td>';
             row += '<td><a href="' + appUrl('/web/agent/' + agent.Info.Hostname) + '">' + agent.Info.Hostname + '</a></td>';
             row += '<td>' + agent.Status + '</td>';
             row += '<td>' + moment.utc(agent.LastSeen).format("YYYY-MM-DD HH:mm:ss") + '</td>';

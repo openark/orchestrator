@@ -63,7 +63,7 @@ $(document).ready(function() {
     $("#agent_hostname").html(agent.Info.Hostname + '<div class="pull-right btn-group"><button class="btn btn-xs btn-success" id="agent_discover_button" data-hostname="' + agent.Info.Hostname + '" data-mysql-port="' + agent.Info.MySQLPort + '">Discover</button><button class="btn btn-xs btn-info" id="agent_refresh_button" data-hostname="' + agent.Info.Hostname + '">Refresh</button></div>'
     );
     $("#agent_port").html(agent.Info.Port);
-    $("#agent_cluster_name").html('<a href="' + appUrl('/web/cluster/alias/' + agent.ClusterAlias + '">' + agent.ClusterAlias + '</a>'))
+    $("#agent_cluster_name").html('<a href="' + appUrl('/web/cluster/' + agent.ClusterAlias + '">' + agent.ClusterAlias + '</a>'))
     sourceAgentCluster = agent.ClusterAlias
     $("#agent_status").html(agent.Status)
     $("#agent_last_seen").html(moment.utc(agent.LastSeen).format("YYYY-MM-DD HH:mm:ss"))
