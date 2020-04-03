@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cd .gopath/src/github.com/github/orchestrator
+
+unit_tests() {
+  echo "# Running unit tests"
+  go test ./go/...
+}
+
+unit_tests
