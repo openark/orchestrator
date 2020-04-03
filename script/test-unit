@@ -1,7 +1,9 @@
 #!/bin/bash
 
-echo "directory is $(pwd)"
+echo "directory1 is $(pwd)"
+ls -l .gopath
 cd .gopath/src/github.com/github/orchestrator
+echo "directory2 is $(pwd)"
 
 unit_tests() {
   echo "# Running unit tests"
