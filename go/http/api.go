@@ -2443,10 +2443,6 @@ func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r rende
 
 // AgentsStatuses provides list of all possible agent statuses
 func (this *HttpAPI) AgentsStatuses(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2468,10 +2464,6 @@ func (this *HttpAPI) AgentsStatuses(params martini.Params, r render.Render, req 
 
 // SeedsStatuses provides list of all possible seeds statuses
 func (this *HttpAPI) SeedsStatuses(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2493,10 +2485,6 @@ func (this *HttpAPI) SeedsStatuses(params martini.Params, r render.Render, req *
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2538,10 +2526,6 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 
 // AgentsHosts provides list of agents hostnames
 func (this *HttpAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2557,10 +2541,6 @@ func (this *HttpAPI) AgentsHosts(params martini.Params, r render.Render, req *ht
 
 // Agent returns complete information of a given agent
 func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2578,10 +2558,6 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 
 // AgentData returns data for give agent
 func (this *HttpAPI) AgentData(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2857,10 +2833,6 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 
 // AgentActiveSeeds lists active seeds and their state
 func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2884,10 +2856,6 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 
 // AgentRecentSeeds lists recent seeds of a given agent
 func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2911,10 +2879,6 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 
 // AgentSeedDetails provides details of a given seed
 func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2937,10 +2901,6 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 
 // AgentSeedStates returns the breakdown of states (steps) of a given seed
 func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
@@ -2968,10 +2928,6 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 
 // Seeds returns all seeds
 func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
