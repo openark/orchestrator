@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export GOPATH="$PWD/.gopath"
+cd .gopath/src/github.com/github/orchestrator
+
 setup_mysql() {
   if [ ! -f "dbdeployer" ] ; then
     return
@@ -11,13 +14,10 @@ setup_mysql() {
   PATH=bin:$PATH
 }
 
-setup_mysql
-
-cd .gopath/src/github.com/github/orchestrator
-
 integration_tests() {
   echo "# Running integration tests"
   ./tests/integration/test.sh || exit 1
 }
 
+setup_mysql
 integration_tests
