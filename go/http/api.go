@@ -2576,6 +2576,27 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 	r.JSON(http.StatusOK, agent)
 }
 
+// AgentData returns data for give agent
+func (this *HttpAPI) AgentData(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	agent, err := agent.ReadAgent(params["host"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent.Data)
+}
+
 // UpdateAgent updates information about a given agent in database
 func (this *HttpAPI) UpdateAgent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -4084,6 +4105,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "agents-statuses", this.AgentsStatuses)
 	this.registerAPIRequest(m, "agents-hosts", this.AgentsHosts)
 	this.registerAPIRequest(m, "agent/:host", this.Agent)
+	this.registerAPIRequest(m, "agent-data/:host", this.AgentData)
 	this.registerAPIRequest(m, "agent-update/:host", this.UpdateAgent)
 	this.registerAPIRequest(m, "agent-mysql-error-log/:host", this.AgentTailMySQLErrorLog)
 	this.registerAPIRequest(m, "agent-umount/:host", this.AgentUnmount)
