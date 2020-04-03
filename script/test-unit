@@ -2,7 +2,8 @@
 
 echo "directory1 is $(pwd)"
 echo "GOPATH is ${GOPATH}"
-ls -l .gopath
+export GOPATH="$PWD/.gopath"
+echo "GOPATH is ${GOPATH}"
 cd .gopath/src/github.com/github/orchestrator
 echo "directory2 is $(pwd)"
 
