@@ -16,12 +16,6 @@ jobs:
         version: 1.12
       id: go
 
-    - name: Set up SQLite
-      run:  sudo apt-get install sqlite3
-
-    - name: Start local MySQL
-      run: sudo /etc/init.d/mysql start
-
     - name: Test source code
       run:  script/test-source
 
@@ -30,6 +24,12 @@ jobs:
 
     - name: Test unit
       run:  script/test-unit
+
+    - name: Set up SQLite
+      run:  sudo apt-get install sqlite3
+
+    - name: Start local MySQL
+      run: sudo /etc/init.d/mysql start
 
     - name: Test integration
       run:  script/test-integration
