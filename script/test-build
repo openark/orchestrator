@@ -1,6 +1,8 @@
 #!/bin/bash
 echo "directory1 is $(pwd)"
+echo "GOPATH is ${GOPATH}"
 
 echo "# Building"
 script/build
 echo "directory2 is $(pwd)"
+echo "GOPATH is ${GOPATH}"
