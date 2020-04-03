@@ -22,17 +22,17 @@ jobs:
     - name: Start local MySQL
       run: sudo /etc/init.d/mysql start
 
-    - name: Test: source code
+    - name: Test source code
       run:  script/test-source
 
-    - name: Test: build
+    - name: Test build
       run:  script/test-build
 
-    - name: Test: unit
+    - name: Test unit
       run:  script/test-unit
 
-    - name: Test: integration
+    - name: Test integration
       run:  script/test-integration
 
-    - name: Test: documentation
+    - name: Test documentation
       run:  script/test-docs
