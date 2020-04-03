@@ -18,5 +18,8 @@ jobs:
     - name: Set up SQLite
       run:  sudo apt-get install sqlite3
 
+    - name: Start local MySQL
+      run: sudo /etc/init.d/mysql start
+
     - name: Build
       run:  script/cibuild
