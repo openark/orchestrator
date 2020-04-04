@@ -1064,7 +1064,20 @@ func (s *Seed) AbortSeed() error {
 		return fmt.Errorf("Unable to abort seed in %s status", previousStatus.String())
 	}
 	switch s.Stage {
-	case Prepare, Cleanup:
+	case Prepare:
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
+			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
+			if err != nil {
+				return err
+			}
+			if agentSeedStageState.Status == Running || (agent.Info.Hostname == targetAgent.Info.Hostname && s.BackupSide == Source) {
+				if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+					return err
+				}
+				s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage", s.Stage.String()))
+			}
+		}
+	case Cleanup:
 		for _, agent := range []*Agent{targetAgent, sourceAgent} {
 			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 			if err != nil {
