@@ -8,15 +8,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v2
 
     - name: Set up Go 1.12
       uses: actions/setup-go@v1
       with:
         version: 1.12
       id: go
+
+    - name: Test source code
+      run:  script/test-source
+
+    - name: Test build
+      run:  script/test-build
+
+    - name: Test unit
+      run:  script/test-unit
+
     - name: Set up SQLite
       run:  sudo apt-get install sqlite3
 
-    - name: Build
-      run:  script/cibuild
+    - name: Start local MySQL
+      run: sudo /etc/init.d/mysql start
+
+    - name: Test integration
+      run:  script/test-integration
+
+    - name: Test documentation
+      run:  script/test-docs
