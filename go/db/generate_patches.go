@@ -556,4 +556,9 @@ var generateSQLPatches = []string{
 			global_recovery_disable
 			ADD COLUMN disabled_reason text CHARACTER SET utf8 NOT NULL default ''
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
+	`,
 }

@@ -48,6 +48,7 @@ const (
 	DeadIntermediateMasterWithSingleSlaveFailingToConnect              = "DeadIntermediateMasterWithSingleSlaveFailingToConnect"
 	DeadIntermediateMasterAndSomeSlaves                                = "DeadIntermediateMasterAndSomeSlaves"
 	DeadIntermediateMasterAndSlaves                                    = "DeadIntermediateMasterAndSlaves"
+	UnreachableIntermediateMasterWithLaggingReplicas                   = "UnreachableIntermediateMasterWithLaggingReplicas"
 	UnreachableIntermediateMaster                                      = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesFailingToConnectOrDead                  = "AllIntermediateMasterSlavesFailingToConnectOrDead"
 	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
@@ -56,12 +57,15 @@ const (
 )
 
 const (
-	StatementAndMixedLoggingSlavesStructureWarning StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
-	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
-	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
-	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
-	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
+	StatementAndMixedLoggingSlavesStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
+	StatementAndRowLoggingSlavesStructureWarning                             = "StatementAndRowLoggingSlavesStructureWarning"
+	MixedAndRowLoggingSlavesStructureWarning                                 = "MixedAndRowLoggingSlavesStructureWarning"
+	MultipleMajorVersionsLoggingSlavesStructureWarning                       = "MultipleMajorVersionsLoggingSlavesStructureWarning"
+	NoLoggingReplicasStructureWarning                                        = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -96,12 +100,21 @@ const (
 	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
 )
 
+type AnalysisInstanceType string
+
+const (
+	AnalysisInstanceTypeMaster             AnalysisInstanceType = "master"
+	AnalysisInstanceTypeCoMaster           AnalysisInstanceType = "co-master"
+	AnalysisInstanceTypeIntermediateMaster AnalysisInstanceType = "intermediate-master"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
 	AnalyzedInstanceDataCenter                string
+	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool
@@ -127,6 +140,7 @@ type ReplicationAnalysis struct {
 	OracleGTIDImmediateTopology               bool
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
+	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
@@ -144,6 +158,7 @@ type ReplicationAnalysis struct {
 	MaxReplicaGTIDMode                        string
 	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
+	IsReadOnly                                bool
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
@@ -169,6 +184,17 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 		result = append(result, string(structureAnalysis))
 	}
 	return strings.Join(result, ", ")
+}
+
+// Get a string description of the analyzed instance type (master? co-master? intermediate-master?)
+func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType {
+	if this.IsCoMaster {
+		return AnalysisInstanceTypeCoMaster
+	}
+	if this.IsMaster {
+		return AnalysisInstanceTypeMaster
+	}
+	return AnalysisInstanceTypeIntermediateMaster
 }
 
 // ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time

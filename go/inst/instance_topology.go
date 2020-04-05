@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	goos "os"
 	"regexp"
 	"sort"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/os"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
 	"github.com/openark/golib/util"
@@ -47,7 +49,7 @@ var countRetries = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool, printTags bool) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -70,17 +72,25 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 		} else {
 			entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
 		}
+		if printTags {
+			tags, _ := ReadInstanceTags(&instance.Key)
+			tagsString := make([]string, len(tags))
+			for idx, tag := range tags {
+				tagsString[idx] = tag.Display()
+			}
+			entry = fmt.Sprintf("%s [%s]", entry, strings.Join(tagsString, ","))
+		}
 	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated, printTags)
 		result = append(result, replicasResult...)
 	}
 	return result
 }
 
 // ASCIITopology returns a string representation of the topology of given cluster.
-func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool) (result string, err error) {
+func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool, printTags bool) (result string, err error) {
 	fillerCharacter := asciiFillerCharacter
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
@@ -116,12 +126,12 @@ func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated
 	var entries []string
 	if masterInstance != nil {
 		// Single master
-		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated, printTags)
 	} else {
 		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
 		for _, instance := range instances {
 			if instance.IsCoMaster {
-				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)...)
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated, printTags)...)
 			}
 		}
 	}
@@ -659,10 +669,16 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID, max concurrency: %v",
+		len(replicas),
+		other.Key,
+		config.Config.MaxConcurrentReplicaOperations)
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
+
+	var concurrencyChan = make(chan bool, config.Config.MaxConcurrentReplicaOperations)
+
 	for _, replica := range replicas {
 		replica := replica
 
@@ -671,6 +687,10 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
+
+				concurrencyChan <- true
+				defer func() { recover(); <-concurrencyChan }()
+
 				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
 				if replicaErr != nil && movedReplica != nil {
 					replica = movedReplica
@@ -1043,88 +1063,6 @@ Cleanup:
 	return instance, err
 }
 
-// DetachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will detach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = DetachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("detach-replica", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
-
-	return instance, err
-}
-
-// ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will reattach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = ReattachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("reattach-replica", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
-
-	return instance, err
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1264,6 +1202,57 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	AuditOperation("disable-gtid", instanceKey, fmt.Sprintf("disabled GTID on %+v", *instanceKey))
 
 	return instance, err
+}
+
+func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	errantSearch := instance.GtidErrant
+	if errantSearch == "" {
+		return errantBinlogs, log.Errorf("locate-errant-gtid: no errant-gtid on %+v", *instanceKey)
+	}
+	subtract, err := GTIDSubtract(instanceKey, errantSearch, instance.GtidPurged)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	if subtract != errantSearch {
+		return errantBinlogs, fmt.Errorf("locate-errant-gtid: %+v is already purged on %+v", subtract, *instanceKey)
+	}
+	binlogs, err := ShowBinaryLogs(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	previousGTIDs := make(map[string]*OracleGtidSet)
+	for _, binlog := range binlogs {
+		oracleGTIDSet, err := GetPreviousGTIDs(instanceKey, binlog)
+		if err != nil {
+			return errantBinlogs, err
+		}
+		previousGTIDs[binlog] = oracleGTIDSet
+	}
+	for i, binlog := range binlogs {
+		if errantSearch == "" {
+			break
+		}
+		previousGTID := previousGTIDs[binlog]
+		subtract, err := GTIDSubtract(instanceKey, errantSearch, previousGTID.String())
+		if err != nil {
+			return errantBinlogs, err
+		}
+		if subtract != errantSearch {
+			// binlogs[i-1] is safe to use when i==0. because that implies GTIDs have been purged,
+			// which covered by an earlier assertion
+			errantBinlogs = append(errantBinlogs, binlogs[i-1])
+			errantSearch = subtract
+		}
+	}
+	if errantSearch != "" {
+		// then it's in the last binary log
+		errantBinlogs = append(errantBinlogs, binlogs[len(binlogs)-1])
+	}
+	return errantBinlogs, err
 }
 
 // ErrantGTIDResetMaster will issue a safe RESET MASTER on a replica that replicates via GTID:
@@ -1698,6 +1687,34 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 	return instance, len(relocatedReplicas), err
 }
 
+// Created this function to allow a hook to be called after a successful TakeMaster event
+func TakeMasterHook(successor *Instance, demoted *Instance) {
+	successorKey := successor.Key
+	demotedKey := demoted.Key
+	env := goos.Environ()
+
+	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", successorKey))
+	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", demotedKey))
+
+	successorStr := fmt.Sprintf("%s", successorKey)
+	demotedStr := fmt.Sprintf("%s", demotedKey)
+
+	processCount := len(config.Config.PostTakeMasterProcesses)
+	for i, command := range config.Config.PostTakeMasterProcesses {
+		fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
+		log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
+		start := time.Now()
+		if err := os.CommandRun(command, env, successorStr, demotedStr); err == nil {
+			info := fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
+			log.Infof("Take-Master: %s", info)
+		} else {
+			info := fmt.Sprintf("Execution of PostTakeMasterProcesses failed in %v with error: %v", time.Since(start), err)
+			log.Errorf("Take-Master: %s", info)
+		}
+	}
+
+}
+
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
 // It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
@@ -1757,6 +1774,14 @@ Cleanup:
 		return instance, err
 	}
 	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
+
+	// Created this to enable a custom hook to be called after a TakeMaster success.
+	// This only runs if there is a hook configured in orchestrator.conf.json
+	demoted := masterInstance
+	successor := instance
+	if config.Config.PostTakeMasterProcesses != nil {
+		TakeMasterHook(successor, demoted)
+	}
 
 	return instance, err
 }
@@ -1842,7 +1867,7 @@ func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicatio
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
 func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, dataCenterHint string) [](*Instance) {
-	if len(replicas) == 0 {
+	if len(replicas) <= 1 {
 		return replicas
 	}
 	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
@@ -2156,9 +2181,12 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	replicas = RemoveInstance(replicas, &candidateReplica.Key)
 	for _, replica := range replicas {
 		replica := replica
-		if canReplicate, _ := replica.CanReplicateFrom(candidateReplica); !canReplicate {
+		if canReplicate, err := replica.CanReplicateFrom(candidateReplica); !canReplicate {
 			// lost due to inability to replicate
 			cannotReplicateReplicas = append(cannotReplicateReplicas, replica)
+			if err != nil {
+				log.Errorf("chooseCandidateReplica(): error checking CanReplicateFrom(). replica: %v; error: %v", replica.Key, err)
+			}
 		} else if replica.ExecBinlogCoordinates.SmallerThan(&candidateReplica.ExecBinlogCoordinates) {
 			laterReplicas = append(laterReplicas, replica)
 		} else if replica.ExecBinlogCoordinates.Equals(&candidateReplica.ExecBinlogCoordinates) {
@@ -2661,6 +2689,9 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
+	if other.IsDescendantOf(instance) {
+		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
+	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
 		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
@@ -2767,10 +2798,41 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 		// Nothing to do
 		return replicas, other, nil, errs
 	}
+	for _, replica := range replicas {
+		if other.IsDescendantOf(replica) {
+			return replicas, other, log.Errorf("relocate-replicas: %+v is a descendant of %+v", *otherKey, replica.Key), errs
+		}
+	}
 	replicas, err, errs = relocateReplicasInternal(replicas, instance, other)
 
 	if err == nil {
 		AuditOperation("relocate-replicas", instanceKey, fmt.Sprintf("relocated %+v replicas of %+v below %+v", len(replicas), *instanceKey, *otherKey))
 	}
 	return replicas, other, err, errs
+}
+
+// PurgeBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string, force bool) (*Instance, error) {
+	replicas, err := ReadReplicaInstances(instanceKey)
+	if err != nil {
+		return nil, err
+	}
+	if !force {
+		purgeCoordinates := &BinlogCoordinates{LogFile: logFile, LogPos: 0}
+		for _, replica := range replicas {
+			if !purgeCoordinates.SmallerThan(&replica.ExecBinlogCoordinates) {
+				return nil, log.Errorf("Unsafe to purge binary logs on %+v up to %s because replica %+v has only applied up to %+v", *instanceKey, logFile, replica.Key, replica.ExecBinlogCoordinates)
+			}
+		}
+	}
+	return purgeBinaryLogsTo(instanceKey, logFile)
+}
+
+// PurgeBinaryLogsToLatest attempts to 'PURGE BINARY LOGS' until latest binary log
+func PurgeBinaryLogsToLatest(instanceKey *InstanceKey, force bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile, force)
 }
