@@ -456,6 +456,15 @@ func ReadSeedsInStatusPaged(status SeedStatus, page int) ([]*Seed, error) {
 	return readSeeds(whereCondition, sqlutils.Args(status.String()), limit)
 }
 
+// ReadSeedsInStatus returns seeds in specified status
+func ReadSeedsInStatus(status SeedStatus) ([]*Seed, error) {
+	whereCondition := `
+		where
+			status = ?
+	`
+	return readSeeds(whereCondition, sqlutils.Args(status.String()), ``)
+}
+
 // ReadSeedsForAgent reads seeds where agent participates either as source or target in given status
 func ReadSeedsForAgent(agent *Agent, limit string) ([]*Seed, error) {
 	whereCondition := `

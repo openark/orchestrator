@@ -2877,6 +2877,22 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 	r.JSON(http.StatusOK, output)
 }
 
+// AgentFailedSeeds lists all failed seeds
+func (this *HttpAPI) AgentFailedSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	output, err := agent.ReadSeedsInStatus(agent.Failed)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, output)
+}
+
 // AgentSeedDetails provides details of a given seed
 func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !config.Config.ServeAgentsHttp {
@@ -4073,6 +4089,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "agent-seed/:seedMethod/:targetHost/:sourceHost", this.AgentSeed)
 	this.registerAPIRequest(m, "agent-active-seeds/:host", this.AgentActiveSeeds)
 	this.registerAPIRequest(m, "agent-recent-seeds/:host", this.AgentRecentSeeds)
+	this.registerAPIRequest(m, "agents-failed-seeds", this.AgentFailedSeeds)
 	this.registerAPIRequest(m, "agent-seed-details/:seedId", this.AgentSeedDetails)
 	this.registerAPIRequest(m, "agent-seed-states/:seedId", this.AgentSeedStates)
 	this.registerAPIRequest(m, "agent-abort-seed/:seedId", this.AbortSeed)
