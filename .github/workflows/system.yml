@@ -16,9 +16,6 @@ jobs:
       with:
         go-version: 1.12
 
-    - name: Start local MySQL
-      run: sudo /etc/init.d/mysql start
-
     - name: check out
       uses: actions/checkout@v2
 
