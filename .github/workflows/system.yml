@@ -32,4 +32,11 @@ jobs:
         sudo cp bin/orchestrator /usr/local/orchestrator/
         sudo cp conf/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
         sudo systemctl daemon-reload
+
+    - name: run orchestrator service
+      run: |
         sudo systemctl start orchestrator
+
+    - name: check orchestrator service
+      run: |
+        sudo systemctl status orchestrator
