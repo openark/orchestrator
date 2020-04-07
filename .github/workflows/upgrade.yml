@@ -54,3 +54,20 @@ jobs:
       run: |
         test_config_file=/tmp/orchestrator-ci-mysql.conf.json
         bin/orchestrator --config=$test_config_file -c clusters
+
+
+    - name: check out PR branch
+      uses: actions/checkout@v2
+
+    - name: build branch
+      run:  script/test-build
+
+    - name: deploy branch via SQLite
+      run: |
+        test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters
+
+    - name: deploy branch via MySQL
+      run: |
+        test_config_file=/tmp/orchestrator-ci-mysql.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters
