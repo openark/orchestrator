@@ -30,6 +30,7 @@ jobs:
         sudo cp etc/systemd/orchestrator.service /etc/systemd/system/orchestrator.service
         sudo mkdir -p /usr/local/orchestrator
         sudo cp bin/orchestrator /usr/local/orchestrator/
+        sudo cp resources/bin/orchestrator-client /usr/bin
         sudo cp conf/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
         sudo systemctl daemon-reload
 
@@ -40,3 +41,7 @@ jobs:
     - name: check orchestrator service
       run: |
         sudo systemctl status orchestrator
+
+    - name: orchestrator-client status
+      run: |
+        orchestrator-client -c api -path status
