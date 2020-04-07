@@ -1,0 +1,35 @@
+name: upgrade
+
+on: [pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     backend: [sqlite, MySQL]
+
+    steps:
+    - name: Set up Go 1.12
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.12
+
+    - name: check out master branch
+      uses: actions/checkout@v2
+      ref: 'master'
+
+    - name: build master
+      run:  script/test-build
+
+    - name: generate SQLite config file
+      run: |
+        test_config_file=/tmp/orchestrator-ci-upgrade.conf.json
+        cp conf/orchestrator-ci-upgrade.conf.json ${test_config_file}
+        sed -i -e "s/backend-db-placeholder/sqlite/g" ${test_config_file}
+        echo "SQLite config generated"
+
+    - name: deploy master via SQLite
+      run: |
+        bin/orchestrator -c clusters
