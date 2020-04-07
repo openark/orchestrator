@@ -45,12 +45,12 @@ jobs:
     - name: build master
       run:  script/test-build
 
-    - name: deploy master via SQLite
+    - name: execute master via SQLite
       run: |
         test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
         bin/orchestrator --config=$test_config_file -c clusters
 
-    - name: deploy master via MySQL
+    - name: execute master via MySQL
       run: |
         test_config_file=/tmp/orchestrator-ci-mysql.conf.json
         bin/orchestrator --config=$test_config_file -c clusters
@@ -62,12 +62,12 @@ jobs:
     - name: build branch
       run:  script/test-build
 
-    - name: deploy branch via SQLite
+    - name: execute branch via SQLite
       run: |
         test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
         bin/orchestrator --config=$test_config_file -c clusters
 
-    - name: deploy branch via MySQL
+    - name: execute branch via MySQL
       run: |
         test_config_file=/tmp/orchestrator-ci-mysql.conf.json
         bin/orchestrator --config=$test_config_file -c clusters
