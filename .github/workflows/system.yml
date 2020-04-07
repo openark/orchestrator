@@ -44,4 +44,4 @@ jobs:
 
     - name: orchestrator-client status
       run: |
-        orchestrator-client -c api -path status
+        orchestrator-client -c api -path status | jq .
