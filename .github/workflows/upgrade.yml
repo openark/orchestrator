@@ -18,7 +18,8 @@ jobs:
 
     - name: check out master branch
       uses: actions/checkout@v2
-      ref: 'master'
+      with:
+        ref: master
 
     - name: build master
       run:  script/test-build
