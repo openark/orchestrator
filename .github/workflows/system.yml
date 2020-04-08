@@ -37,21 +37,31 @@ jobs:
           git clone https://github.com/openark/orchestrator-ci-env.git
         fi
 
-    - name: deploy as service
+    - name: deploy consul as service
       run: |
-        sudo cp etc/systemd/orchestrator.service /etc/systemd/system/orchestrator.service
+        gunzip < orchestrator-ci-env/bin/linux/consul.gz > /usr/local/bin/consul
+        sudo cp tests/system/etc/systemd/consul.service /etc/systemd/system/
+
+    - name: deploy orchestrator as service
+      run: |
+        sudo cp etc/systemd/orchestrator.service /etc/systemd/system/
         sudo mkdir -p /usr/local/orchestrator
         sudo cp bin/orchestrator /usr/local/orchestrator/
         sudo cp resources/bin/orchestrator-client /usr/bin
         sudo cp tests/system/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
+
+    - name: reload systemctl
+      run: |
         sudo systemctl daemon-reload
 
-    - name: run orchestrator service
+    - name: run services
       run: |
+        sudo systemctl start consul
         sudo systemctl start orchestrator
 
-    - name: check orchestrator service
+    - name: check services
       run: |
+        sudo systemctl status consul
         sudo systemctl status orchestrator
 
     - name: orchestrator-client status
