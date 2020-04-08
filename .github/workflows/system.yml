@@ -42,6 +42,10 @@ jobs:
         gunzip < orchestrator-ci-env/bin/linux/consul.gz | sudo tee /usr/local/bin/consul > /dev/null
         sudo cp tests/system/etc/systemd/consul.service /etc/systemd/system/
 
+    - name: test consul
+      run: |
+        /usr/local/bin/consul --version
+
     - name: deploy orchestrator as service
       run: |
         sudo cp etc/systemd/orchestrator.service /etc/systemd/system/
