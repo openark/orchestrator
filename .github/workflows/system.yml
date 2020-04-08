@@ -34,7 +34,7 @@ jobs:
 
         if [ "$remote_commit" != "$local_commit" ] ; then
           rm -rf ./orchestrator-ci-env
-          git clone https://github.com/github/orchestrator-ci-env.git
+          git clone https://github.com/openark/orchestrator-ci-env.git
         fi
 
     - name: deploy as service
