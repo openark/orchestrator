@@ -43,6 +43,10 @@ jobs:
         sudo cp orchestrator-ci-env/bin/linux/consul /usr/local/bin/
         sudo cp tests/system/etc/systemd/consul.service /etc/systemd/system/
 
+        sudo useradd --system --home /etc/consul.d --shell /bin/false consul
+        sudo mkdir --parents /opt/consul
+        sudo chown --recursive consul:consul /opt/consul
+
         sudo mkdir --parents /etc/consul.d
         sudo touch /etc/consul.d/consul.hcl
         sudo chown --recursive consul:consul /etc/consul.d
@@ -56,7 +60,7 @@ jobs:
         sudo cp tests/system/etc/consul.d/consul.hcl /etc/consul.d/
         sudo cp tests/system/etc/consul.d/server.hcl /etc/consul.d/
 
-    - name: test consul
+    - name: test consul binary
       run: |
         /usr/local/bin/consul --version
 
@@ -77,7 +81,7 @@ jobs:
         sudo systemctl start consul
         sudo systemctl start orchestrator
 
-    - name: check services
+    - name: test services
       run: |
         sudo systemctl status consul
         sudo systemctl status orchestrator
