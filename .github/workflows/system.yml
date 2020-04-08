@@ -28,7 +28,7 @@ jobs:
         sudo mkdir -p /usr/local/orchestrator
         sudo cp bin/orchestrator /usr/local/orchestrator/
         sudo cp resources/bin/orchestrator-client /usr/bin
-        sudo cp conf/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
+        sudo cp tests/system/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
         sudo systemctl daemon-reload
 
     - name: run orchestrator service
