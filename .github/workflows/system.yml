@@ -39,7 +39,7 @@ jobs:
 
     - name: deploy consul as service
       run: |
-        gunzip < orchestrator-ci-env/bin/linux/consul.gz | sudo cat - /usr/local/bin/consul
+        gunzip < orchestrator-ci-env/bin/linux/consul.gz | sudo tee /usr/local/bin/consul > /dev/null
         sudo cp tests/system/etc/systemd/consul.service /etc/systemd/system/
 
     - name: deploy orchestrator as service
