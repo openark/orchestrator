@@ -47,7 +47,6 @@ const (
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 7
 	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
@@ -70,7 +69,6 @@ var deprecatedConfigurationVariables = []string{
 	"DiscoveryPollSeconds",
 	"ActiveNodeExpireSeconds",
 	"AuditPageSize",
-	"AuditPurgeDays",
 	"SlaveStartPostWaitMilliseconds",
 	"MySQLTopologyMaxPoolConnections",
 	"MaintenancePurgeDays",
@@ -162,6 +160,7 @@ type Configuration struct {
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                              bool     // If true, audit messages are written to syslog
 	AuditToBackendDB                           bool     // If true, audit messages are written to the backend DB's `audit` table (default: true)
+	AuditPurgeDays                             uint     // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
@@ -259,11 +258,13 @@ type Configuration struct {
 	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate seom data from external host
 	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent discovering instances of any kind
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ConsulScheme                               string            // Scheme (http or https) for Consul
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
+	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -336,6 +337,7 @@ func newConfiguration() *Configuration {
 		AuditLogFile:                               "",
 		AuditToSyslog:                              false,
 		AuditToBackendDB:                           false,
+		AuditPurgeDays:                             7,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "",
@@ -421,11 +423,13 @@ func newConfiguration() *Configuration {
 		URLPrefix:                                  "",
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
 		ConsulAddress:                              "",
+		ConsulScheme:                               "http",
 		ConsulAclToken:                             "",
 		ConsulCrossDataCenterDistribution:          false,
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",
+		MaxConcurrentReplicaOperations:             5,
 	}
 }
 

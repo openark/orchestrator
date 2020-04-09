@@ -46,7 +46,6 @@ var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
 var countRetries = 5
-var MaxConcurrentReplicaOperations = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
@@ -670,12 +669,15 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID, max concurrency: %v",
+		len(replicas),
+		other.Key,
+		config.Config.MaxConcurrentReplicaOperations)
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
 
-	var concurrencyChan = make(chan bool, MaxConcurrentReplicaOperations)
+	var concurrencyChan = make(chan bool, config.Config.MaxConcurrentReplicaOperations)
 
 	for _, replica := range replicas {
 		replica := replica
@@ -2179,9 +2181,12 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	replicas = RemoveInstance(replicas, &candidateReplica.Key)
 	for _, replica := range replicas {
 		replica := replica
-		if canReplicate, _ := replica.CanReplicateFrom(candidateReplica); !canReplicate {
+		if canReplicate, err := replica.CanReplicateFrom(candidateReplica); !canReplicate {
 			// lost due to inability to replicate
 			cannotReplicateReplicas = append(cannotReplicateReplicas, replica)
+			if err != nil {
+				log.Errorf("chooseCandidateReplica(): error checking CanReplicateFrom(). replica: %v; error: %v", replica.Key, err)
+			}
 		} else if replica.ExecBinlogCoordinates.SmallerThan(&candidateReplica.ExecBinlogCoordinates) {
 			laterReplicas = append(laterReplicas, replica)
 		} else if replica.ExecBinlogCoordinates.Equals(&candidateReplica.ExecBinlogCoordinates) {

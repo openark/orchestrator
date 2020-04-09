@@ -21,4 +21,4 @@ RUN ./dbdeployer unpack 5.7.21.tar.gz --unpack-version="5.7.21" --sandbox-binary
 
 COPY . .
 
-CMD ["script/test"]
+CMD ["script/test-all"]
