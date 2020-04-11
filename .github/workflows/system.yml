@@ -37,6 +37,10 @@ jobs:
           git clone https://github.com/openark/orchestrator-ci-env.git
         fi
 
+    - name: apt-get update
+      run: |
+        sudo apt-get update
+
     - name: deploy orchestrator-ci-env
       run: |
         cd orchestrator-ci-env

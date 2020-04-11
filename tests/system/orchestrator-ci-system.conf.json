@@ -15,6 +15,9 @@
   "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
+  "DiscoverySeeds": [
+    "127.0.0.1:10571"
+  ],
   "InstancePollSeconds": 5,
   "DiscoveryIgnoreReplicaHostnameFilters": [
     "a_host_i_want_to_ignore[.]example[.]com",
