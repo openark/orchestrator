@@ -79,3 +79,15 @@ jobs:
     - name: orchestrator-client status
       run: |
         orchestrator-client -c api -path status | jq .
+
+    - name: orchestrator-client cluster
+      run: |
+        orchestrator-client -c clusters-alias
+        orchestrator-client -c all-instances
+        orchestrator-client -c topology -alias ci
+
+        sleep 5
+        echo "slept"
+        orchestrator-client -c clusters-alias
+        orchestrator-client -c all-instances
+        orchestrator-client -c topology -alias ci
