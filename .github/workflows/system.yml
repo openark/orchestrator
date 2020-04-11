@@ -79,8 +79,7 @@ jobs:
     - name: graceful sleep
       run: |
         echo "Sleeping gracefully to let orchestrator detect the topology"
-        sleep 5
-        orchestrator-client -c discover -i 127.0.0.1:10571
+        sleep 10
 
     - name: orchestrator-client cluster
       run: |
