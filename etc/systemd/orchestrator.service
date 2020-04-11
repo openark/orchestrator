@@ -1,7 +1,7 @@
 [Unit]
 Description=orchestrator: MySQL replication management and visualization
 Documentation=https://github.com/github/orchestrator
-After=syslog.target network.target
+After=syslog.target network.target mysqld.service mysql.service 
 
 [Service]
 Type=simple
