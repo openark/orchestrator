@@ -82,6 +82,9 @@ jobs:
 
     - name: orchestrator-client cluster
       run: |
+        sleep 10
+        sudo journalctl -u orchestrator.service
+
         orchestrator-client -c clusters-alias
         orchestrator-client -c all-instances
         orchestrator-client -c topology -alias ci
@@ -91,3 +94,7 @@ jobs:
         orchestrator-client -c clusters-alias
         orchestrator-client -c all-instances
         orchestrator-client -c topology -alias ci
+
+    - name: get consul KV values
+      run: |
+        consul kv get -recurse mysql/master
