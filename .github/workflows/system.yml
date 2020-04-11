@@ -80,20 +80,17 @@ jobs:
       run: |
         orchestrator-client -c api -path status | jq .
 
+    - name: graceful sleep
+      run: |
+        echo "Sleeping gracefully to let orchestrator detect the topology"
+        sleep 5
+
     - name: orchestrator-client cluster
       run: |
-        sleep 10
-        sudo journalctl -u orchestrator.service
-
         orchestrator-client -c clusters-alias
         orchestrator-client -c all-instances
-        orchestrator-client -c topology -alias ci
-
-        sleep 5
-        echo "slept"
-        orchestrator-client -c clusters-alias
-        orchestrator-client -c all-instances
-        orchestrator-client -c topology -alias ci
+        orchestrator-client -c topology-tabulated -alias ci
+        orchestrator-client -c replication-analysis
 
     - name: get consul KV values
       run: |
