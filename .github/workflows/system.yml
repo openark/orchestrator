@@ -37,32 +37,20 @@ jobs:
           git clone https://github.com/openark/orchestrator-ci-env.git
         fi
 
-    - name: deploy consul as service
+    - name: deploy orchestrator-ci-env
       run: |
-        (cd orchestrator-ci-env/bin/linux && gunzip consul.gz)
-        sudo cp orchestrator-ci-env/bin/linux/consul /usr/local/bin/
-        sudo cp tests/system/etc/systemd/consul.service /etc/systemd/system/
+        cd orchestrator-ci-env
 
-        sudo useradd --system --home /etc/consul.d --shell /bin/false consul
-        sudo mkdir --parents /opt/consul
-        sudo chown --recursive consul:consul /opt/consul
+        script/deploy-haproxy
+        script/run-haproxy
 
-        sudo mkdir --parents /etc/consul.d
-        sudo touch /etc/consul.d/consul.hcl
-        sudo chown --recursive consul:consul /etc/consul.d
-        sudo chmod 640 /etc/consul.d/consul.hcl
+        script/deploy-consul
+        script/run-consul
 
-        sudo mkdir --parents /etc/consul.d
-        sudo touch /etc/consul.d/server.hcl
-        sudo chown --recursive consul:consul /etc/consul.d
-        sudo chmod 640 /etc/consul.d/server.hcl
+        script/deploy-consul-template
+        script/run-consul-template
 
-        sudo cp tests/system/etc/consul.d/consul.hcl /etc/consul.d/
-        sudo cp tests/system/etc/consul.d/server.hcl /etc/consul.d/
-
-    - name: test consul binary
-      run: |
-        /usr/local/bin/consul --version
+        script/deploy-replication
 
     - name: deploy orchestrator as service
       run: |
@@ -76,14 +64,12 @@ jobs:
       run: |
         sudo systemctl daemon-reload
 
-    - name: run services
+    - name: run orchestrator service
       run: |
-        sudo systemctl start consul
         sudo systemctl start orchestrator
 
     - name: test services
       run: |
-        sudo systemctl status consul
         sudo systemctl status orchestrator
 
     - name: orchestrator-client status
