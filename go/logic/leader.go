@@ -45,6 +45,9 @@ func OnLeaderStateChange(isTurnedLeader bool) {
 func recoveryDisabledHint() *string {
 	items := recoveryDisableHints.Items()
 	for k := range items {
+		// "turned-leader" auto expires
+		// "turned-non-leader" gets actively removed in OnLeaderStateChange()
+		// either way, existence of any of these keys in recoveryDisableHints indicates recoveries are disabled.
 		return &k
 	}
 	return nil
