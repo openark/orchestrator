@@ -57,12 +57,6 @@ Edit `orchestrator.conf.json` to match the above as follows:
     "MySQLOrchestratorPassword": "orch_backend_password",
     ...
 
-On systemd, and assuming your `orchestrator` config uses a MySQL backend (as opposed to SQLite), ensure that Orchestrator starts after your backend is loaded. Edit `/etc/systemd/system/orchestrator.service` and add `mysqld.service` in the [Unit] section:
-
-    [Unit]
-    After=syslog.target network.target mysqld.service
-
-
 #### Grant access to orchestrator on all your MySQL servers
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
