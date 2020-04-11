@@ -40,7 +40,7 @@ A MySQL-Driver for Go's [database/sql](https://golang.org/pkg/database/sql/) pac
   * Optional placeholder interpolation
 
 ## Requirements
-  * Go 1.7 or higher. We aim to support the 3 latest versions of Go.
+  * Go 1.8 or higher. We aim to support the 3 latest versions of Go.
   * MySQL (4.1+), MariaDB, Percona Server, Google CloudSQL or Sphinx (2.2.3+)
 
 ---------------------------------------
@@ -259,6 +259,7 @@ Default:        false
 ```
 
 `parseTime=true` changes the output type of `DATE` and `DATETIME` values to `time.Time` instead of `[]byte` / `string`
+The date or datetime like `0000-00-00 00:00:00` is converted into zero value of `time.Time`.
 
 
 ##### `readTimeout`
@@ -300,6 +301,19 @@ other cases. You should ensure your application will never cause an ERROR 1290
 except for `read-only` mode when enabling this option.
 
 
+##### `serverPubKey`
+
+```
+Type:           string
+Valid Values:   <name>
+Default:        none
+```
+
+Server public keys can be registered with [`mysql.RegisterServerPubKey`](https://godoc.org/github.com/go-sql-driver/mysql#RegisterServerPubKey), which can then be used by the assigned name in the DSN.
+Public keys are used to transmit encrypted data, e.g. for authentication.
+If the server's public key is known, it should be set manually to avoid expensive and potentially insecure transmissions of the public key from the server to the client each time it is required.
+
+
 ##### `timeout`
 
 ```
@@ -314,11 +328,11 @@ Timeout for establishing connections, aka dial timeout. The value must be a deci
 
 ```
 Type:           bool / string
-Valid Values:   true, false, skip-verify, <name>
+Valid Values:   true, false, skip-verify, preferred, <name>
 Default:        false
 ```
 
-`tls=true` enables TLS / SSL encrypted connection to the server. Use `skip-verify` if you want to use a self-signed or invalid certificate (server side). Use a custom value registered with [`mysql.RegisterTLSConfig`](https://godoc.org/github.com/go-sql-driver/mysql#RegisterTLSConfig).
+`tls=true` enables TLS / SSL encrypted connection to the server. Use `skip-verify` if you want to use a self-signed or invalid certificate (server side) or use `preferred` to use TLS only when advertised by the server. This is similar to `skip-verify`, but additionally allows a fallback to a connection which is not encrypted. Neither `skip-verify` nor `preferred` add any reliable security. You can use a custom TLS config after registering it with [`mysql.RegisterTLSConfig`](https://godoc.org/github.com/go-sql-driver/mysql#RegisterTLSConfig).
 
 
 ##### `writeTimeout`

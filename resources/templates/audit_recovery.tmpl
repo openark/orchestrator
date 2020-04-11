@@ -53,8 +53,12 @@
     return parseInt("{{.page}}");
   }
 
-  function auditCluster() {
+  function clusterName() {
     return "{{.clusterName}}";
+  }
+
+  function clusterAlias() {
+    return "{{.clusterAlias}}";
   }
 
   function recoveryId() {

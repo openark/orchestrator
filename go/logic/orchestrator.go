@@ -190,6 +190,11 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		log.Debugf("discoverInstance: skipping discovery of %+v because it is set to be forgotten", instanceKey)
 		return
 	}
+	if inst.RegexpMatchPatterns(instanceKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
+		log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", instanceKey)
+		return
+	}
+
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
 	latency.AddMany([]string{
@@ -279,7 +284,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
-		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+		if inst.RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
 		}
 
@@ -289,7 +294,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryQueue.Push(instance.MasterKey)
+		if !inst.RegexpMatchPatterns(instance.MasterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			discoveryQueue.Push(instance.MasterKey)
+		}
 	}
 }
 
@@ -411,16 +418,12 @@ func InjectPseudoGTIDOnWriters() error {
 // stores are updated via failovers.
 func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
 	kvPairs, err = inst.GetMastersKVPairs(clusterName)
+	log.Debugf("kv.SubmitMastersToKvStores, clusterName: %s, force: %+v: numPairs: %+v", clusterName, force, len(kvPairs))
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
-	command := "add-key-value"
-	applyFunc := kv.AddKVPair
-	if force {
-		command = "put-key-value"
-		applyFunc = kv.PutKVPair
-	}
 	var selectedError error
+	var submitKvPairs [](*kv.KVPair)
 	for _, kvPair := range kvPairs {
 		if !force {
 			// !force: Called periodically to auto-populate KV
@@ -429,16 +432,21 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 				// Let's not overload database with queries. Let's not overload raft with events.
 				continue
 			}
-			if v, found, err := kv.GetValue(kvPair.Key); err == nil && found && v == kvPair.Value {
+			v, found, err := kv.GetValue(kvPair.Key)
+			if err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				continue
 			}
 		}
+		submitKvPairs = append(submitKvPairs, kvPair)
+	}
+	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
+	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand(command, kvPair)
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
 		} else {
-			err = applyFunc(kvPair)
+			err = kv.PutKVPair(kvPair)
 		}
 		if err == nil {
 			submittedCount++
@@ -446,7 +454,23 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 			selectedError = err
 		}
 	}
+	if err := kv.DistributePairs(kvPairs); err != nil {
+		log.Errore(err)
+	}
 	return kvPairs, submittedCount, log.Errore(selectedError)
+}
+
+func injectSeeds(seedOnce *sync.Once) {
+	seedOnce.Do(func() {
+		for _, seed := range config.Config.DiscoverySeeds {
+			instanceKey, err := inst.ParseRawInstanceKey(seed)
+			if err == nil {
+				inst.InjectSeed(instanceKey)
+			} else {
+				log.Errorf("Error parsing seed %s: %+v", seed, err)
+			}
+		}
+	})
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -476,6 +500,8 @@ func ContinuousDiscovery() {
 	runCheckAndRecoverOperationsTimeRipe := func() bool {
 		return time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod
 	}
+
+	var seedOnce sync.Once
 
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
@@ -507,6 +533,7 @@ func ContinuousDiscovery() {
 				if IsLeaderOrActive() {
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
+					go injectSeeds(&seedOnce)
 				}
 			}()
 		case <-autoPseudoGTIDTick:

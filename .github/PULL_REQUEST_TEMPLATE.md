@@ -14,7 +14,15 @@ This PR [briefly explain what is does]
 
 > In case this PR introduced Go code changes:
 
+Please make sure that:
+
 - [ ] contributed code is using same conventions as original code
-- [ ] code is formatted via `gofmt` (please avoid `goimports`)
-- [ ] code is built via `./build.sh`
-- [ ] code is tested via `go test ./go/...`
+
+Please make sure the PR passes CI tests. For your information, CI tests the following:
+
+- code is formatted via `gofmt` (please avoid `goimports`)
+- code passes compilation
+- code passes unit tests
+- code passes integration tests with MySQL backend
+- code passes integration tests with SQLite backend
+- There are no orphaned docs/ pages (there's some link in the docs to point to any page)

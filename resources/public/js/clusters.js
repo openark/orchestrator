@@ -1,29 +1,6 @@
 $(document).ready(function() {
   showLoader();
 
-  var errorMapping = {
-    "inMaintenanceProblem": {
-      "badge": "label-info",
-      "description": "In maintenance"
-    },
-    "lastCheckInvalidProblem": {
-      "badge": "label-fatal",
-      "description": "Last check invalid"
-    },
-    "notRecentlyCheckedProblem": {
-      "badge": "label-stale",
-      "description": "Not recently checked (stale)"
-    },
-    "notReplicatingProblem": {
-      "badge": "label-danger",
-      "description": "Not replicating"
-    },
-    "replicationLagProblem": {
-      "badge": "label-warning",
-      "description": "Replication lag"
-    }
-  };
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     $.get(appUrl("/api/replication-analysis"), function(replicationAnalysis) {
       $.get(appUrl("/api/problems"), function(problemInstances) {
@@ -44,12 +21,31 @@ $(document).ready(function() {
     return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
   }
 
+  function sortByClusterName(cluster1, cluster2) {
+    return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+  }
+
+  function sortByClusterAlias(cluster1, cluster2) {
+    return cluster1.ClusterAlias.localeCompare(cluster2.ClusterAlias);
+  }
+
   function displayClusters(clusters, replicationAnalysis, problemInstances) {
     hideLoader();
 
     clusters = clusters || [];
 
-    clusters.sort(sortByCountInstances);
+    var dashboardSort = $.cookie("dashboard-sort") || "count"
+
+    refreshDashboardSortButton();
+    $("#li-dashboard-sort").appendTo("ul.navbar-nav").show();
+    $("#dashboard-sort a").click(function() {
+      $.cookie("dashboard-sort", $(this).attr("dashboard-sort"), {
+        path: '/',
+        expires: 3650
+      });
+      location.reload();
+    });
+
     var clustersProblems = {};
     clusters.forEach(function(cluster) {
       clustersProblems[cluster.ClusterName] = {};
@@ -71,11 +67,26 @@ $(document).ready(function() {
       });
     });
 
+    function refreshDashboardSortButton() {
+      if (dashboardSort == "name") {
+        clusters.sort(sortByClusterName);
+      } else if (dashboardSort == "alias") {
+        clusters.sort(sortByClusterAlias);
+      } else {
+        clusters.sort(sortByCountInstances);
+      }
+
+      $("#dashboard-sort-button").html("Sort by " + dashboardSort + ' <span class="caret"></span>')
+    }
+
     function addInstancesBadge(clusterName, count, badgeClass, title) {
       $("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge ' + badgeClass + '" title="' + title + '">' + count + '</span> ');
     }
 
     function incrementClusterProblems(clusterName, problemType) {
+      if (!problemType) {
+        return
+      }
       if (clustersProblems[clusterName][problemType] > 0) {
         clustersProblems[clusterName][problemType] = clustersProblems[clusterName][problemType] + 1;
       } else {
@@ -83,19 +94,7 @@ $(document).ready(function() {
       }
     }
     problemInstances.forEach(function(instance) {
-      if (instance.inMaintenanceProblem()) {
-        incrementClusterProblems(instance.ClusterName, "inMaintenanceProblem")
-      }
-      //
-      if (instance.lastCheckInvalidProblem()) {
-        incrementClusterProblems(instance.ClusterName, "lastCheckInvalidProblem")
-      } else if (instance.notRecentlyCheckedProblem()) {
-        incrementClusterProblems(instance.ClusterName, "notRecentlyCheckedProblem")
-      } else if (instance.notReplicatingProblem()) {
-        incrementClusterProblems(instance.ClusterName, "notReplicatingProblem")
-      } else if (instance.replicationLagProblem()) {
-        incrementClusterProblems(instance.ClusterName, "replicationLagProblem")
-      }
+      incrementClusterProblems(instance.ClusterName, instance.problem)
     });
 
     clusters.forEach(function(cluster) {

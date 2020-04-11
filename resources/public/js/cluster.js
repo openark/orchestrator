@@ -719,9 +719,6 @@ function Cluster() {
       // Obviously this is also checked on server side, no need to try stupid hacks
       return unaccepted;
     }
-    if (moveInstanceMethod != "smart") {
-      return unaccepted;
-    }
     var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
 
     if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
@@ -1210,24 +1207,16 @@ function Cluster() {
         instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
-        if (instance.inMaintenanceProblem()) {
-          incrementProblems("inMaintenanceProblem", instanceDescription)
-        }
-        if (instance.lastCheckInvalidProblem()) {
-          incrementProblems("lastCheckInvalidProblem", instanceDescription)
-        } else if (instance.notRecentlyCheckedProblem()) {
-          incrementProblems("notRecentlyCheckedProblem", instanceDescription)
-        } else if (instance.notReplicatingProblem()) {
-          incrementProblems("notReplicatingProblem", instanceDescription)
-        } else if (instance.replicationLagProblem()) {
-          incrementProblems("replicationLagProblem", instanceDescription)
-        }
+        instance.Problems.forEach(function(problem) {
+          incrementProblems(problem, instanceDescription)
+        });
       });
       var aggergateInstance = instances[0];
       aggergateInstance.isAggregate = true;
       aggergateInstance.title = "[aggregation]";
       if (dataCenter) {
         aggergateInstance.title = "[aggregation in " + dataCenter + "]";
+        aggergateInstance.InstanceAlias = aggergateInstance.title;
       }
       aggergateInstance.canonicalTitle = aggergateInstance.title;
       aggergateInstance.aggregatedInstances = instances; // includes itself
@@ -1395,11 +1384,7 @@ function Cluster() {
       content = '<hr/>' + content
     }
     wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
-    if (tag === "analysis") {
-      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
-    } else {
-      $("#cluster_info").append(wrappedContent)
-    }
+    $("#cluster_info").append(wrappedContent)
   }
 
   function populateSidebar(clusterInfo) {
@@ -1498,6 +1483,13 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
+    // Alias
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=alias] .glyphicon");
+      var is = isAliased();
+      glyph.addClass(is ? "text-info" : "text-muted");
+      glyph.attr("title", is ? "Cancel alias" : "Instance alias display");
+    }
     // Silent UI
     {
       var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
@@ -1532,7 +1524,6 @@ function Cluster() {
     analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
     var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
     addSidebarInfoPopoverContent(content, "analysis", false);
-
     if (analysisEntry.IsStructureAnalysis) {
       return;
     }
@@ -1744,11 +1735,15 @@ function Cluster() {
       $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');
       $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');
       $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');
+      $("#dropdown-context").append('<li><a data-command="alias">Alias</a></li>');
       if ($.cookie("pool-indicator") == "true") {
         $("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isAnonymized()) {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
+      }
+      if (isAliased()) {
+        $("#dropdown-context a[data-command=alias]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isColorizeDC()) {
         $("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
@@ -1817,6 +1812,13 @@ function Cluster() {
         return
       }
       $.cookie("anonymize", "true", {
+        path: '/',
+        expires: 1
+      });
+      location.reload();
+    });
+    $("body").on("click", "a[data-command=alias]", function(event) {
+      $.cookie("alias", isAliased() ? "false" : "true", {
         path: '/',
         expires: 1
       });

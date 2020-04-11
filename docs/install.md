@@ -57,7 +57,6 @@ Edit `orchestrator.conf.json` to match the above as follows:
     "MySQLOrchestratorPassword": "orch_backend_password",
     ...
 
-
 #### Grant access to orchestrator on all your MySQL servers
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:

@@ -60,9 +60,9 @@ func JSONSince(c *collection.Collection, t time.Time) ([](MetricJSON), error) {
 	for i := range raw {
 		m := raw[i].(*Metric) // convert back to a real Metric rather than collection.Metric interface
 		mj := MetricJSON{
-			Timestamp: m.Timestamp,
-			Hostname:  m.InstanceKey.Hostname,
-			Port:      m.InstanceKey.Port,
+			Timestamp:              m.Timestamp,
+			Hostname:               m.InstanceKey.Hostname,
+			Port:                   m.InstanceKey.Port,
 			BackendLatencySeconds:  formattedFloat(m.BackendLatency.Seconds()),
 			InstanceLatencySeconds: formattedFloat(m.InstanceLatency.Seconds()),
 			TotalLatencySeconds:    formattedFloat(m.TotalLatency.Seconds()),
