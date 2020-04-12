@@ -397,7 +397,13 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 	return err
 }
 
-func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, recoveryType RecoveryType, forceRecovery bool) (topologyRecovery *TopologyRecovery, rejectReason string, err error) {
+func requestAuthorizationToRecover(
+	analysisEntry *inst.ReplicationAnalysis,
+	recoveryType RecoveryType,
+	forceRecovery bool,
+) (
+	topologyRecovery *TopologyRecovery, rejectReason string, err error,
+) {
 	log.Infof("requestAuthorizationToRecover: Analysis: %+v, InstanceKey: %+v, recoveryType: %+v, forceRecovery: %+v",
 		analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, recoveryType, forceRecovery)
 
@@ -427,7 +433,7 @@ func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, reco
 
 	instanceRecoveryType := NewInstanceRecoveryType(&analysisEntry.AnalyzedInstanceKey, recoveryType)
 	if err := recentRecoveryAuthorizationRequests.Add(instanceRecoveryType.String(), time.Now(), time.Duration(config.Config.RecoveryPeriodBlockSeconds)*time.Second); err != nil {
-		// Cannot re-register this recovery
+		// Cannot re-register this recovery (same instance, same recovery type)
 		message := fmt.Sprintf("blocked due to existing %s on %+v", recoveryType, analysisEntry.AnalyzedInstanceKey)
 		logRecoveryDisabled(message)
 		if !forceRecovery {
