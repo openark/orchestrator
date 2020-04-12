@@ -52,6 +52,7 @@ test_single() {
 
   echo_dot
   if [ ! -f $tests_path/$test_name/run ] ; then
+    echo
     echo "missing 'run' script"
     return 1
   fi
