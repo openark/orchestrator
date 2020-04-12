@@ -1,0 +1,8 @@
+#!/bin/bash
+
+system_tests() {
+  echo "# Running system tests"
+  ./tests/system/test.sh || exit 1
+}
+
+system_tests

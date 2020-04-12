@@ -94,3 +94,6 @@ jobs:
     - name: get consul KV values
       run: |
         consul kv get -recurse mysql/master
+
+    - name: system tests
+      run:  script/test-system
