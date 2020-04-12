@@ -103,8 +103,8 @@ test_all() {
       echo "+ pass"
     fi
 
-    bash check_restore > $test_restore_outfile
-    diff -b expect_restore $test_restore_outfile > $test_restore_diff_file
+    bash $tests_path/check_restore > $test_restore_outfile
+    diff -b $tests_path/expect_restore $test_restore_outfile > $test_restore_diff_file
     diff_result=$?
     if [ $diff_result -ne 0 ] ; then
       echo
