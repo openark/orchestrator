@@ -50,34 +50,20 @@ test_single() {
 
   echo -n "Testing: $test_name"
 
-  return 0
   echo_dot
-  run_queries $tests_path/create-per-test.sql
-
-  echo_dot
-  if [ -f $tests_path/$test_name/create.sql ] ; then
-    run_queries $tests_path/$test_name/create.sql
+  if [ ! -f $tests_path/$test_name/run ] ; then
+    echo "missing 'run' script"
+    return 1
   fi
 
-  extra_args=""
-  if [ -f $tests_path/$test_name/extra_args ] ; then
-    extra_args=$(cat $tests_path/$test_name/extra_args)
-  fi
-  #
-  cmd="$orchestrator_binary \
-    --config=${test_config_file}
-    --debug \
-    --stack \
-    ${extra_args[@]}"
   echo_dot
-  echo $cmd > $exec_command_file
-  echo_dot
-  bash $exec_command_file 1> $test_outfile 2> $test_logfile
-
+  bash $tests_path/$test_name/run 1> $test_outfile 2> $test_logfile
   execution_result=$?
 
-  if [ -f $tests_path/$test_name/destroy.sql ] ; then
-    run_queries $tests_path/$test_name/destroy.sql
+  if [ -f $tests_path/$test_name/restore ] ; then
+    bash $tests_path/$test_name/restore
+  else
+    script/deploy-replication
   fi
 
   if [ -f $tests_path/$test_name/expect_failure ] ; then
@@ -90,7 +76,7 @@ test_single() {
       # 'expect_failure' file has content. We expect to find this content in the log.
       expected_error_message="$(cat $tests_path/$test_name/expect_failure)"
       if grep -q "$expected_error_message" $test_logfile ; then
-          return 0
+        return 0
       fi
       echo
       echo "ERROR $test_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
