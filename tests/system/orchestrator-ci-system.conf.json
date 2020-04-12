@@ -30,7 +30,7 @@
   "AuditToSyslog": false,
   "ReadOnly": false,
   "AuthenticationMethod": "",
-  "ReplicationLagQuery": "",
+  "ReplicationLagQuery": "select timestampdiff(second, ts, now()) from test.heartbeat",
   "DetectClusterAliasQuery": "SELECT 'ci'",
   "DetectClusterDomainQuery": "",
   "DetectInstanceAliasQuery": "",
