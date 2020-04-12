@@ -126,13 +126,13 @@ func (s *AgentTestSuite) SetUpTest(c *C) {
 		}
 
 		mysqlDatabases := map[string]*MySQLDatabase{
-			"sakila": &MySQLDatabase{
+			"sakila": {
 				Engines: []Engine{InnoDB},
 				Size:    0,
 			},
 		}
 		availiableSeedMethods := map[SeedMethod]*SeedMethodOpts{
-			Mydumper: &SeedMethodOpts{
+			Mydumper: {
 				BackupSide:       Target,
 				SupportedEngines: []Engine{ROCKSDB, MRG_MYISAM, CSV, BLACKHOLE, InnoDB, MEMORY, ARCHIVE, MyISAM, FEDERATED, TokuDB},
 				BackupToDatadir:  false,
@@ -253,13 +253,13 @@ func (s *AgentTestSuite) SetUpSuite(c *C) {
 	log.Info("Creating Orchestrator agents mocks")
 	for i := 1; i <= agentsCount; i++ {
 		mysqlDatabases := map[string]*MySQLDatabase{
-			"sakila": &MySQLDatabase{
+			"sakila": {
 				Engines: []Engine{InnoDB},
 				Size:    0,
 			},
 		}
 		availiableSeedMethods := map[SeedMethod]*SeedMethodOpts{
-			Mydumper: &SeedMethodOpts{
+			Mydumper: {
 				BackupSide:       Target,
 				SupportedEngines: []Engine{ROCKSDB, MRG_MYISAM, CSV, BLACKHOLE, InnoDB, MEMORY, ARCHIVE, MyISAM, FEDERATED, TokuDB},
 			},
