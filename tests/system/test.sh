@@ -12,27 +12,8 @@ test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
 test_diff_file=/tmp/orchestrator-test.diff
 test_query_file=/tmp/orchestrator-test.sql
-test_config_file=/tmp/orchestrator.conf.json
-orchestrator_binary=/tmp/orchestrator-test
-exec_command_file=/tmp/orchestrator-test.bash
-test_mysql_defaults_file=/tmp/orchestrator-test-my.cnf
-db_type=""
-sqlite_file="/tmp/orchestrator.db"
-mysql_args="--defaults-extra-file=${test_mysql_defaults_file} --default-character-set=utf8mb4 -s -s"
-
-function run_queries() {
-  queries_file="$1"
-
-  if [ "$db_type" == "sqlite" ] ; then
-    cat $queries_file |
-      sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" |
-      sed -e "s/current_timestamp + interval 1 minute/datetime('now', '+1 minute')/g" |
-      sqlite3 $sqlite_file
-  else
-    # Assume mysql
-    mysql $mysql_args test < $queries_file
-  fi
-}
+test_restore_outfile=/tmp/orchestrator-test-restore.out
+test_restore_diff_file=/tmp/orchestrator-test-restore.diff
 
 exec_cmd() {
   echo "$@"
@@ -120,6 +101,18 @@ test_all() {
     else
       echo
       echo "+ pass"
+    fi
+
+    bash check_restore > $test_restore_outfile
+    diff -b expect_restore $test_restore_outfile > $test_restore_diff_file
+    diff_result=$?
+    if [ $diff_result -ne 0 ] ; then
+      echo
+      echo "ERROR $test_name restore failure. cat $test_restore_diff_file"
+      echo "---"
+      cat $test_restore_diff_file
+      echo "---"
+      return 1
     fi
   done
 }
