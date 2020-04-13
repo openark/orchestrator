@@ -39,5 +39,5 @@ jobs:
     - name: Upload orchestrator binary artifact
       uses: actions/upload-artifact@v1
       with:
-        name: orchestrator-build-binary-linux-amd64
+        name: orchestrator
         path: bin/orchestrator
