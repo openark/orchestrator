@@ -1,3 +1,7 @@
+![](https://github.com/openark/orchestrator/workflows/CI/badge.svg)
+![](https://github.com/openark/orchestrator/workflows/upgrade/badge.svg)
+![](https://github.com/openark/orchestrator/workflows/system%20tests/badge.svg)
+
 # orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
 
 [![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
