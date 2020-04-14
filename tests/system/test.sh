@@ -42,8 +42,8 @@ test_single() {
   bash $tests_path/$test_name/run 1> $test_outfile 2> $test_logfile
   execution_result=$?
 
-  if [ -f $tests_path/$test_name/restore ] ; then
-    bash $tests_path/$test_name/restore
+  if [ -f $tests_path/$test_name/teardown ] ; then
+    bash $tests_path/$test_name/teardown
   else
     script/deploy-replication
   fi
@@ -111,8 +111,8 @@ test_step() {
   bash $test_path/run 1> $test_outfile 2> $test_logfile
   execution_result=$?
 
-  if [ -f $test_path/restore ] ; then
-    bash $test_path/restore
+  if [ -f $test_path/teardown ] ; then
+    bash $test_path/teardown
   elif [ "$test_step_name" == "main" ] ; then
     script/deploy-replication
   fi
