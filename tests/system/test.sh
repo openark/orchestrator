@@ -91,10 +91,84 @@ test_single() {
   return 0
 }
 
+
+test_step() {
+  local test_path
+  test_path="$1"
+
+  local test_name
+  test_name="$2"
+
+  local test_step_name
+  test_step_name="${3:-main}"
+
+  echo -n "Testing: $test_name/$test_step_name"
+
+  echo_dot
+  if [ ! -f $test_path/run ] ; then
+    echo
+    echo "missing 'run' script"
+    return 1
+  fi
+
+  echo_dot
+  bash $test_path/run 1> $test_outfile 2> $test_logfile
+  execution_result=$?
+
+  if [ -f $test_path/restore ] ; then
+    bash $test_path/restore
+  elif [ "$test_step_name" == "main" ] ; then
+    script/deploy-replication
+  fi
+
+  if [ -f $test_path/expect_failure ] ; then
+    if [ $execution_result -eq 0 ] ; then
+      echo
+      echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
+      return 1
+    fi
+    if [ -s $test_path/expect_failure ] ; then
+      # 'expect_failure' file has content. We expect to find this content in the log.
+      expected_error_message="$(cat $test_path/expect_failure)"
+      if grep -q "$expected_error_message" $test_logfile ; then
+        return 0
+      fi
+      echo
+      echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
+      return 1
+    fi
+    # 'expect_failure' file has no content. We generally agree that the failure is correct
+    return 0
+  fi
+
+  if [ $execution_result -ne 0 ] ; then
+    echo
+    echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
+    return 1
+  fi
+
+  if [ -f $test_path/expect_output ] ; then
+    diff -b $test_path/expect_output $test_outfile > $test_diff_file
+    diff_result=$?
+    if [ $diff_result -ne 0 ] ; then
+      echo
+      echo "ERROR $test_name/$test_step_name diff failure. cat $test_diff_file"
+      echo "---"
+      cat $test_diff_file
+      echo "---"
+      return 1
+    fi
+  fi
+
+  # all is well
+  return 0
+}
+
+
 test_all() {
   test_pattern="${1:-.}"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 5 | egrep "$test_pattern" | while read test_name ; do
-    test_single "$test_name"
+    test_step "$tests_path/$test_name" "$test_name" ""
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
       return 1
