@@ -7,7 +7,7 @@
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
-tests_path=$(dirname $0)/tests
+tests_path=$(dirname $0)/
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
 test_diff_file=/tmp/orchestrator-test.diff
@@ -104,14 +104,10 @@ test_step() {
 
   echo -n "Testing: $test_name/$test_step_name"
 
-  echo_dot
   if [ ! -f $test_path/run ] ; then
-    echo
     echo "missing 'run' script"
     return 1
   fi
-
-  echo_dot
   bash $test_path/run 1> $test_outfile 2> $test_logfile
   execution_result=$?
 
@@ -123,7 +119,6 @@ test_step() {
 
   if [ -f $test_path/expect_failure ] ; then
     if [ $execution_result -eq 0 ] ; then
-      echo
       echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
       return 1
     fi
@@ -133,7 +128,6 @@ test_step() {
       if grep -q "$expected_error_message" $test_logfile ; then
         return 0
       fi
-      echo
       echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
       return 1
     fi
@@ -142,7 +136,6 @@ test_step() {
   fi
 
   if [ $execution_result -ne 0 ] ; then
-    echo
     echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
     return 1
   fi
@@ -151,11 +144,20 @@ test_step() {
     diff -b $test_path/expect_output $test_outfile > $test_diff_file
     diff_result=$?
     if [ $diff_result -ne 0 ] ; then
-      echo
       echo "ERROR $test_name/$test_step_name diff failure. cat $test_diff_file"
       echo "---"
       cat $test_diff_file
       echo "---"
+      return 1
+    fi
+  fi
+
+  if [ -f $test_path/post_run ] ; then
+    bash $test_path/post_run 1> $test_outfile 2> $test_logfile
+    execution_result=$?
+
+    if [ $execution_result -ne 0 ] ; then
+      echo "ERROR $test_name/$test_step_name post_run execution failure. cat $test_logfile"
       return 1
     fi
   fi
@@ -168,14 +170,22 @@ test_step() {
 test_all() {
   test_pattern="${1:-.}"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 5 | egrep "$test_pattern" | while read test_name ; do
+    # test steps:
+    find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 6 | while read test_step_name ; do
+      test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
+      if [ $? -ne 0 ] ; then
+        echo "+ FAIL"
+        return 1
+      fi
+      echo "+ pass"
+    done
+    # test main step:
     test_step "$tests_path/$test_name" "$test_name" ""
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
       return 1
-    else
-      echo
-      echo "+ pass"
     fi
+    echo "+ pass"
 
     bash $tests_path/check_restore > $test_restore_outfile
     diff -b $tests_path/expect_restore $test_restore_outfile > $test_restore_diff_file
