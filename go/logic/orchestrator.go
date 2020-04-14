@@ -460,6 +460,19 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 	return kvPairs, submittedCount, log.Errore(selectedError)
 }
 
+func injectSeeds(seedOnce *sync.Once) {
+	seedOnce.Do(func() {
+		for _, seed := range config.Config.DiscoverySeeds {
+			instanceKey, err := inst.ParseRawInstanceKey(seed)
+			if err == nil {
+				inst.InjectSeed(instanceKey)
+			} else {
+				log.Errorf("Error parsing seed %s: %+v", seed, err)
+			}
+		}
+	})
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -487,6 +500,8 @@ func ContinuousDiscovery() {
 	runCheckAndRecoverOperationsTimeRipe := func() bool {
 		return time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod
 	}
+
+	var seedOnce sync.Once
 
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
@@ -518,6 +533,7 @@ func ContinuousDiscovery() {
 				if IsLeaderOrActive() {
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
+					go injectSeeds(&seedOnce)
 				}
 			}()
 		case <-autoPseudoGTIDTick:

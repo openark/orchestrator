@@ -77,6 +77,8 @@ var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var writeBufferMetrics = collection.CreateOrReturnCollection("WRITE_BUFFER")
+var writeBufferLatency = stopwatch.NewNamedStopwatch()
 
 var emptyQuotesRegexp = regexp.MustCompile(`^""$`)
 
@@ -85,6 +87,8 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+	writeBufferLatency.AddMany([]string{"wait", "write"})
+	writeBufferLatency.Start("wait")
 
 	go initializeInstanceDao()
 }
@@ -141,7 +145,7 @@ func ExecDBWriteFunc(f func() error) error {
 func ExpireTableData(tableName string, timestampColumn string) error {
 	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		_, err := db.ExecOrchestrator(query, config.Config.AuditPurgeDays)
 		return err
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -1831,6 +1835,21 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 	return res, nil
 }
 
+// InjectSeed: intented to be used to inject an instance upon startup, assuming it's not already known to orchestrator.
+func InjectSeed(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return fmt.Errorf("InjectSeed: nil instanceKey")
+	}
+	clusterName := instanceKey.StringCode()
+	// minimal details:
+	instance := &Instance{Key: *instanceKey, Version: "Unknown", ClusterName: clusterName}
+	instance.SetSeed()
+	err := WriteInstance(instance, false, nil)
+	log.Debugf("InjectSeed: %+v, %+v", *instanceKey, err)
+	AuditOperation("inject-seed", instanceKey, "injected")
+	return err
+}
+
 // InjectUnseenMasters will review masters of instances that are known to be replicating, yet which are not listed
 // in database_instance. Since their replicas are listed as replicating, we can assume that such masters actually do
 // exist: we shall therefore inject them with minimal details into the database_instance table.
@@ -2470,21 +2489,20 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 
 // writeManyInstances stores instances in the orchestrator backend
 func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
-	if len(instances) == 0 {
-		return nil // nothing to write
-	}
-
 	writeInstances := [](*Instance){}
 	for _, instance := range instances {
-		if !InstanceIsForgotten(&instance.Key) {
-			writeInstances = append(writeInstances, instance)
+		if InstanceIsForgotten(&instance.Key) && !instance.IsSeed() {
+			continue
 		}
+		writeInstances = append(writeInstances, instance)
+	}
+	if len(writeInstances) == 0 {
+		return nil // nothing to write
 	}
 	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
 	if err != nil {
 		return err
 	}
-
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
 	}
@@ -2509,9 +2527,14 @@ var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
 	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
-		// Signal the "flushing" gorouting that there's work.
+		// Signal the "flushing" goroutine that there's work.
 		// We prefer doing all bulk flushes from one goroutine.
-		forceFlushInstanceWriteBuffer <- true
+		// Non blocking send to avoid blocking goroutines on sending a flush,
+		// if the "flushing" goroutine is not able read is because a flushing is ongoing.
+		select {
+		case forceFlushInstanceWriteBuffer <- true:
+		default:
+		}
 	}
 	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
 }
@@ -2521,11 +2544,24 @@ func flushInstanceWriteBuffer() {
 	var instances []*Instance
 	var lastseen []*Instance // instances to update with last_seen field
 
+	defer func() {
+		// reset stopwatches (TODO: .ResetAll())
+		writeBufferLatency.Reset("wait")
+		writeBufferLatency.Reset("write")
+		writeBufferLatency.Start("wait") // waiting for next flush
+	}()
+
+	writeBufferLatency.Stop("wait")
+
 	if len(instanceWriteBuffer) == 0 {
 		return
 	}
 
-	for i := 0; i < len(instanceWriteBuffer); i++ {
+	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
+	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
+	// this is why we want to flush all instances in the buffer untill a max of `InstanceWriteBufferSize`.
+	// Otherwise we can flush way more instances than what's expected.
+	for i := 0; i < config.Config.InstanceWriteBufferSize && len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
 		if upd.instanceWasActuallyFound && upd.lastError == nil {
 			lastseen = append(lastseen, upd.instance)
@@ -2534,6 +2570,9 @@ func flushInstanceWriteBuffer() {
 			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
+
+	writeBufferLatency.Start("write")
+
 	// sort instances by instanceKey (table pk) to make locking predictable
 	sort.Sort(byInstanceKey(instances))
 	sort.Sort(byInstanceKey(lastseen))
@@ -2555,6 +2594,15 @@ func flushInstanceWriteBuffer() {
 	if err != nil {
 		log.Errorf("flushInstanceWriteBuffer: %v", err)
 	}
+
+	writeBufferLatency.Stop("write")
+
+	writeBufferMetrics.Append(&WriteBufferMetric{
+		Timestamp:    time.Now(),
+		WaitLatency:  writeBufferLatency.Elapsed("wait"),
+		WriteLatency: writeBufferLatency.Elapsed("write"),
+		Instances:    len(lastseen) + len(instances),
+	})
 }
 
 // WriteInstance stores an instance in the orchestrator backend

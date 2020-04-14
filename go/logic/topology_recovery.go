@@ -480,7 +480,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 }
 
 // recoverDeadMaster recovers a dead master, complete logic inside
-func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
+func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
 	topologyRecovery.Type = MasterRecovery
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
@@ -490,7 +490,7 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
 	if !skipProcesses {
 		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
-			return nil, lostReplicas, topologyRecovery.AddError(err)
+			return false, nil, lostReplicas, topologyRecovery.AddError(err)
 		}
 	}
 
@@ -586,7 +586,7 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 		AuditTopologyRecovery(topologyRecovery, message)
 		inst.AuditOperation("recover-dead-master", failedInstanceKey, message)
 	}
-	return promotedReplica, lostReplicas, err
+	return true, promotedReplica, lostReplicas, err
 }
 
 func MasterFailoverGeographicConstraintSatisfied(analysisEntry *inst.ReplicationAnalysis, suggestedInstance *inst.Instance) (satisfied bool, dissatisfiedReason string) {
@@ -814,11 +814,11 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, !forceInstanceRecovery, !forceInstanceRecovery)
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, !forceInstanceRecovery, !forceInstanceRecovery)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
@@ -827,8 +827,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	// That's it! We must do recovery!
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName))
 	recoverDeadMasterCounter.Inc(1)
-	promotedReplica, lostReplicas, err := recoverDeadMaster(topologyRecovery, candidateInstanceKey, skipProcesses)
+	recoveryAttempted, promotedReplica, lostReplicas, err := recoverDeadMaster(topologyRecovery, candidateInstanceKey, skipProcesses)
+	if err != nil {
+		AuditTopologyRecovery(topologyRecovery, err.Error())
+	}
 	topologyRecovery.LostReplicas.AddInstances(lostReplicas)
+	if !recoveryAttempted {
+		return false, topologyRecovery, err
+	}
 
 	overrideMasterPromotion := func() (*inst.Instance, error) {
 		if promotedReplica == nil {
@@ -852,8 +858,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		// All seems well. No override done.
 		return promotedReplica, err
 	}
-	promotedReplica, err = overrideMasterPromotion()
-	if err != nil {
+	if promotedReplica, err = overrideMasterPromotion(); err != nil {
 		AuditTopologyRecovery(topologyRecovery, err.Error())
 	}
 	// And this is the end; whether successful or not, we're done.
@@ -945,8 +950,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	return true, topologyRecovery, err
 }
 
-// isGeneralyValidAsCandidateSiblingOfIntermediateMaster sees that basic server configuration and state are valid
-func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
+// isGenerallyValidAsCandidateSiblingOfIntermediateMaster sees that basic server configuration and state are valid
+func isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
 	if !sibling.LogBinEnabled {
 		return false
 	}
@@ -968,7 +973,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 		// same instance
 		return false
 	}
-	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
+	if !isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
 	if inst.IsBannedFromBeingCandidateReplica(sibling) {

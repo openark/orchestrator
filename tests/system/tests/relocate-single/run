@@ -1,0 +1,1 @@
+orchestrator-client -c relocate -i 127.0.0.1:10113 -d 127.0.0.1:10112
