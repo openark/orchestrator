@@ -10,7 +10,7 @@
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
   "DiscoverySeeds": [
-    "127.0.0.1:10571"
+    "127.0.0.1:10111"
   ],
   "InstancePollSeconds": 2,
   "DiscoveryIgnoreReplicaHostnameFilters": [],
