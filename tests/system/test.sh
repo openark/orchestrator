@@ -160,7 +160,7 @@ test_step() {
     diff -b $test_path/expect_output $test_outfile > $test_diff_file
     diff_result=$?
     if [ $diff_result -ne 0 ] ; then
-      echo "ERROR $test_name/$test_step_name diff failure. cat $test_diff_file"
+      echo "ERROR $test_name/$test_step_name output does not match expect_output"
       echo "---"
       cat $test_diff_file
       echo "---"
