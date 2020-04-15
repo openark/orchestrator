@@ -1,6 +1,8 @@
 name: system tests
 
-on: [pull_request]
+on:
+  schedule:
+    - cron:  '13,43 * * * *'
 
 jobs:
   tests:
