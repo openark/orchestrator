@@ -48,12 +48,13 @@ test_step() {
     fi
   fi
 
-  if [ ! -f $test_path/run ] ; then
+  if [ -f $test_path/run ] ; then
+    bash $test_path/run 1> $test_outfile 2> $test_logfile
+    execution_result=$?
+  elif [ ! -f $test_path/skip_run ] ; then
     echo "missing 'run' script in $test_path"
     return 1
   fi
-  bash $test_path/run 1> $test_outfile 2> $test_logfile
-  execution_result=$?
 
   if [ -f $test_path/teardown ] ; then
     bash $test_path/teardown 1> $setup_teardown_logfile 2>&1
@@ -67,42 +68,43 @@ test_step() {
     script/deploy-replication
   fi
 
-  if [ -f $test_path/expect_failure ] ; then
-    if [ $execution_result -eq 0 ] ; then
-      echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
-      return 1
-    fi
-    if [ -s $test_path/expect_failure ] ; then
-      # 'expect_failure' file has content. We expect to find this content in the log.
-      expected_error_message="$(cat $test_path/expect_failure)"
-      if grep -q "$expected_error_message" $test_logfile ; then
-        return 0
+  if [ -f $test_path/run ] ; then
+    if [ -f $test_path/expect_failure ] ; then
+      if [ $execution_result -eq 0 ] ; then
+        echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
+        return 1
       fi
-      echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
+      if [ -s $test_path/expect_failure ] ; then
+        # 'expect_failure' file has content. We expect to find this content in the log.
+        expected_error_message="$(cat $test_path/expect_failure)"
+        if grep -q "$expected_error_message" $test_logfile ; then
+          return 0
+        fi
+        echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
+        return 1
+      fi
+      # 'expect_failure' file has no content. We generally agree that the failure is correct
+      return 0
+    fi
+
+    if [ $execution_result -ne 0 ] ; then
+      echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
       return 1
     fi
-    # 'expect_failure' file has no content. We generally agree that the failure is correct
-    return 0
-  fi
 
-  if [ $execution_result -ne 0 ] ; then
-    echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
-    return 1
-  fi
-
-  if [ -f $test_path/expect_output ] ; then
-    diff -b $test_path/expect_output $test_outfile > $test_diff_file
-    diff_result=$?
-    if [ $diff_result -ne 0 ] ; then
-      echo "ERROR $test_name/$test_step_name output does not match expect_output"
-      echo "---"
-      cat $test_diff_file
-      echo "---"
-      return 1
+    if [ -f $test_path/expect_output ] ; then
+      diff -b $test_path/expect_output $test_outfile > $test_diff_file
+      diff_result=$?
+      if [ $diff_result -ne 0 ] ; then
+        echo "ERROR $test_name/$test_step_name output does not match expect_output"
+        echo "---"
+        cat $test_diff_file
+        echo "---"
+        return 1
+      fi
     fi
-  fi
+  fi # [ -f $test_path/run ]
 
-  # all is well
   return 0
 }
 
