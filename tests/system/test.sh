@@ -102,7 +102,7 @@ test_step() {
   local test_step_name
   test_step_name="${3:-main}"
 
-  echo -n "Testing: $test_name/$test_step_name"
+  echo "Testing: $test_name/$test_step_name"
 
   if [ ! -f $test_path/run ] ; then
     echo "missing 'run' script"
@@ -171,7 +171,8 @@ test_all() {
   test_pattern="${1:-.}"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     # test steps:
-    find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 5 | while read test_step_name ; do
+    find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
+      [ "$test_step_name" == "." ] && continue
       test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
       if [ $? -ne 0 ] ; then
         echo "+ FAIL"
