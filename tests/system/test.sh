@@ -175,8 +175,10 @@ test_step() {
 
 test_all() {
   test_pattern="${1:-.}"
+  echo "+ will find in $tests_path/"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     # test steps:
+    echo "+ will find in $tests_path/$test_name, <$tests_path>,<$test_name>"
     find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
       [ "$test_step_name" == "." ] && continue
       echo test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
@@ -187,6 +189,9 @@ test_all() {
       fi
       echo "+ pass"
     done
+    if [ $? -ne 0 ] ; then
+      return 1
+    fi
     # test main step:
     test_step "$tests_path/$test_name" "$test_name" "main"
     if [ $? -ne 0 ] ; then
