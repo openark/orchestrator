@@ -101,7 +101,7 @@ test_step() {
   test_name="$2"
 
   local test_step_name
-  test_step_name="${3:-main}"
+  test_step_name="$3"
 
   echo "Testing: $test_name/$test_step_name"
 
@@ -187,7 +187,7 @@ test_all() {
       echo "+ pass"
     done
     # test main step:
-    test_step "$tests_path/$test_name" "$test_name" ""
+    test_step "$tests_path/$test_name" "$test_name" "main"
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
       return 1
