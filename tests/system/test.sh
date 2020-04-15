@@ -8,6 +8,7 @@
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
 tests_path=$(dirname $0)/
+setup_teardown_logfile=/tmp/orchestrator-setup-teardown.log
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
 test_diff_file=/tmp/orchestrator-test.diff
@@ -104,6 +105,15 @@ test_step() {
 
   echo "Testing: $test_name/$test_step_name"
 
+  if [ -f $test_path/setup ] ; then
+    bash $test_path/setup 1> $setup_teardown_logfile 2>&1
+    if [ $? -ne 0 ] ; then
+      echo "ERROR $test_name/$test_step_name setup failed"
+      cat $setup_teardown_logfile
+      return 1
+    fi
+  fi
+
   if [ ! -f $test_path/run ] ; then
     echo "missing 'run' script"
     return 1
@@ -112,7 +122,12 @@ test_step() {
   execution_result=$?
 
   if [ -f $test_path/teardown ] ; then
-    bash $test_path/teardown
+    bash $test_path/teardown 1> $setup_teardown_logfile 2>&1
+    if [ $? -ne 0 ] ; then
+      echo "ERROR $test_name/$test_step_name teardown failed"
+      cat $setup_teardown_logfile
+      return 1
+    fi
   fi
   if [ -f $test_path/teardown_redeploy ] ; then
     script/deploy-replication
@@ -149,16 +164,6 @@ test_step() {
       echo "---"
       cat $test_diff_file
       echo "---"
-      return 1
-    fi
-  fi
-
-  if [ -f $test_path/post_run ] ; then
-    bash $test_path/post_run 1> $test_outfile 2> $test_logfile
-    execution_result=$?
-
-    if [ $execution_result -ne 0 ] ; then
-      echo "ERROR $test_name/$test_step_name post_run execution failure. cat $test_logfile"
       return 1
     fi
   fi
