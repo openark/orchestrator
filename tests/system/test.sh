@@ -113,7 +113,8 @@ test_step() {
 
   if [ -f $test_path/teardown ] ; then
     bash $test_path/teardown
-  elif [ "$test_step_name" == "main" ] ; then
+  fi
+  if [ -f $test_path/teardown_redeploy ] ; then
     script/deploy-replication
   fi
 
