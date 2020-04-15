@@ -51,7 +51,9 @@ test_step() {
   if [ -f $test_path/run ] ; then
     bash $test_path/run 1> $test_outfile 2> $test_logfile
     execution_result=$?
-  elif [ ! -f $test_path/skip_run ] ; then
+  elif [ -f $test_path/skip_run ] ; then
+    echo "skipping run"
+  else
     echo "missing 'run' script in $test_path"
     return 1
   fi
