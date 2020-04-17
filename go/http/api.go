@@ -2504,7 +2504,7 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 	if hostname := req.URL.Query().Get("hostname"); hostname != "" {
 		var foundAgent *agent.Agent
 		foundAgent, err = agent.ReadAgent(hostname)
-		if err != nil {
+		if err == nil {
 			agents = append(agents, foundAgent)
 		}
 	} else if clusterName := req.URL.Query().Get("clusteralias"); clusterName != "" {

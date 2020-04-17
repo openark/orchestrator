@@ -909,6 +909,8 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				s.updateSeed(targetAgent, fmt.Sprintf("Error setting GTID_PURGED: %+v", err))
 				return
 			}
+		}
+		if master.UsingGTID() {
 			gtidHint = inst.GTIDHintForce
 		}
 		binlogCoordinates := &inst.BinlogCoordinates{
