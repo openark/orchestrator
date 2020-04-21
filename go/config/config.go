@@ -265,6 +265,7 @@ type Configuration struct {
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
+	FlushTablesWithReadLockTimeoutSeconds      int               // Number of seconds to wait for `flush tables with read lock` to execute in a graceful master takeover when suggestReplica is true
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -430,6 +431,7 @@ func newConfiguration() *Configuration {
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
+		FlushTablesWithReadLockTimeoutSeconds:      20,
 	}
 }
 

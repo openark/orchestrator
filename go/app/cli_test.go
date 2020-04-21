@@ -1,10 +1,11 @@
 package app
 
 import (
+	"testing"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
-	"testing"
 )
 
 func init() {
@@ -14,12 +15,12 @@ func init() {
 }
 
 func TestHelp(t *testing.T) {
-	Cli("help", false, "localhost:9999", "localhost:9999", "orc", "no-reason", "1m", ".", "no-alias", "no-pool", "")
+	Cli("help", false, "localhost:9999", "localhost:9999", "orc", "no-reason", "1m", ".", "no-alias", "no-pool", "", false)
 	test.S(t).ExpectTrue(len(knownCommands) > 0)
 }
 
 func TestKnownCommands(t *testing.T) {
-	Cli("help", false, "localhost:9999", "localhost:9999", "orc", "no-reason", "1m", ".", "no-alias", "no-pool", "")
+	Cli("help", false, "localhost:9999", "localhost:9999", "orc", "no-reason", "1m", ".", "no-alias", "no-pool", "", false)
 
 	commandsMap := make(map[string]string)
 	for _, command := range knownCommands {

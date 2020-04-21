@@ -44,6 +44,7 @@ func main() {
 	clusterAlias := flag.String("alias", "", "cluster alias")
 	pool := flag.String("pool", "", "Pool logical name (applies for pool-related commands)")
 	hostnameFlag := flag.String("hostname", "", "Hostname/fqdn/CNAME/VIP (applies for hostname/resolve related commands)")
+	suggestReplica := flag.Bool("suggestReplica", false, "suggest replica in graceful master takeover")
 	discovery := flag.Bool("discovery", true, "auto discovery mode")
 	quiet := flag.Bool("quiet", false, "quiet")
 	verbose := flag.Bool("verbose", false, "verbose")
@@ -156,7 +157,7 @@ func main() {
 	case helpTopic != "":
 		app.HelpCommand(helpTopic)
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
+		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag, *suggestReplica)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

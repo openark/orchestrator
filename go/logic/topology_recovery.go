@@ -1804,7 +1804,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 // This function is graceful in that it will first lock down the master, then wait
 // for the designated replica to catch up with last position.
 // It will point old master at the newly promoted master at the correct coordinates, but will not start replication.
-func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
+func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey, suggestReplica bool) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v; error: %+v", clusterName, err)
@@ -1829,12 +1829,23 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		designatedKey = nil
 	}
 	if designatedKey == nil {
-		// Expect a single replica.
-		if len(clusterMasterDirectReplicas) > 1 {
-			return nil, nil, fmt.Errorf("When no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+		if !suggestReplica {
+			// Expect a single replica.
+			if len(clusterMasterDirectReplicas) > 1 {
+				return nil, nil, fmt.Errorf("When no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+			}
+			designatedInstance = clusterMasterDirectReplicas[0]
+			log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
+		} else {
+			log.Infof("GracefulMasterTakeover: No target instance is indicated and suggestReplica is true, will look for replia of %+v that has caugh up with master on ExecBinlogCoordinates", clusterMaster.Key)
+			designatedInstance, err = inst.SuggestDesignatedReplica(&clusterMaster.Key)
+			if err != nil {
+				// unlock tables on master before return. Error is already logged if any
+				inst.UnlockTables(&clusterMaster.Key)
+				return nil, nil, fmt.Errorf("GracefulMasterTakeover: SuggestDesignatedReplica failed: %+v", err)
+			}
+			log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
 		}
-		designatedInstance = clusterMasterDirectReplicas[0]
-		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
 	} else {
 		// Verify designated instance is a direct replica of master
 		for _, directReplica := range clusterMasterDirectReplicas {
@@ -1849,17 +1860,21 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	}
 
 	if inst.IsBannedFromBeingCandidateReplica(designatedInstance) {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, fmt.Errorf("GracefulMasterTakeover: designated instance %+v cannot be promoted due to promotion rule or it is explicitly ignored in PromotionIgnoreHostnameFilters configuration", designatedInstance.Key)
 	}
 
 	masterOfDesignatedInstance, err := inst.GetInstanceMaster(designatedInstance)
 	if err != nil {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, err
 	}
 	if !masterOfDesignatedInstance.Key.Equals(&clusterMaster.Key) {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, fmt.Errorf("Sanity check failure. It seems like the designated instance %+v does not replicate from the master %+v (designated instance's master key is %+v). This error is strange. Panicking", designatedInstance.Key, clusterMaster.Key, designatedInstance.MasterKey)
 	}
 	if !designatedInstance.HasReasonableMaintenanceReplicationLag() {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
 	}
 
@@ -1885,6 +1900,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 					log.Warningf("GracefulMasterTakeover: unable to relocate %+v below designated %+v, but since it is downtimed (downtime reason: %s) I will proceed", directReplica.Key, designatedInstance.Key, directReplica.DowntimeReason)
 					continue
 				}
+				inst.UnlockTables(&clusterMaster.Key)
 				return nil, nil, fmt.Errorf("Desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
 			}
 		}
@@ -1895,6 +1911,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 
 	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.GracefulMasterTakeoverCommandHint, &clusterMaster.Key)
 	if err != nil {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, err
 	}
 	preGracefulTakeoverTopologyRecovery := &TopologyRecovery{
@@ -1902,13 +1919,20 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		AnalysisEntry: analysisEntry,
 	}
 	if err := executeProcesses(config.Config.PreGracefulTakeoverProcesses, "PreGracefulTakeoverProcesses", preGracefulTakeoverTopologyRecovery, true); err != nil {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, fmt.Errorf("Failed running PreGracefulTakeoverProcesses: %+v", err)
 	}
 
 	log.Infof("GracefulMasterTakeover: Will set %+v as read_only", clusterMaster.Key)
 	if clusterMaster, err = inst.SetReadOnly(&clusterMaster.Key, true); err != nil {
+		inst.UnlockTables(&clusterMaster.Key)
 		return nil, nil, err
 	}
+
+	// unlock tables after read_only is set
+	// this also marks the end of attempting unlock tables
+	inst.UnlockTables(&clusterMaster.Key)
+
 	demotedMasterSelfBinlogCoordinates := &clusterMaster.SelfBinlogCoordinates
 	log.Infof("GracefulMasterTakeover: Will wait for %+v to reach master coordinates %+v", designatedInstance.Key, *demotedMasterSelfBinlogCoordinates)
 	if designatedInstance, _, err = inst.WaitForExecBinlogCoordinatesToReach(&designatedInstance.Key, demotedMasterSelfBinlogCoordinates, time.Duration(config.Config.ReasonableMaintenanceReplicationLagSeconds)*time.Second); err != nil {

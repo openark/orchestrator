@@ -3074,8 +3074,9 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 		return
 	}
 	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
+	suggestReplica := (req.URL.Query().Get("suggestReplica") == "true") || (params["suggestReplica"] == "true")
 	// designatedKey may be empty/invalid
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey, suggestReplica)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return

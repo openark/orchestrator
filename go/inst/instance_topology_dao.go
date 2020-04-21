@@ -1210,3 +1210,60 @@ func ShowBinaryLogs(instanceKey *InstanceKey) (binlogs []string, err error) {
 	})
 	return binlogs, err
 }
+
+// UnlockTables executes 'unlock tables' on the given instance
+func UnlockTables(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	_, err = ExecInstance(instanceKey, `unlock tables`)
+	if err != nil {
+		return nil, log.Errore(err)
+	}
+	log.Infof("unlock-tables on %+v", *instanceKey)
+	AuditOperation("unlock-tables", instanceKey, "success")
+
+	return ReadTopologyInstance(instanceKey)
+}
+
+// GetMatchingExecBinlogCoordinatesReplicas gets replicas whose ExecBinlogCoordinates match that of master
+// it executes WaitForExecBinlogCoordinatesToReach on the given replicas concurrently
+func GetMatchingExecBinlogCoordinatesReplicas(replicas [](*Instance), coordinates *BinlogCoordinates) (matchingReplicas [](*Instance)) {
+	if len(replicas) == 0 {
+		return matchingReplicas
+	}
+
+	barrier := make(chan *InstanceKey)
+	replicaMutex := make(chan bool, 1)
+	for _, replica := range replicas {
+		replica := replica
+
+		go func() {
+			defer func() { barrier <- &replica.Key }()
+			ExecuteOnTopology(func() {
+				log.Infof("GetMatchingExecBinlogCoordinatesReplicas: Will wait for %+v to reach master coordinates %+v", replica.Key, *coordinates)
+				replica, _, err := WaitForExecBinlogCoordinatesToReach(&replica.Key, coordinates, time.Duration(config.Config.ReasonableMaintenanceReplicationLagSeconds)*time.Second)
+
+				func() {
+					// Instantaneous mutex.
+					replicaMutex <- true
+					defer func() { <-replicaMutex }()
+					if err != nil {
+						log.Errorf("GetMatchingExecBinlogCoordinatesReplicas: %+v failed: %+v", replica.Key, err)
+					} else {
+						// add to matchingReplicas if replica's ExecBinlogCoordinates is equal or past that of master's
+						matchingReplicas = append(matchingReplicas, replica)
+					}
+				}()
+			})
+		}()
+	}
+	for range replicas {
+		<-barrier
+	}
+	log.Debugf("GetMatchingExecBinlogCoordinatesReplicas: found %d replicas that has mathching ExecBinlogCoordinates as master's ExecBinlogCoordinates %+v", len(matchingReplicas), *coordinates)
+
+	return matchingReplicas
+}

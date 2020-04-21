@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"context"
 	"fmt"
 	goos "os"
 	"regexp"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/os"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
@@ -2835,4 +2837,86 @@ func PurgeBinaryLogsToLatest(instanceKey *InstanceKey, force bool) (*Instance, e
 		return instance, log.Errore(err)
 	}
 	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile, force)
+}
+
+// SuggestDesignatedReplica returns a candidate replica whose ExecBinlogCoordinates has reached that of master's
+// and has no errant GTID
+func SuggestDesignatedReplica(masterKey *InstanceKey) (candidateReplica *Instance, err error) {
+	replicas, err := ReadReplicaInstances(masterKey)
+	if err != nil {
+		return candidateReplica, err
+	}
+
+	// get a subset of replicas with reasonable replication delay and no GTID errant
+	var candidateReplicas [](*Instance)
+	for _, replica := range replicas {
+		replica, err := ReadTopologyInstance(&replica.Key)
+		if err != nil {
+			log.Errorf("SuggestDesignatedReplica: %+v: %+v", replica.Key, err)
+		} else if !replica.HasReasonableMaintenanceReplicationLag() {
+			log.Infof("SuggestDesignatedReplica: replica %+v is lagging %d seconds behind master, not considered to be a candidate", replica.Key, replica.SecondsBehindMaster.Int64)
+		} else if replica.GtidErrant != "" {
+			log.Infof("SuggestDesignatedReplica: replica %+v has errant GTID, not considered to be a candidate", replica.Key)
+		} else if IsBannedFromBeingCandidateReplica(replica) {
+			log.Infof("SuggestDesignatedReplica: replica %+v is explicitly ignored in PromotionIgnoreHostnameFilters configuration", replica.Key)
+		} else {
+			candidateReplicas = append(candidateReplicas, replica)
+		}
+	}
+	if len(candidateReplicas) == 0 {
+		return candidateReplica, fmt.Errorf("No replica with reasonable delay and without errant GTID is found for %+v", *masterKey)
+	}
+	log.Debugf("SuggestDesignatedReplica: found %d replicas with reasonable delay and has no errant GTID", len(candidateReplicas))
+
+	// execute `flush tables with read lock` with timeout
+	// bail if timeout is reached or error executing the statement
+	log.Debugf("SuggestDesignatedReplica: will attempt to 'flush table with read lock' on %+v", *masterKey)
+	db, err := db.OpenTopology(masterKey.Hostname, masterKey.Port)
+	if err != nil {
+		return candidateReplica, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.FlushTablesWithReadLockTimeoutSeconds)*time.Second)
+	defer cancel()
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return candidateReplica, err
+	}
+	defer conn.Close()
+
+	_, err = conn.ExecContext(ctx, `flush tables with read lock`)
+	if ctx.Err() == context.DeadlineExceeded {
+		log.Errorf("SuggestDesignatedReplica: 'flush table with read lock' timed out %+v: %+v", *masterKey, err)
+		return candidateReplica, fmt.Errorf("'flush table with read lock' timed out %+v: %+v", *masterKey, err)
+	}
+	if err != nil {
+		log.Errorf("SuggestDesignatedReplica: 'flush table with read lock' failed on %+v: %+v", *masterKey, err)
+		return candidateReplica, fmt.Errorf("'flush table with read lock' failed on %+v: %+v", *masterKey, err)
+	}
+	log.Infof("flush-table-with-read-lock on %+v", *masterKey)
+	AuditOperation("flush-table-with-read-lock", masterKey, "success")
+
+	masterInstance, err := ReadTopologyInstance(masterKey)
+	if err != nil {
+		return candidateReplica, err
+	}
+
+	// get the replicas whose ExecBinlogCoordinates is the same as that of master
+	clusterMasterSelfBinlogCoordinates := &masterInstance.SelfBinlogCoordinates
+	candidateReplicas = GetMatchingExecBinlogCoordinatesReplicas(candidateReplicas, clusterMasterSelfBinlogCoordinates)
+	if len(candidateReplicas) == 0 {
+		return candidateReplica, fmt.Errorf("No replica is found to have the matching ExecBinlogCoordinates as the master %+v", *masterKey)
+	}
+
+	// if more than one candidateReplica found, select one at the same data center as the master
+	dataCenterHint := masterInstance.DataCenter
+	sortInstancesDataCenterHint(candidateReplicas, dataCenterHint)
+
+	log.Debugf("master:%+v, masterExec:%+v", *masterKey, *clusterMasterSelfBinlogCoordinates)
+	for _, replica := range candidateReplicas {
+		log.Debugf("- candidateReplicas:%+v, Self:%+v, Read:%+v, Exec:%+v", replica.Key, replica.SelfBinlogCoordinates, replica.ReadBinlogCoordinates, replica.ExecBinlogCoordinates)
+	}
+
+	return candidateReplicas[0], nil
 }

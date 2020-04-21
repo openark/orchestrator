@@ -133,7 +133,7 @@ func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Inst
 
 // CliWrapper is called from main and allows for the instance parameter
 // to take multiple instance names separated by a comma or whitespace.
-func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string, suggestReplica bool) {
 	if config.Config.RaftEnabled && !*config.RuntimeCLIFlags.IgnoreRaftSetup {
 		log.Fatalf(`Orchestrator configured to run raft ("RaftEnabled": true). All access must go through the web API of the active raft node. You may use the orchestrator-client script which has a similar interface to the command line invocation. You may override this with --ignore-raft-setup`)
 	}
@@ -148,13 +148,13 @@ func CliWrapper(command string, strict bool, instances string, destination strin
 	}
 	for _, instance := range tokens {
 		if instance != "" || len(tokens) == 1 {
-			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
+			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag, suggestReplica)
 		}
 	}
 }
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string, suggestReplica bool) {
 	if synonym, ok := commandSynonyms[command]; ok {
 		command = synonym
 	}
@@ -1502,13 +1502,13 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
 		}
-	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.`):
+	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com', or setup replication tree to have a single direct replica to the master, or set suggestReplica to true to let orchestrator select a replica to promote.`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			if destinationKey != nil {
 				validateInstanceIsFound(destinationKey)
 			}
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey, suggestReplica)
 			if err != nil {
 				log.Fatale(err)
 			}
