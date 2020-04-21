@@ -13,7 +13,7 @@ $(document).ready(function () {
     $.get(appUrl("/api/agent-seed-states/"+currentSeedId()), function (seedStates) {
 	        showLoader();
 	        seedStates.forEach(function (seedState) {
-	        	appendSeedState(seedState);
+	        	appendSeedState(seedState, "#seed_states");
 	    	});
 	    }, "json");
 });	

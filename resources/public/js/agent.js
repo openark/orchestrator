@@ -35,7 +35,7 @@ $(document).ready(function() {
       $.get(appUrl("/api/agent-seed-states/" + activeSeeds[0].SeedID), function(seedStates) {
         showLoader();
         seedStates.forEach(function(seedState) {
-          appendSeedState(seedState);
+          appendSeedState(seedState, "#seed_states");
         });
       }, "json");
     }

@@ -24,7 +24,7 @@ function appendSeedDetails(seed, selector) {
     hideLoader();
 }
 
-function appendSeedState(seedState) {
+function appendSeedState(seedState,selector) {
 	var row = '<tr>';
 	row += '<td>' + moment.utc(seedState.Timestamp).format("YYYY-MM-DD HH:mm:ss") + '</td>';
 	row += '<td>' + seedState.Stage + '</td>';
@@ -32,7 +32,7 @@ function appendSeedState(seedState) {
 	row += '<td>' + seedState.Status + '</td>';
 	row += '<td>' + seedState.Details + '</td>';
 	row += '</tr>';
-	$("#seed_states").append(row);
+	$(selector).append(row);
     hideLoader();
 }
 
