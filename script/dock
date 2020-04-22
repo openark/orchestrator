@@ -6,6 +6,7 @@
 #   dock alpine:              build and run orchestrator on alpine linux
 #   dock hub:                 build hub.docker.com image with latest tag
 #   dock pkg [target-path]:   build orchestrator release packages and copy to target path (default path: /tmp/orchestrator-release)
+#   dock system:              create and run a system test environment
 
 command="$1"
 
@@ -32,6 +33,10 @@ case "$command" in
     docker build . -f Dockerfile.packaging -t "${docker_target}" && docker run --rm -it -v "${packages_path}:/tmp/pkg" "${docker_target}:latest" bash -c 'find /tmp/orchestrator-release/ -maxdepth 1 -type f | xargs cp -t /tmp/pkg'
     echo "packages generated on ${packages_path}:"
     ls -l "${packages_path}"
+    ;;
+  "system")
+    docker_target="orchestrator-system"
+    docker build . -f Dockerfile.system -t "${docker_target}" && docker run --rm -it "${docker_target}:latest"
     ;;
   *)
     >&2 echo "Usage: dock dock <test|alpine|packages> [arg]"
