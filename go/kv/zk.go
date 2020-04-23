@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/zookeepercli/zk"
+	"github.com/outbrain/zookeepercli/go/zk"
 	zkconstants "github.com/samuel/go-zookeeper/zk"
 )
 
