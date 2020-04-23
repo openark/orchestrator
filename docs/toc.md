@@ -58,4 +58,3 @@
 
 - [FAQ](faq.md)
 - [First steps](first-steps.md), a quick introduction to `orchestrator`
-- Orchestrator for [developers](developers.md). Read this if you wish to develop/contribute to `orchestrator`.
