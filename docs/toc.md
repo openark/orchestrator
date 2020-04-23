@@ -33,8 +33,13 @@
 - [Status Checks](status-checks.md)
 - [Tags](tags.md)
 
-#### Various
+#### Development
+- [Understanding CI](ci.md)
+- [Building and testing](build.md)
+- [System test environment](ci-env.md)
 - [Docker](docker.md)
+
+#### Various
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Pseudo GTID](pseudo-gtid.md): refactoring and high availability without using GTID.
