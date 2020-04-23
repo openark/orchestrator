@@ -18,6 +18,8 @@ package inst
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/github/orchestrator/go/db"
 )
@@ -46,7 +48,7 @@ func (cdi *CandidateDatabaseInstance) WithCurrentTime() *CandidateDatabaseInstan
 
 // String returns a string representation of the CandidateDatabaseInstance struct
 func (cdi *CandidateDatabaseInstance) String() string {
-	return fmt.Sprintf("%s:%d %s", cdi.Hostname, cdi.Port, cdi.PromotionRule)
+	return fmt.Sprintf("%s %s", net.JoinHostPort(cdi.Hostname, strconv.Itoa(cdi.Port)), cdi.PromotionRule)
 }
 
 // Key returns an instance key representing this candidate

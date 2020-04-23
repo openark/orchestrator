@@ -23,6 +23,7 @@ import (
 	"os/user"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -179,8 +180,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		rawInstanceKey = nil
 	}
 
-	if destination != "" && !strings.Contains(destination, ":") {
-		destination = fmt.Sprintf("%s:%d", destination, config.Config.DefaultInstancePort)
+	if destination != "" {
+		if _, _, err := net.SplitHostPort(destination); err != nil {
+			destination = net.JoinHostPort(destination, strconv.Itoa(config.Config.DefaultInstancePort))
+		}
 	}
 	destinationKey, err := inst.ParseResolveInstanceKey(destination)
 	if err != nil {
@@ -995,7 +998,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, clusterPoolInstance := range clusterPoolInstances {
-				fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.ClusterAlias, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
+				fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s", clusterPoolInstance.ClusterName, clusterPoolInstance.ClusterAlias, clusterPoolInstance.Pool, net.JoinHostPort(clusterPoolInstance.Hostname, strconv.Itoa(clusterPoolInstance.Port))))
 			}
 		}
 	case registerCliCommand("which-heuristic-cluster-pool-instances", "Pools", `List instances of a given cluster which are in either any pool or in a specific pool`):

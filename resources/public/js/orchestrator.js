@@ -9,6 +9,26 @@ reloadPageHint = {
   port: ""
 }
 
+function splitHostPort(addr) {
+    if (addr.indexOf(':') < 0) {
+        return [addr, undefined]
+    }
+    chunks = addr.split(':')
+    port = chunks.pop()
+    host = chunks.join(':')
+    if (host.startsWith('[') && host.endsWith(']')) {
+        host = host.substring(1, host.length - 1)
+    }
+    return [host, port]
+}
+
+function joinHostPort(host, port) {
+    if (host.indexOf(':') > -1) {
+        return '[' + host + ']:' + port
+    }
+    return host + ':' + port
+}
+
 function updateCountdownDisplay() {
   if ($.cookie("auto-refresh") == "true") {
     $("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');
@@ -138,7 +158,7 @@ function getInstanceTitle(host, port) {
   if (host == "") {
     return "";
   }
-  return canonizeInstanceTitle(host + ":" + port);
+  return canonizeInstanceTitle(joinHostPort(host, port));
 }
 
 
@@ -290,7 +310,7 @@ function openNodeModal(node) {
           // This very instance; will not move below itself
           return;
         }
-        var title = canonizeInstanceTitle(equivalence.Key.Hostname + ':' + equivalence.Key.Port);
+        var title = canonizeInstanceTitle(joinHostPort(equivalence.Key.Hostname, equivalence.Key.Port));
         $('#node_modal [data-btn-group=move-equivalent] ul').append('<li><a href="#" data-btn="move-equivalent" data-hostname="' + equivalence.Key.Hostname + '" data-port="' + equivalence.Key.Port + '">' + title + '</a></li>');
       });
 
@@ -410,7 +430,7 @@ function openNodeModal(node) {
     apiCommand("/api/reattach-replica-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=reset-slave]').click(function() {
-    var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to reset <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>This will stop and break the replication." +
       "<p>FYI, this is a destructive operation that cannot be easily reverted";
@@ -422,7 +442,7 @@ function openNodeModal(node) {
     return false;
   });
   $('#node_modal [data-btn=gtid-errant-reset-master]').click(function() {
-    var message = "<p>Are you sure you wish to reset master on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to reset master on <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>This will purge binary logs on server.";
     bootbox.confirm(message, function(confirm) {
@@ -448,7 +468,7 @@ function openNodeModal(node) {
     apiCommand("/api/set-writeable/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=enable-gtid]').click(function() {
-    var message = "<p>Are you sure you wish to enable GTID on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to enable GTID on <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>Replication <i>might</i> break as consequence";
     bootbox.confirm(message, function(confirm) {
@@ -458,7 +478,7 @@ function openNodeModal(node) {
     });
   });
   $('#node_modal button[data-btn=disable-gtid]').click(function() {
-    var message = "<p>Are you sure you wish to disable GTID on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to disable GTID on <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>Replication <i>might</i> break as consequence";
     bootbox.confirm(message, function(confirm) {
@@ -468,7 +488,7 @@ function openNodeModal(node) {
     });
   });
   $('#node_modal button[data-btn=forget-instance]').click(function() {
-    var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to forget <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>It may be re-discovered if accessible from an existing instance through replication topology.";
     bootbox.confirm(message, function(confirm) {
@@ -540,7 +560,7 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=regroup-replicas]').show();
   }
   $('#node_modal button[data-btn=regroup-replicas]').click(function() {
-    var message = "<p>Are you sure you wish to regroup replicas of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    var message = "<p>Are you sure you wish to regroup replicas of <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?" +
       "<p>This will attempt to promote one replica over its siblings";
     bootbox.confirm(message, function(confirm) {
@@ -559,7 +579,7 @@ function openNodeModal(node) {
     if (isSilentUI()) {
       apiCommand(apiUrl);
     } else {
-      var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+      var message = "<p>Are you sure you want <code><strong>" + joinHostPort(node.Key.Hostname, node.Key.Port) +
         "</strong></code> to take its siblings?";
       bootbox.confirm(message, function(confirm) {
         if (confirm) {
@@ -597,9 +617,9 @@ function openNodeModal(node) {
 
 function normalizeInstance(instance) {
   instance.id = getInstanceId(instance.Key.Hostname, instance.Key.Port);
-  instance.title = instance.Key.Hostname + ':' + instance.Key.Port;
+  instance.title = joinHostPort(instance.Key.Hostname, instance.Key.Port);
   instance.canonicalTitle = instance.title;
-  instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
+  instance.masterTitle = joinHostPort(instance.MasterKey.Hostname, instance.MasterKey.Port);
   instance.masterId = getInstanceId(instance.MasterKey.Hostname,
     instance.MasterKey.Port);
 

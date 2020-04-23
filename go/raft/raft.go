@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"strings"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -105,13 +105,12 @@ func computeLeaderURI() (uri string, err error) {
 	}
 
 	hostname := config.Config.RaftAdvertise
-	listenTokens := strings.Split(config.Config.ListenAddress, ":")
-	if len(listenTokens) < 2 {
+	_, port, err := net.SplitHostPort(config.Config.ListenAddress)
+	if err != nil {
 		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)
 	}
-	port := listenTokens[1]
 
-	uri = fmt.Sprintf("%s://%s:%s", scheme, hostname, port)
+	uri = fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(hostname, port))
 	return uri, nil
 }
 
@@ -196,16 +195,19 @@ func normalizeRaftHostnameIP(host string) (string, error) {
 // normalizeRaftNode attempts to make sure there's a port to the given node.
 // It consults the DefaultRaftPort when there isn't
 func normalizeRaftNode(node string) (string, error) {
-	hostPort := strings.Split(node, ":")
-	host, err := normalizeRaftHostnameIP(hostPort[0])
+	host, port, err := net.SplitHostPort(node)
+	if err != nil {
+		host = node
+	}
+	host, err = normalizeRaftHostnameIP(host)
 	if err != nil {
 		return host, err
 	}
-	if len(hostPort) > 1 {
-		return fmt.Sprintf("%s:%s", host, hostPort[1]), nil
+	if port != "" {
+		return net.JoinHostPort(host, port), nil
 	} else if config.Config.DefaultRaftPort != 0 {
 		// No port specified, add one
-		return fmt.Sprintf("%s:%d", host, config.Config.DefaultRaftPort), nil
+		return net.JoinHostPort(host, strconv.Itoa(config.Config.DefaultRaftPort)), nil
 	} else {
 		return host, nil
 	}

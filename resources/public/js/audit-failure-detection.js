@@ -26,7 +26,7 @@ $(document).ready(function() {
 
     hideLoader();
     auditEntries.forEach(function(audit) {
-      var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname + ":" + audit.AnalysisEntry.AnalyzedInstanceKey.Port;
+      var analyzedInstanceDisplay = joinHostPort(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
       var row = $('<tr/>');
       var analysisElement = $('<a class="more-detection-info"/>').attr("data-detection-id", audit.Id).text(audit.AnalysisEntry.Analysis);
 

@@ -698,9 +698,9 @@ function Cluster() {
     if (shouldApply) {
       addAlert(
         "Cannot move <code><strong>" +
-        node.Key.Hostname + ":" + node.Key.Port +
+        joinHostPort(node.Key.Hostname, node.Key.Port) +
         "</strong></code> under <code><strong>" +
-        droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
+        joinHostPort(droppableNode.Key.Hostname, droppableNode.Key.Port) +
         "</strong></code>. " +
         "You may only move a node down below its sibling or up below its grandparent."
       );
@@ -914,9 +914,9 @@ function Cluster() {
     if (shouldApply) {
       addAlert(
         "Cannot move replicas of <code><strong>" +
-        node.Key.Hostname + ":" + node.Key.Port +
+        joinHostPort(node.Key.Hostname, node.Key.Port) +
         "</strong></code> under <code><strong>" +
-        droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
+        joinHostPort(droppableNode.Key.Hostname, droppableNode.Key.Port) +
         "</strong></code>. " +
         "You may only repoint or move up the replicas of an instance. Otherwise try Smart Mode."
       );
@@ -945,9 +945,9 @@ function Cluster() {
 
   function relocate(node, siblingNode) {
     var message = "<h4>relocate</h4>Are you sure you wish to turn <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> into a replica of <code><strong>" +
-      siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+      joinHostPort(siblingNode.Key.Hostname, siblingNode.Key.Port) +
       "</strong></code>?" +
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
       "<p>In case multiple steps are involved, failure of one would leave your instance hanging in a different location than you expected, " +
@@ -959,9 +959,9 @@ function Cluster() {
   function relocateReplicas(node, siblingNode, pattern) {
     pattern = pattern || "";
     var message = "<h4>relocate-replicas</h4>Are you sure you wish to relocate replicas of <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> below <code><strong>" +
-      siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+      joinHostPort(siblingNode.Key.Hostname, siblingNode.Key.Port) +
       "</strong></code>?" +
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
       "<p>In case multiple steps are involved, failure of one may leave some instances hanging in a different location than you expected, " +
@@ -972,7 +972,7 @@ function Cluster() {
 
   function repointReplicas(node, siblingNode) {
     var message = "<h4>repoint-replicas</h4>Are you sure you wish to repoint replicas of <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/repoint-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -980,9 +980,9 @@ function Cluster() {
 
   function moveUpReplicas(node, masterNode) {
     var message = "<h4>move-up-replicas</h4>Are you sure you wish to move up replicas of <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> below <code><strong>" +
-      masterNode.Key.Hostname + ":" + masterNode.Key.Port +
+      joinHostPort(masterNode.Key.Hostname, masterNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/move-up-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -990,9 +990,9 @@ function Cluster() {
 
   function matchReplicas(node, otherNode) {
     var message = "<h4>match-replicas</h4>Are you sure you wish to match replicas of <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> below <code><strong>" +
-      otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+      joinHostPort(otherNode.Key.Hostname, otherNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/match-replicas/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1000,9 +1000,9 @@ function Cluster() {
 
   function moveBelow(node, siblingNode) {
     var message = "<h4>move-below</h4>Are you sure you wish to turn <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> into a replica of <code><strong>" +
-      siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+      joinHostPort(siblingNode.Key.Hostname, siblingNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1010,9 +1010,9 @@ function Cluster() {
 
   function moveUp(node, grandparentNode) {
     var message = "<h4>move-up</h4>Are you sure you wish to turn <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> into a replica of <code><strong>" +
-      grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
+      joinHostPort(grandparentNode.Key.Hostname, grandparentNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1020,9 +1020,9 @@ function Cluster() {
 
   function takeMaster(node, masterNode) {
     var message = "<h4>take-master</h4>Are you sure you wish to make <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> master of <code><strong>" +
-      masterNode.Key.Hostname + ":" + masterNode.Key.Port +
+      joinHostPort(masterNode.Key.Hostname, masterNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/take-master/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1030,9 +1030,9 @@ function Cluster() {
 
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> into a replica of <code><strong>" +
-      otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+      joinHostPort(otherNode.Key.Hostname, otherNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1040,9 +1040,9 @@ function Cluster() {
 
   function moveBelowGTID(node, otherNode) {
     var message = "<h4>GTID MODE, move-below</h4>Are you sure you wish to turn <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> into a replica of <code><strong>" +
-      otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+      joinHostPort(otherNode.Key.Hostname, otherNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/move-below-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1050,9 +1050,9 @@ function Cluster() {
 
   function moveReplicasGTID(node, otherNode) {
     var message = "<h4>GTID MODE, move-replicas</h4>Are you sure you wish to move replicas of <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> below <code><strong>" +
-      otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+      joinHostPort(otherNode.Key.Hostname, otherNode.Key.Port) +
       "</strong></code>?";
     var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
@@ -1060,9 +1060,9 @@ function Cluster() {
 
   function makeCoMaster(node, childNode) {
     var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
+      joinHostPort(node.Key.Hostname, node.Key.Port) +
       "</strong></code> and <code><strong>" +
-      childNode.Key.Hostname + ":" + childNode.Key.Port +
+      joinHostPort(childNode.Key.Hostname, childNode.Key.Port) +
       "</strong></code> co-masters?";
     bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
       if (confirm) {
@@ -1076,7 +1076,7 @@ function Cluster() {
 
   function gracefulMasterTakeover(newMasterNode, existingMasterNode) {
     var message = '<h1><span class="glyphicon glyphicon-exclamation-sign text-warning"></span> DANGER ZONE</h1><h4>Graceful-master-takeover</h4>Are you sure you wish to promote <code><strong>' +
-      newMasterNode.Key.Hostname + ':' + newMasterNode.Key.Port +
+      joinHostPort(newMasterNode.Key.Hostname, newMasterNode.Key.Port) +
       '</strong></code> as master?';
     bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
       if (confirm) {
@@ -1327,14 +1327,14 @@ function Cluster() {
 
   // This is legacy and will be removed
   function makeMaster(instance) {
-    var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname + ":" + instance.Key.Port + "</strong></code> the new master?" + "<p>Siblings of <code><strong>" + instance.Key.Hostname + ":" + instance.Key.Port + "</strong></code> will turn to be its children, " + "via Pseudo-GTID." + "<p>The instance will be set to be writeable (<code><strong>read_only = 0</strong></code>)." + "<p>Replication on this instance will be stopped, but not reset. You should run <code><strong>RESET SLAVE</strong></code> yourself " + "if this instance will indeed become the master." + "<p>Pointing your application servers to the new master is on you.";
+    var message = "Are you sure you wish to make <code><strong>" + joinHostPort(instance.Key.Hostname, instance.Key.Port) + "</strong></code> the new master?" + "<p>Siblings of <code><strong>" + joinHostPort(instance.Key.Hostname, instance.Key.Port) + "</strong></code> will turn to be its children, " + "via Pseudo-GTID." + "<p>The instance will be set to be writeable (<code><strong>read_only = 0</strong></code>)." + "<p>Replication on this instance will be stopped, but not reset. You should run <code><strong>RESET SLAVE</strong></code> yourself " + "if this instance will indeed become the master." + "<p>Pointing your application servers to the new master is on you.";
     var apiUrl = "/api/make-master/" + instance.Key.Hostname + "/" + instance.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
   //This is legacy and will be removed
   function makeLocalMaster(instance) {
-    var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname + ":" + instance.Key.Port + "</strong></code> a local master?" + "<p>Siblings of <code><strong>" + instance.Key.Hostname + ":" + instance.Key.Port + "</strong></code> will turn to be its children, " + "via Pseudo-GTID." + "<p>The instance will replicate from its grandparent.";
+    var message = "Are you sure you wish to make <code><strong>" + joinHostPort(instance.Key.Hostname, instance.Key.Port) + "</strong></code> a local master?" + "<p>Siblings of <code><strong>" + joinHostPort(instance.Key.Hostname, instance.Key.Port) + "</strong></code> will turn to be its children, " + "via Pseudo-GTID." + "<p>The instance will replicate from its grandparent.";
     var apiUrl = "/api/make-local-master/" + instance.Key.Hostname + "/" + instance.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
@@ -1521,7 +1521,7 @@ function Cluster() {
     if (extraText != '') {
       analysisContent += '<div>' + extraText + '</div>';
     }
-    analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
+    analysisContent += "<div>" + joinHostPort(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port) + "</div>";
     var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
     addSidebarInfoPopoverContent(content, "analysis", false);
     if (analysisEntry.IsStructureAnalysis) {

@@ -123,7 +123,10 @@ func ReadAllPoolInstancesSubmissions() ([]PoolInstancesSubmission, error) {
 		select
 			pool,
 			min(registered_at) as registered_at,
-			GROUP_CONCAT(concat(hostname, ':', port)) as hosts
+			GROUP_CONCAT(
+			CASE WHEN INSTR(hostname, ':') THEN concat('[', hostname, ']:', port)
+				 ELSE concat(hostname, ':', port)
+			END) as hosts
 		from
 			database_instance_pool
 		group by

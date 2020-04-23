@@ -109,9 +109,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		            OR master_instance.master_port = 0
 								OR substr(master_instance.master_host, 1, 2) = '//') AS is_master,
 		        MIN(master_instance.is_co_master) AS is_co_master,
-		        MIN(CONCAT(master_instance.hostname,
-		                ':',
-		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
+		        MIN((CASE WHEN INSTR(master_instance.hostname, ':') > 0
+						THEN concat('[', master_instance.hostname, ']:', master_instance.port)
+						ELSE concat(master_instance.hostname, ':', master_instance.port)
+					END)
+						= master_instance.cluster_name) AS is_cluster_master,
 						MIN(master_instance.gtid_mode) AS gtid_mode,
 		        COUNT(replica_instance.server_id) AS count_replicas,
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
@@ -126,7 +128,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                    AND replica_instance.slave_sql_running = 1),
 		                0) AS count_replicas_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
-		        GROUP_CONCAT(concat(replica_instance.Hostname, ':', replica_instance.Port)) as slave_hosts,
+		        GROUP_CONCAT((CASE WHEN INSTR(replica_instance.hostname, ':') > 0
+						THEN concat('[', replica_instance.hostname, ']:', replica_instance.port)
+						ELSE concat(replica_instance.hostname, ':', replica_instance.port)
+					END)) as slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0

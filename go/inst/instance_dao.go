@@ -620,14 +620,16 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			defer waitGroup.Done()
 			err := sqlutils.QueryRowsMap(db, `
       	select
-      		substring_index(host, ':', 1) as slave_hostname
+			host
       	from
       		information_schema.processlist
       	where
           command IN ('Binlog Dump', 'Binlog Dump GTID')
   		`,
 				func(m sqlutils.RowMap) error {
-					cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
+					host := m.GetString("host")
+					host = host[0:strings.LastIndex(host, ":")]
+					cname, resolveErr := ResolveHostname(host)
 					if resolveErr != nil {
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
@@ -1369,7 +1371,11 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or instr(cluster_name, ?) > 0
 			or instr(version, ?) > 0
 			or instr(version_comment, ?) > 0
-			or instr(concat(hostname, ':', port), ?) > 0
+			or instr(
+				CASE WHEN INSTR(hostname, ':') THEN concat('[', hostname, ']:', port)
+				 	 ELSE concat(hostname, ':', port)
+				END,
+				?) > 0
 			or instr(suggested_cluster_alias, ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
@@ -1485,8 +1491,8 @@ func ReadDowntimedInstances(clusterName string) ([](*Instance), error) {
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 			cluster_name = ?
-			and concat(hostname, ':', port) in (
-				select concat(hostname, ':', port)
+			and concat(hostname, ' ', port) in (
+				select concat(hostname, ' ', port)
 					from candidate_database_instance
 					where promotion_rule in ('must', 'prefer')
 			)

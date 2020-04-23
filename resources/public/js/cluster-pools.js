@@ -79,7 +79,7 @@ $(document).ready(function() {
       pool.instances.forEach(function(instance) {
         var instanceId = getInstanceId(instance.Hostname, instance.Port);
         var problemInstance = problemInstancesMap[instanceId];
-        var instanceDisplay = instance.Hostname + ":" + instance.Port;
+        var instanceDisplay = joinHostPort(instance.Hostname, instance.Port);
         if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
           instanceDisplay = instanceDisplay.replace(removeTextFromHostnameDisplay(), '');
         }

@@ -254,8 +254,8 @@ func ExpireMaintenance() error {
 				database_instance_maintenance
 			where
 				explicitly_bounded = 0
-				and concat(processing_node_hostname, ':', processing_node_token) not in (
-					select concat(hostname, ':', token) from node_health
+				and concat(processing_node_hostname, ' ', processing_node_token) not in (
+					select concat(hostname, ' ', token) from node_health
 				)
 			`,
 		)

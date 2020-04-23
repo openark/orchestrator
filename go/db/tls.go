@@ -19,6 +19,8 @@ package db
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,7 +58,7 @@ func init() {
 }
 
 func requiresTLS(host string, port int, mysql_uri string) bool {
-	cacheKey := fmt.Sprintf("%s:%d", host, port)
+	cacheKey := net.JoinHostPort(host, strconv.Itoa(port))
 
 	if value, found := requireTLSCache.Get(cacheKey); found {
 		readInstanceTLSCacheCounter.Inc(1)

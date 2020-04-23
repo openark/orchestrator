@@ -48,7 +48,7 @@ $(document).ready(function() {
     }
     $("[data-agent=hostname]").html(agent.Hostname)
     $("[data-agent=hostname_search]").html(
-      '<a href="' + appUrl('/web/search?s=' + agent.Hostname + ':' + agent.MySQLPort) + '">' + agent.Hostname + '</a>' + '<div class="pull-right"><button class="btn btn-xs btn-success" data-command="discover" data-hostname="' + agent.Hostname + '" data-mysql-port="' + agent.MySQLPort + '">Discover</button></div>'
+      '<a href="' + appUrl('/web/search?s=' + joinHostPort(agent.Hostname, agent.MySQLPort)) + '">' + agent.Hostname + '</a>' + '<div class="pull-right"><button class="btn btn-xs btn-success" data-command="discover" data-hostname="' + agent.Hostname + '" data-mysql-port="' + agent.MySQLPort + '">Discover</button></div>'
     );
     $("[data-agent=port]").html(agent.Port)
     $("[data-agent=last_submitted]").html(agent.LastSubmitted)
