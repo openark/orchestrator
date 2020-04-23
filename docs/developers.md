@@ -18,7 +18,7 @@ If you would like to build `orchestrator` on your own machine, or eventually sub
 
 Clone the repo anywhere on your filesystem via
 
-	git clone git@github.com:github/orchestrator.git
+	git clone git@github.com:openark/orchestrator.git
 	cd orchestrator
 
 Ensure you have proper build tools installed (CentOS referenced below)
