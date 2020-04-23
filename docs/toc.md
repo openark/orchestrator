@@ -33,11 +33,12 @@
 - [Status Checks](status-checks.md)
 - [Tags](tags.md)
 
-#### Development
+#### Developers
 - [Understanding CI](ci.md)
 - [Building and testing](build.md)
 - [System test environment](ci-env.md)
 - [Docker](docker.md)
+- [Contributions](contributions.md)
 
 #### Various
 - [Security](security.md)
@@ -50,7 +51,6 @@
 - [Gotchas](gotchas.md)
 - [Supported topologies and versions](supported-topologies-and-versions.md)
 - [Bugs](bugs.md)
-- [Contributions](contributions.md)
 - [Who uses Orchestrator?](users.md)
 - [Presentations](presentations.md)
 
