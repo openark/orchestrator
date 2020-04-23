@@ -9,14 +9,14 @@ validate_documentation() {
   egrep -R '[(][^/()]+.md[)]' docs/ -o --no-file | sort | uniq | tr -d '()' | while read link ; do
     echo "### Checking link: $link"
     ls docs/$link > /dev/null && echo "## - yes" || exit 1
-  done
+  done || exit 1
 
   echo "## Checking every doc page has an inbound link"
   ls docs/*.md | grep -v README.md | while read f ; do
     docfile="$(basename $f)"
     echo "### Checking if doc file $docfile is linked from another doc"
     egrep -c -R "[(]$docfile[)]" docs/ -q && echo "## - yes" || exit 1
-  done
+  done || exit 1
 }
 
 
