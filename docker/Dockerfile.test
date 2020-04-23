@@ -1,5 +1,5 @@
 FROM golang:1.12.1
-LABEL maintainer="github@github.com"
+LABEL maintainer="openark@github.com"
 
 RUN apt-get update
 RUN apt-get install -y lsb-release
