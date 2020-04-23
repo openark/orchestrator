@@ -11,10 +11,15 @@ Please keep this list in alphabetical order and include the company name and url
 a short description of usage.
 
 * [Booking.com](http://www.booking.com)
+* [Box](http://www.box.com)
 * [GitHub Inc](http://www.github.com)
 * [Goggle/Vitess](http://vitess.io)
+* [MessageBird](https://www.messagebird.com/)
 * [Outbrain](http://www.outbrain.com)
-* [Rentalcars.com](http://www.rentalcars.com) - evaluating in production
+* [PagerDuty](http://www.pagerduty.com)
+* [Rentalcars.com](http://www.rentalcars.com)
 * [SendGrid](https://sendgrid.com)
+* [Slack](https://slackhq.com)
 * [Square](http://squareup.com)
+* [SurveyMonkey](http://www.surveymonkey.com)
 * [Wix](http://www.wix.com)
