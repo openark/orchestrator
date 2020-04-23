@@ -3,8 +3,9 @@
 validate_documentation() {
   echo "# Validating documentation"
   echo "## docs/toc.md and docs/README.md must be identical"
-  diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
-
+  diff docs/toc.md docs/README.md > /dev/null 2> /dev/null || exit 1
+  echo "OK"
+  
   echo "## Checking if all local links are backed by doc files"
   egrep -R '[(][^/()]+.md[)]' docs/ -o --no-file | sort | uniq | tr -d '()' | while read link ; do
     echo "### Checking link: $link"
