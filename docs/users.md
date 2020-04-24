@@ -12,6 +12,7 @@ a short description of usage.
 
 * [Booking.com](http://www.booking.com)
 * [Box](http://www.box.com)
+* [Citymobil](https://www.city-mobil.ru)
 * [GitHub Inc](http://www.github.com)
 * [Goggle/Vitess](http://vitess.io)
 * [MessageBird](https://www.messagebird.com/)
