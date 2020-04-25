@@ -26,6 +26,19 @@ echo_dot() {
   echo -n "."
 }
 
+check_environment() {
+  echo "checking orchestrator-client"
+  if ! which orchestrator-client ; then
+    echo "+ not found in PATH"
+    if [ -f resources/bin/orchestrator-client ] ; then
+      echo "found in resources/bin. Updating PATH"
+      export PATH="$PATH:$(pwd)/resources/bin"
+    else
+      echo "orchestrator-client not found"
+      exit 1
+    fi
+  fi
+}
 
 test_step() {
   local test_path
@@ -150,6 +163,7 @@ test_all() {
 }
 
 main() {
+  check_environment
   test_all "$@"
 }
 
