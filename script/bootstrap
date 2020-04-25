@@ -13,5 +13,5 @@ set -e
 set -x
 rm -rf .gopath
 mkdir -p .gopath/src/github.com/github
-ln -s "$PWD" .gopath/src/github.com/github/orchestrator
+ln -s "$PWD" .gopath/src/github.com/openark/orchestrator
 export GOPATH=$PWD/.gopath:$GOPATH

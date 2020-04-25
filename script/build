@@ -24,7 +24,7 @@ version=$(git rev-parse HEAD)
 describe=$(git describe --tags --always --dirty)
 
 export GOPATH="$PWD/.gopath"
-cd .gopath/src/github.com/github/orchestrator
+cd .gopath/src/github.com/openark/orchestrator
 
 # We put the binaries directly into the bindir, because we have no need for shim wrappers
 go build -i -o "$bindir/orchestrator" -ldflags "-X main.AppVersion=${version} -X main.BuildDescribe=${describe}" ./go/cmd/orchestrator/main.go
