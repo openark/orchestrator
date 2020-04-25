@@ -1,6 +1,6 @@
 # orchestrator-client
 
-[orchestrator-client](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client) is a script that wraps API calls with convenient command line interface.
+[orchestrator-client](https://github.com/openark/orchestrator/blob/master/resources/bin/orchestrator-client) is a script that wraps API calls with convenient command line interface.
 
 It can auto-determine the leader of an `orchestrator` setup and in such case forward all requests to the leader.
 
