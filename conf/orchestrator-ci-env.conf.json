@@ -20,7 +20,7 @@
   "ReadOnly": false,
   "AuthenticationMethod": "",
   "ReplicationLagQuery": "select timestampdiff(second, ts, now()) from test.heartbeat",
-  "DetectClusterAliasQuery": "SELECT 'ci-env'",
+  "DetectClusterAliasQuery": "SELECT 'ci'",
   "DetectClusterDomainQuery": "",
   "DetectInstanceAliasQuery": "",
   "DetectPromotionRuleQuery": "",
@@ -80,6 +80,6 @@
   "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeReplicaRecoveryOnLagMinutes": 0,
-  "ConsulAddress": "",
+  "ConsulAddress": "127.0.0.1:8500",
   "ConsulAclToken": ""
 }
