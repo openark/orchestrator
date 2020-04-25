@@ -5,7 +5,7 @@
   "MySQLTopologyUser": "ci",
   "MySQLTopologyPassword": "ci",
   "BackendDB": "sqlite",
-  "SQLite3DataFile": "/Users/shlomi/opt/orchestrator/orchestrator.sqlite3",
+  "SQLite3DataFile": "/usr/local/orchestrator.sqlite3",
   "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
