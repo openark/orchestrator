@@ -1,2 +1,2 @@
-sleep 2
+sleep 3
 orchestrator-client -c topology-tabulated -alias ci | cut -d'|' -f 1
