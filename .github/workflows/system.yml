@@ -1,11 +1,14 @@
 name: system tests
 
 on:
+  pull_request:
+    branches:
+      - master
   schedule:
     - cron:  '13,43 * * * *'
 
 jobs:
-  tests:
+  system:
     runs-on: ubuntu-latest
 
     steps:
