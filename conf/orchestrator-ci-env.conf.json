@@ -28,6 +28,9 @@
   "DetectRegionQuery": "select @@hostname",
   "DetectPhysicalEnvironmentQuery": "select 'prod'",
   "DetectSemiSyncEnforcedQuery": "",
+  "DiscoverySeeds": [
+    "127.0.0.1:10111"
+  ],
   "ServeAgentsHttp": false,
   "UseSSL": false,
   "UseMutualTLS": false,
