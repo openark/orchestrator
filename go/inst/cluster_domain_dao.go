@@ -17,9 +17,9 @@
 package inst
 
 import (
+	"github.com/openark/golib/log"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/db"
-	"github.com/openark/golib/log"
 )
 
 // WriteClusterDomainName will write (and override) the domain name of a cluster

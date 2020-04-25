@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openark/orchestrator/go/config"
-	"github.com/openark/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)

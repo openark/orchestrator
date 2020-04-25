@@ -8,9 +8,9 @@ import (
 
 	"github.com/openark/golib/log"
 
+	"github.com/go-martini/martini"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/raft"
-	"github.com/go-martini/martini"
 )
 
 func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context) {

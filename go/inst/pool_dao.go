@@ -19,10 +19,10 @@ package inst
 import (
 	"fmt"
 
-	"github.com/openark/orchestrator/go/config"
-	"github.com/openark/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // writePoolInstances will write (and override) a single cluster name mapping

@@ -19,9 +19,9 @@ package inst
 import (
 	"fmt"
 
-	"github.com/openark/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/db"
 )
 
 func PutInstanceTag(instanceKey *InstanceKey, tag *Tag) (err error) {

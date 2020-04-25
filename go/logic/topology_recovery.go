@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/openark/golib/log"
 	"github.com/openark/orchestrator/go/attributes"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/inst"
@@ -35,7 +36,6 @@ import (
 	"github.com/openark/orchestrator/go/process"
 	"github.com/openark/orchestrator/go/raft"
 	"github.com/openark/orchestrator/go/util"
-	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )

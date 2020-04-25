@@ -30,9 +30,9 @@ package logic
 // go to the database each time.
 
 import (
-	"github.com/openark/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // IsRecoveryDisabled returns true if Recoveries are disabled globally

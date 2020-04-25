@@ -24,8 +24,8 @@ import (
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/util"
 
-	"github.com/openark/orchestrator/go/raft"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/raft"
 	"github.com/patrickmn/go-cache"
 )
 
