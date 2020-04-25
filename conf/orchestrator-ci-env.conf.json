@@ -1,0 +1,82 @@
+{
+  "Debug": true,
+  "EnableSyslog": false,
+  "ListenAddress": ":3000",
+  "MySQLTopologyUser": "ci",
+  "MySQLTopologyPassword": "ci",
+  "BackendDB": "sqlite",
+  "SQLite3DataFile": "/Users/shlomi/opt/orchestrator/orchestrator.sqlite3",
+  "MySQLConnectTimeoutSeconds": 1,
+  "DefaultInstancePort": 3306,
+  "DiscoverByShowSlaveHosts": true,
+  "InstancePollSeconds": 2,
+  "HostnameResolveMethod": "none",
+  "MySQLHostnameResolveMethod": "@@report_host",
+  "SkipBinlogServerUnresolveCheck": true,
+  "ExpiryHostnameResolvesMinutes": 60,
+  "VerifyReplicationFilters": false,
+  "ReasonableMaintenanceReplicationLagSeconds": 20,
+  "CandidateInstanceExpireMinutes": 60,
+  "ReadOnly": false,
+  "AuthenticationMethod": "",
+  "ReplicationLagQuery": "select timestampdiff(second, ts, now()) from test.heartbeat",
+  "DetectClusterAliasQuery": "SELECT 'ci-env'",
+  "DetectClusterDomainQuery": "",
+  "DetectInstanceAliasQuery": "",
+  "DetectPromotionRuleQuery": "",
+  "DetectDataCenterQuery": "select IF(@@port <= 10112, 'dc-east', 'dc-west')",
+  "DetectRegionQuery": "select @@hostname",
+  "DetectPhysicalEnvironmentQuery": "select 'prod'",
+  "DetectSemiSyncEnforcedQuery": "",
+  "ServeAgentsHttp": false,
+  "UseSSL": false,
+  "UseMutualTLS": false,
+  "StatusEndpoint": "/api/status",
+  "StatusSimpleHealth": true,
+  "StatusOUVerify": false,
+  "BinlogEventsChunkSize": 10000,
+  "SkipBinlogEventsContaining": [],
+  "ReduceReplicationAnalysisCount": true,
+  "FailureDetectionPeriodBlockMinutes": 5,
+  "FailMasterPromotionOnLagMinutes": 0,
+  "RecoveryPeriodBlockSeconds": 5,
+  "RecoveryIgnoreHostnameFilters": [],
+  "RecoverMasterClusterFilters": [
+    "*"
+  ],
+  "RecoverIntermediateMasterClusterFilters": [
+    "*"
+  ],
+  "OnFailureDetectionProcesses": [
+    "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
+  ],
+  "PreFailoverProcesses": [
+    "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
+  ],
+  "PostFailoverProcesses": [
+    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostUnsuccessfulFailoverProcesses": [],
+  "PostMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostIntermediateMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
+  "CoMasterRecoveryMustPromoteOtherCoMaster": true,
+  "DetachLostSlavesAfterMasterFailover": true,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
+  "MasterFailoverDetachReplicaMasterHost": false,
+  "MasterFailoverLostInstancesDowntimeMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
+  "ConsulAddress": "",
+  "ConsulAclToken": ""
+}
