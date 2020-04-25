@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/util"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/util"
 
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 )

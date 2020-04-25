@@ -21,7 +21,7 @@ import (
 
 	"github.com/montanaflynn/stats"
 
-	"github.com/github/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/collection"
 )
 
 // AggregatedDiscoveryMetrics contains aggregated metrics for instance discovery.

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/github/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/collection"
 )
 
 // formattedFloat is to force the JSON output to show 3 decimal places

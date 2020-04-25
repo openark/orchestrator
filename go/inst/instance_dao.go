@@ -36,13 +36,13 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/sjmudd/stopwatch"
 
-	"github.com/github/orchestrator/go/attributes"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/metrics/query"
-	"github.com/github/orchestrator/go/util"
+	"github.com/openark/orchestrator/go/attributes"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/metrics/query"
+	"github.com/openark/orchestrator/go/util"
 )
 
 const (

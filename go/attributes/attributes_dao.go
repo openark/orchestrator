@@ -23,7 +23,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/github/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )

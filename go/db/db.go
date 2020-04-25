@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )

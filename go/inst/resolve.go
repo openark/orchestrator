@@ -19,7 +19,7 @@ package inst
 import (
 	"errors"
 	"fmt"
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"net"

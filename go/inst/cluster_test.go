@@ -19,7 +19,7 @@ package inst
 import (
 	"fmt"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
 	"testing"

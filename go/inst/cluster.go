@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/kv"
 )
 
 func GetClusterMasterKVKey(clusterAlias string) string {

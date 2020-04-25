@@ -8,8 +8,8 @@ import (
 
 	"github.com/openark/golib/log"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/raft"
 	"github.com/go-martini/martini"
 )
 
