@@ -50,4 +50,6 @@ Assuming `orchestrator` is built into `bin/orchestrator` (`./script/build` if no
 $ bin/orchestrator --config=conf/orchestrator-ci-env.conf.json --debug http
 ```
 
-`conf/orchestrator-ci-env.conf.json` is designed to work with `orchestrator-ci-env`.
+[`conf/orchestrator-ci-env.conf.json`](https://github.com/openark/orchestrator/blob/master/conf/orchestrator-ci-env.conf.json) is designed to work with `orchestrator-ci-env`.
+
+You may choose to change the value of `SQLite3DataFile`, which is by default on `/tmp`.
