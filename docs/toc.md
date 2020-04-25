@@ -33,8 +33,14 @@
 - [Status Checks](status-checks.md)
 - [Tags](tags.md)
 
-#### Various
+#### Developers
+- [Understanding CI](ci.md)
+- [Building and testing](build.md)
+- [System test environment](ci-env.md)
 - [Docker](docker.md)
+- [Contributions](contributions.md)
+
+#### Various
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Pseudo GTID](pseudo-gtid.md): refactoring and high availability without using GTID.
@@ -45,7 +51,6 @@
 - [Gotchas](gotchas.md)
 - [Supported topologies and versions](supported-topologies-and-versions.md)
 - [Bugs](bugs.md)
-- [Contributions](contributions.md)
 - [Who uses Orchestrator?](users.md)
 - [Presentations](presentations.md)
 
@@ -53,4 +58,3 @@
 
 - [FAQ](faq.md)
 - [First steps](first-steps.md), a quick introduction to `orchestrator`
-- Orchestrator for [developers](developers.md). Read this if you wish to develop/contribute to `orchestrator`.

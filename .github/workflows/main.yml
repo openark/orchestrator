@@ -35,3 +35,9 @@ jobs:
 
     - name: Test documentation
       run:  script/test-docs
+
+    - name: Upload orchestrator binary artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: orchestrator
+        path: bin/orchestrator
