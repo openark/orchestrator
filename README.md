@@ -62,7 +62,7 @@ Read the [Orchestrator documentation](https://github.com/openark/orchestrator/tr
 Authored by [Shlomi Noach](https://github.com/shlomi-noach):
 
 - 2020- as https://github.com/openark/orchestrator
-- 2016-2020 at [GitHub](http://github.com) as https://github.com/openark/orchestrator
+- 2016-2020 at [GitHub](http://github.com) as https://github.com/github/orchestrator
 - 2015 at [Booking.com](http://booking.com) as https://github.com/outbrain/orchestrator
 - 2014 at [Outbrain](http://outbrain.com) as https://github.com/outbrain/orchestrator
 
