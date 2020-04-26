@@ -1338,7 +1338,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 
 	// We've just made the destructive operation. Again, allow for retries:
 	for i := 0; i < countRetries; i++ {
-		err = setGTIDPurged(instance, gtidSubtract)
+		err = SetGTIDPurged(instance, gtidSubtract)
 		if err == nil {
 			break
 		}

@@ -1,23 +1,58 @@
 <style type="text/css">
-  #agents .popover.instance {
-    display: inline-block;
-    position: inherit;
-    width: 276px;
-  }
 
-  #agents .popover.instance {
-    margin: 8px;
-  }
-
-  #agents .popover.instance p {
-    margin: 8px 0px;
-  }
 </style>
 
 <div class="container" id="agents">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      Agents
+    </div>
+    <div class="panel-body">
+      <div class="input-group agent-filter-group" id="agents_filter_input">
+        <select id="agents_filter_type" class="form-control">
+          <option value="hostname" selected="">Hostname = </option>
+          <option value="clusteralias">Cluster Alias =</option>
+          <option value="status">Status =</option>
+        </select>
+        <span class="agent-filter-empty-space input-group-addon"></span>
+        <input id="agents_filter" type="text" class="form-control agent-filter">
+        <span class="input-group-addon agent-filter-empty-space"></span>
+        <span class="input-group-btn">
+          <button id="agent_filter_button" class="btn btn-info" type="button">Filter</button>
+        </span>
+      </div>
+      <div class="agents_info panel panel-default agents-table">
+        <table class="table agents-table table-condensed table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>Cluster</th>
+              <th>Hostname</th>
+              <th>Status</th>
+              <th>Last seen</th>
+              <th>MySQL version</th>
+              <th>Databases count</th>
+              <th>OS</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>Backup Directory disk free</th>
+              <th>MySQL disk usage</th>
+              <th>MySQL disk free</th>
+              <th>Availiable seed methods</th>
+            </tr>
+          </thead>
+          <tbody id="agents_info"></tbody>
+        </table>
+      </div>
+      <ul class="pager">
+        <li class="previous small"><a href="#"><span class="glyphicon glyphicon-chevron-left"></span></a></li>
+        <li class="next small"><a href="#"><span class="glyphicon glyphicon-chevron-right"></span></a></li>
+      </ul>
+    </div>
+  </div>
+</div>
 </div>
 
 
-<script>
-</script>
+
+
 <script src="{{.prefix}}/js/agents.js"></script>

@@ -117,6 +117,9 @@ function booleanString(b) {
 }
 
 function toHumanFormat(bytes) {
+  if (bytes == 0) {
+    return "0 bytes"
+  }
   var s = ['bytes', 'kB', 'MB', 'GB', 'TB', 'PB'];
   var e = Math.floor(Math.log(bytes) / Math.log(1024));
   return (bytes / Math.pow(1024, e)).toFixed(2) + " " + s[e];
@@ -962,7 +965,6 @@ function onClusters(func) {
   onClustersListeners.push(func);
 }
 
-
 function getParameterByName(name) {
   name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
   var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
@@ -1053,8 +1055,8 @@ $(document).ready(function() {
     }
     updateCountdownDisplay();
   });
-  if (agentsHttpActive() == "true") {
-    $("#nav_agents").show();
+  if (agentsHttpActive() == "false") {
+    $("#agents_menu").remove();
   }
   if (contextMenuVisible() == "true") {
     showContextMenu();

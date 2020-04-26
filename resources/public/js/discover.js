@@ -20,14 +20,14 @@ function discover(hostname, port) {
     var uri = "/api/discover/"+hostname+"/"+port;
     $.get(appUrl(uri), function (operationResult) {
         hideLoader();
-        if (operationResult.Code == "ERROR" || operationResult.Details == null) {
-            addAlert(operationResult.Message)
-        } else {
-        	var instance = operationResult.Details;
-            addInfo('Discovered <a href="' + appUrl('/web/search?s='+instance.Key.Hostname+":"+instance.Key.Port) + '" class="alert-link">'
-            		+instance.Key.Hostname+":"+instance.Key.Port+'</a>'
-            	);
-        }   
-    }, "json"); 
-	
+        var instance = operationResult.Details;
+        addInfo('Discovered <a href="' + appUrl('/web/search?s='+instance.Key.Hostname+":"+instance.Key.Port) + '" class="alert-link">'
+                +instance.Key.Hostname+":"+instance.Key.Port+'</a>'
+            );
+        }, "json").fail(function(operationResult) {
+            hideLoader();
+            if (operationResult.responseJSON.Code == "ERROR") {
+                addAlert(operationResult.responseJSON.Message)
+              }
+    });
 }

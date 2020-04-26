@@ -5,7 +5,7 @@
 <div class="container" id="agent">
   <div class="panel panel-default">
     <div class="panel-heading">
-      Agent: <strong><span data-agent="hostname"></span></strong>
+      Agent: <strong><span>{{.agentHost}}</span></strong>
     </div>
     <div class="panel-body">
       <div class="col-xs-6">
@@ -13,36 +13,86 @@
           <div class="panel-heading">
             Info
           </div>
-          <table class="table">
+          <table class="table agent-table">
             <tr>
               <td>Hostname</td>
-              <td data-agent="hostname_search"></td>
+              <td id="agent_hostname"></td>
             </tr>
             <tr>
               <td>Port</td>
-              <td data-agent="port"></td>
+              <td id="agent_port"></td>
             </tr>
             <tr>
-              <td>Last submitted</td>
-              <td data-agent="last_submitted"></td>
+              <td>Cluster</td>
+              <td id="agent_cluster_name"></td>
+            </tr>
+            <tr>
+              <td>Status</td>
+              <td id="agent_status"></td>
+            </tr>
+            <tr>
+              <td>Last seen</td>
+              <td id="agent_last_seen"></td>
+            </tr>
+            <tr>
+              <td>OS</td>
+              <td id="agent_os"></td>
+            </tr>
+            <tr>
+              <td>CPU</td>
+              <td id="agent_cpu"></td>
+            </tr>
+            <tr>
+              <td>RAM</td>
+              <td id="agent_ram"></td>
+            </tr>
+            <tr>
+              <td>Availiable seed methods</td>
+              <td id="agent_avaliable_seed_methods"></td>
+            </tr>
+            <tr id="agent_commands_container">
+              <td>Agent commands</td>
+              <td id="agent_commands"></td>
+            </tr>
+            <tr>
+              <td>Backup directory</td>
+              <td id="agent_backup_dir"></td>
+            </tr>
+            <tr>
+              <td>Backup directory disk usage</td>
+              <td id="agent_backup_dir_used"></td>
+            </tr>
+            <tr>
+              <td>Backup directory disk free</td>
+              <td id="agent_backup_dir_free"></td>
+            </tr>
+            <tr>
+              <td>MySQL version</td>
+              <td id="agent_mysql_version"></td>
             </tr>
             <tr>
               <td>MySQL running</td>
-              <td data-agent="mysql_running"></td>
+              <td id="agent_mysql_running"></td>
             </tr>
             <tr>
               <td>MySQL port</td>
-              <td data-agent="mysql_port"></td>
+              <td id="agent_mysql_port"></td>
+            </tr>
+            <tr>
+              <td>MySQL datadir</td>
+              <td id="agent_mysql_datadir"></td>
             </tr>
             <tr>
               <td>MySQL disk usage</td>
-              <td data-agent="mysql_disk_usage"></td>
+              <td id="agent_mysql_disk_usage"></td>
             </tr>
             <tr>
-              <td>Error log tail (click to expand)</td>
-              <td>
-                <a data-agent="mysql_error_log_tail"></a>
-              </td>
+              <td>MySQL disk free</td>
+              <td id="agent_mysql_disk_free"></td>
+            </tr>
+            <tr>
+              <td>Error log tail</td>
+              <td id="agent_error_log_tail"></td>
             </tr>
           </table>
         </div>
@@ -50,101 +100,118 @@
       <div class="col-xs-6">
         <div class="panel panel-default">
           <div class="panel-heading">
-            Snapshots
+            New seed
           </div>
-          <table class="table">
-            <tr>
-              <td>Available locally</td>
-              <td>
-                <table class="table table-condensed table-unbordered" data-agent="available_local_snapshots"></table>
-              </td>
-            </tr>
-            <tr>
-              <td>Available remote</td>
-              <td>
-                <table class="table table-condensed table-unbordered" data-agent="available_remote_snapshots"></table>
-              </td>
-            </tr>
-            <tr>
-              <td>Snapshots taken on this host
-                <div>
-                  <button class="btn btn-xs btn-info" data-command="create-snapshot">Create snapshot</button>
+          <div class="panel-body">
+            <div class="form-group" id="agent_new-seed-from">
+              <div class="input-group" id="agent_seed_hostname_input">
+                <div class="input-group-btn" id="new-seed-selector">
+                  <select class="form-control" id="agent_seed_side">
+                    <option>Seed from</option>
+                    <option>Seed to</option>
+                  </select>
                 </div>
-              </td>
-            </tr>
+                <span class="agent-filter-empty-space input-group-addon"></span>
+                <input class="form-control agent-filter" id="agent_seed_hostname" type="text" placeholder="Enter hostname">
+              </div>
+            </div>
+            <div class="form-inline" id="agent_seed_method_container">
+              <label for="category" id="agent_seed_method_label">
+                Seed Method:
+              </label>
+              <select class="form-control" id="agent_seed_seed_method">
+              </select>
+            </div>
+            <div class="input-group" id="agent_start_seed_button_container">
+              <button id="agent_start_seed_button" class="btn btn-success" type="button">
+                Start seed
+              </button>
+            </div>
+          </div>
         </div>
-        </td>
-        <td>
-          <table class="table table-condensed table-unbordered" data-agent="lv_snapshots"></table>
-        </td>
-        </tr>
-        <tr>
-          <td>Mounted snapshot</td>
-          <td>
-            <table class="table table-condensed table-unbordered">
-              <tr data-agent="mount_point"></tr>
-            </table>
-          </td>
-        </tr>
+        <div class="panel panel-default" id="agent_databases_container">
+          <div class="panel-heading">
+            Databases
+          </div>
+          <table class="table agent-table" id="agent_databases">
+          </table>
+        </div>
+      <div class="panel panel-default" id="agent_snapshots_info_container">
+        <div class="panel-heading">
+          Snapshots
+        </div>
+        <table class="table agent-table" id="agent_snaphots_data">
         </table>
-      </div>
+    </div>
+
     </div>
   </div>
 
   <div class="panel-body">
-    <div class="active_seeds panel panel-default">
+    <div id="agent_active_seeds_container" class="panel panel-default">
       <div class="panel-heading">
         Active seeds
       </div>
       <table class="table table-condensed table-bordered table-striped ">
         <thead>
           <tr>
-            <th>Status</th>
             <th>Id</th>
+            <th>Status</th>
             <th>Target host</th>
             <th>Source host</th>
-            <th>Seed start time</th>
-            <th>Seed end time</th>
+            <th>Seed method</th>
+            <th>Seed stage</th>
+            <th>Retries</th>
+            <th>Last update time</th>
+            <th>Start time</th>
+            <th>End time</th>
           </tr>
         </thead>
-        <tbody data-agent="active_seeds"></tbody>
+        <tbody id="agent_active_seeds"></tbody>
       </table>
     </div>
   </div>
+
   <div class="panel-body">
-    <div class="seed_states panel panel-default">
+    <div id="agent_active_seeds_states_container" class="panel panel-default">
       <div class="panel-heading">
         Active seed states
       </div>
       <table class="table table-condensed table-bordered table-striped ">
         <thead>
           <tr>
-            <th>State start time</th>
-            <th>State action</th>
-            <th>Error message</th>
+            <th>Timestamp</th>
+            <th>Stage</th>
+            <th>Hostname</th>
+            <th>Status</th>
+            <th>Details</th>
           </tr>
         </thead>
-        <tbody data-agent="seed_states"></tbody>
+        <tbody id="seed_states"></tbody>
       </table>
     </div>
   </div>
   <div class="panel-body">
-    <div class="recent_seeds panel panel-default">
+    <div id ="agent_recent_seeds_container" class="panel panel-default">
       <div class="panel-heading">
         Recent seeds
       </div>
       <table class="table table-condensed table-bordered table-striped">
         <thead>
           <tr>
-            <th>Status</th>
             <th>Id</th>
+            <th>Status</th>
             <th>Target host</th>
             <th>Source host</th>
-            <th>Seed start time</th>
-            <th>Seed end time</th>
+            <th>Seed method</th>
+            <th>Seed stage</th>
+            <th>Retries</th>
+            <th>Last update time</th>
+            <th>Start time</th>
+            <th>End time</th>
           </tr>
         </thead>
-        <tbody data-agent="recent_seeds"></tbody>
+        <tbody id="agent_recent_seeds"></tbody>
       </table>
     </div>
   </div>

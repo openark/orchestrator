@@ -994,3 +994,184 @@ body {
 .instance.instance-search p {
     margin: 8px 0px;
 }
+
+.table_actions {
+    float: right;
+}
+
+#seeds_new_seed #agent_filter_button .input-group .form-control:last-child.agent-filter #agent_start_seed_button .input-group .form-control:not(:first-child):not(:last-child).agent-filter {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.agent-filter-group {
+    margin-left: 60%;
+    margin-bottom: 15px;
+}
+
+.agent-filter-empty-space {
+    width:5px; 
+    padding-left:0px; 
+    padding-right:0px; 
+    border:none;
+    background-color: #fff;
+}
+
+.new-seed-dropdown {
+    min-width: 300px;
+}
+
+table.agents-table > tbody > tr > td {
+    vertical-align: middle;
+}
+
+table.agents-table > thead > tr > th {
+    vertical-align: middle;
+}
+
+.error-log-large-width {
+    margin: 0 auto;
+    width: 90%;
+}
+
+table.agent-table > tbody > tr > td:first-child { 
+    width: 60% !important;
+    vertical-align: middle;
+}
+
+.ui-menu-item {
+    margin: 0 0 5px 0;
+}
+
+.ui-autocomplete {
+    cursor: default;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    float: left;
+    display: none;
+    min-width: 160px;
+    _width: 160px;
+    padding: 4px 20px 0px 4px;
+    margin: 2px 0 0 0;
+    list-style: none;
+    background-color: #ffffff;
+    border-color: #ccc;
+    border-color: rgba(0, 0, 0, 0.2);
+    border-style: solid;
+    border-width: 1px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    border-radius: 5px;
+    -webkit-box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    -moz-box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    -webkit-background-clip: padding-box;
+    -moz-background-clip: padding;
+    background-clip: padding-box;
+    *border-right-width: 2px;
+    *border-bottom-width: 2px;
+}
+
+.ui-autocomplete .ui-menu-item > a.ui-corner-all {
+  display: block;
+  padding: 3px 15px;
+  clear: both;
+  font-weight: normal;
+  line-height: 18px;
+  color: #555555;
+  white-space: nowrap;
+}
+.ui-autocomplete .ui-menu-item > a.ui-corner-all.ui-state-hover, .ui-autocomplete .ui-menu-item > a.ui-corner-all.ui-state-active {
+  color: #ffffff;
+  text-decoration: none;
+  background-color: #0088cc;
+  border-radius: 0px;
+  -webkit-border-radius: 0px;
+  -moz-border-radius: 0px;
+  background-image: none;
+}
+
+.ui-helper-hidden-accessible {
+    display: none;
+}
+
+#agent_new-seed-from {
+    margin-bottom: 10px;
+}
+
+#agent_seed_hostname_input {
+    width:100%;
+}
+
+#new-seed-selector {
+    width:35%;
+}
+
+#agent_seed_side, #agent_seed_hostname, #agent_seed_seed_method {
+    font-size:13px;
+}
+
+#agent_seed_method_container {
+    height: 34px;
+    margin-bottom: 10px;
+}
+
+#agent_seed_method_label {
+    width: 35%;
+    height: 34px;
+    float: left;
+    display: flex;
+    align-items: center;
+    font-weight: 400;
+    font-size:13px
+}
+
+#agent_seed_seed_method {
+    width: 64%;
+    float: right;
+}
+
+#agent_start_seed_button_container {
+    width:100%;
+    text-align: right;
+}
+
+#seeds_filter, #agent_execute_command_button, #agent_seed_hostname  {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px; 
+}
+
+#agents_filter {
+    width: 50%;
+    left: 50%;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+#agents_filter_type {
+    width:70%; 
+    left:100%
+}
+
+#seeds_new_seed_form_group {
+    margin-left: 10%;
+    margin-right: 10%;
+    margin-top: 5px; 
+    margin-bottom:5px
+}
+
+#seeds_start_seed {
+    margin-top:5px; 
+    margin-left:61%
+}

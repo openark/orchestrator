@@ -194,6 +194,9 @@ func translateStatement(statement string) (string, error) {
 	if IsSQLite() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
 	}
+	if config.Config.IsMySQL() && strings.Contains(statement, "/* mysql-skip */") {
+		statement = ""
+	}
 	return statement, nil
 }
 
@@ -264,19 +267,21 @@ func deployStatements(db *sql.DB, queries []string) error {
 		if err != nil {
 			return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 		}
-		if _, err := tx.Exec(query); err != nil {
-			if strings.Contains(err.Error(), "syntax error") {
-				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
-			}
-			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) && !sqlutils.IsDropIndex(query) {
-				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
-			}
-			if !strings.Contains(err.Error(), "duplicate column name") &&
-				!strings.Contains(err.Error(), "Duplicate column name") &&
-				!strings.Contains(err.Error(), "check that column/key exists") &&
-				!strings.Contains(err.Error(), "already exists") &&
-				!strings.Contains(err.Error(), "Duplicate key name") {
-				log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
+		if len(query) > 0 {
+			if _, err := tx.Exec(query); err != nil {
+				if strings.Contains(err.Error(), "syntax error") {
+					return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
+				}
+				if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) && !sqlutils.IsDropIndex(query) {
+					return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
+				}
+				if !strings.Contains(err.Error(), "duplicate column name") &&
+					!strings.Contains(err.Error(), "Duplicate column name") &&
+					!strings.Contains(err.Error(), "check that column/key exists") &&
+					!strings.Contains(err.Error(), "already exists") &&
+					!strings.Contains(err.Error(), "Duplicate key name") {
+					log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
+				}
 			}
 		}
 	}

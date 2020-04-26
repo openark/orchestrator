@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -1816,6 +1817,18 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render, req *http.
 	r.JSON(http.StatusOK, clusterNames)
 }
 
+// ClustersAliases provides list of known clusters aliases
+func (this *HttpAPI) ClustersAliases(params martini.Params, r render.Render, req *http.Request) {
+	clusterAliases, err := inst.ReadClustersAliases(req.URL.Query().Get("clusteralias"))
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, clusterAliases)
+}
+
 // ClustersInfo provides list of known clusters, along with some added metadata per cluster
 func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *http.Request) {
 	clustersInfo, err := inst.ReadClustersInfo("")
@@ -2428,18 +2441,80 @@ func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r rende
 	r.JSON(http.StatusOK, aggregated)
 }
 
-// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
-func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
+// AgentsStatuses provides list of all possible agent statuses
+func (this *HttpAPI) AgentsStatuses(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
+	filter := req.URL.Query().Get("status")
+	fmt.Println(filter)
+	var agentStatuses []string
+	for _, agentStatus := range agent.AgentStatuses {
+		if len(filter) > 0 {
+			if matched, _ := regexp.MatchString(fmt.Sprintf("(?i)^%s.*", filter), agentStatus.String()); matched {
+				agentStatuses = append(agentStatuses, agentStatus.String())
+			}
+		} else {
+			agentStatuses = append(agentStatuses, agentStatus.String())
+		}
+	}
+	r.JSON(http.StatusOK, agentStatuses)
+}
 
-	agents, err := agent.ReadAgents()
+// SeedsStatuses provides list of all possible seeds statuses
+func (this *HttpAPI) SeedsStatuses(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+	filter := req.URL.Query().Get("status")
+	fmt.Println(filter)
+	var seedStatuses []string
+	for _, seedStatus := range agent.SeedStatuses {
+		if len(filter) > 0 {
+			if matched, _ := regexp.MatchString(fmt.Sprintf("(?i)^%s.*", filter), seedStatus.String()); matched {
+				seedStatuses = append(seedStatuses, seedStatus.String())
+			}
+		} else {
+			seedStatuses = append(seedStatuses, seedStatus.String())
+		}
+	}
+	r.JSON(http.StatusOK, seedStatuses)
+}
+
+// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
+func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+	var agents []*agent.Agent
+
+	page, err := strconv.Atoi(req.URL.Query().Get("page"))
+	if err != nil || page < 0 {
+		agents, err = agent.ReadAgents()
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+		r.JSON(http.StatusOK, agents)
+		return
+	}
+	if hostname := req.URL.Query().Get("hostname"); hostname != "" {
+		var foundAgent *agent.Agent
+		foundAgent, err = agent.ReadAgent(hostname)
+		if err == nil {
+			agents = append(agents, foundAgent)
+		}
+	} else if clusterName := req.URL.Query().Get("clusteralias"); clusterName != "" {
+		agents, err = agent.ReadAgentsForClusterPaged(clusterName, page)
+	} else if status := req.URL.Query().Get("status"); status != "" {
+		agentStatus := agent.ToAgentStatus[status]
+		agents, err = agent.ReadAgentsInStatusPaged(agentStatus, page)
+	} else {
+		agents, err = agent.ReadAgentsPaged(page)
+	}
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2449,8 +2524,57 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 	r.JSON(http.StatusOK, agents)
 }
 
+// AgentsHosts provides list of agents hostnames
+func (this *HttpAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+	agentsHosts, err := agent.ReadAgentsHosts(req.URL.Query().Get("hostname"))
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agentsHosts)
+}
+
 // Agent returns complete information of a given agent
 func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	agent, err := agent.ReadAgent(params["host"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
+}
+
+// AgentData returns data for give agent
+func (this *HttpAPI) AgentData(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	agent, err := agent.ReadAgent(params["host"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent.Data)
+}
+
+// UpdateAgent updates information about a given agent in database
+func (this *HttpAPI) UpdateAgent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -2460,14 +2584,44 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 		return
 	}
 
-	agent, err := agent.GetAgent(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
+	if err = agent.UpdateAgent(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
 	r.JSON(http.StatusOK, agent)
+}
+
+// AgentTailMySQLErrorLog returns tail of MySQL error log from agent
+func (this *HttpAPI) AgentTailMySQLErrorLog(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	agent, err := agent.ReadAgentInfo(params["host"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.ErrorLogTail()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, output)
 }
 
 // AgentUnmount instructs an agent to unmount the designated mount point
@@ -2481,14 +2635,18 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	output, err := agent.Unmount(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.Unmount(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMountLV instructs an agent to mount a given volume on the designated mount point
@@ -2502,14 +2660,18 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	output, err := agent.MountLV(params["host"], req.URL.Query().Get("lv"))
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MountLV(req.URL.Query().Get("lv")); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentCreateSnapshot instructs an agent to create a new snapshot. Agent's DIY implementation.
@@ -2523,14 +2685,18 @@ func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render,
 		return
 	}
 
-	output, err := agent.CreateSnapshot(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.CreateSnapshot(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentRemoveLV instructs an agent to remove a logical volume
@@ -2544,14 +2710,18 @@ func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *
 		return
 	}
 
-	output, err := agent.RemoveLV(params["host"], req.URL.Query().Get("lv"))
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.RemoveLV(req.URL.Query().Get("lv")); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMySQLStop stops MySQL service on agent
@@ -2565,14 +2735,18 @@ func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req 
 		return
 	}
 
-	output, err := agent.MySQLStop(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MySQLStop(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMySQLStart starts MySQL service on agent
@@ -2586,14 +2760,18 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 		return
 	}
 
-	output, err := agent.MySQLStart(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MySQLStart(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -2606,7 +2784,13 @@ func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, 
 		return
 	}
 
-	output, err := agent.CustomCommand(params["host"], params["command"])
+	agent, err := agent.ReadAgentInfo(params["host"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.CustomCommand(params["command"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2627,8 +2811,17 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
-
-	output, err := agent.Seed(params["targetHost"], params["sourceHost"])
+	targetAgent, err := agent.ReadAgentInfo(params["targetHost"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	sourceAgent, err := agent.ReadAgentInfo(params["sourceHost"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	output, err := agent.NewSeed(params["seedMethod"], targetAgent, sourceAgent)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2640,16 +2833,18 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 
 // AgentActiveSeeds lists active seeds and their state
 func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
 
-	output, err := agent.ReadActiveSeedsForHost(params["host"])
+	hostAgent, err := agent.ReadAgentInfo(params["host"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.ReadActiveSeedsForAgent(hostAgent)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2661,17 +2856,35 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 
 // AgentRecentSeeds lists recent seeds of a given agent
 func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
 
-	output, err := agent.ReadRecentCompletedSeedsForHost(params["host"])
+	hostAgent, err := agent.ReadAgentInfo(params["host"])
 
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.ReadSeedsForAgent(hostAgent, "limit 10")
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, output)
+}
+
+// AgentFailedSeeds lists all failed seeds
+func (this *HttpAPI) AgentFailedSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !config.Config.ServeAgentsHttp {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	output, err := agent.ReadSeedsInStatus(agent.Failed)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2682,40 +2895,45 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 
 // AgentSeedDetails provides details of a given seed
 func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	output, err := agent.AgentSeedDetails(seedId)
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	seed, err := agent.ReadSeed(seedID)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	r.JSON(http.StatusOK, seed)
 }
 
 // AgentSeedStates returns the breakdown of states (steps) of a given seed
 func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	output, err := agent.ReadSeedStates(seedId)
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	seed, err := agent.ReadSeed(seedID)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
 
+	output, err := seed.ReadSeedStageStates()
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2724,28 +2942,55 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 	r.JSON(http.StatusOK, output)
 }
 
-// Seeds retruns all recent seeds
+// Seeds returns all seeds
 func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !config.Config.ServeAgentsHttp {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
 
-	output, err := agent.ReadRecentSeeds()
+	var seeds []*agent.Seed
+
+	page, err := strconv.Atoi(req.URL.Query().Get("page"))
+	if err != nil || page < 0 {
+		seeds, err = agent.ReadSeeds()
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+		r.JSON(http.StatusOK, seeds)
+		return
+	}
+	if targetHostname := req.URL.Query().Get("targethostname"); targetHostname != "" {
+		targetAgent, err := agent.ReadAgentInfo(targetHostname)
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+		seeds, err = agent.ReadSeedsForTargetAgentPaged(targetAgent, page)
+	} else if sourceHostname := req.URL.Query().Get("sourcehostname"); sourceHostname != "" {
+		sourceAgent, err := agent.ReadAgentInfo(sourceHostname)
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+		seeds, err = agent.ReadSeedsForSourceAgentPaged(sourceAgent, page)
+	} else if status := req.URL.Query().Get("status"); status != "" {
+		seedStatus := agent.ToSeedStatus[status]
+		seeds, err = agent.ReadSeedsInStatusPaged(seedStatus, page)
+	} else {
+		seeds, err = agent.ReadSeedsPaged(page)
+	}
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	r.JSON(http.StatusOK, seeds)
 }
 
-// AbortSeed instructs agents to abort an active seed
+// AbortSeed instructs agents to abort a running seed
 func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -2756,14 +3001,21 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	err = agent.AbortSeed(seedId)
-
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-
+	seed, err := agent.ReadSeed(seedID)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	err = seed.AbortSeed()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
 	r.JSON(http.StatusOK, err == nil)
 }
 
@@ -3673,6 +3925,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "cluster-osc-slaves/:clusterHint", this.ClusterOSCReplicas)
 	this.registerAPIRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerAPIRequest(m, "clusters", this.Clusters)
+	this.registerAPIRequest(m, "clusters-aliases", this.ClustersAliases)
 	this.registerAPIRequest(m, "clusters-info", this.ClustersInfo)
 
 	this.registerAPIRequest(m, "masters", this.Masters)
@@ -3820,21 +4073,28 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// Agents
 	this.registerAPIRequest(m, "agents", this.Agents)
+	this.registerAPIRequest(m, "agents-statuses", this.AgentsStatuses)
+	this.registerAPIRequest(m, "agents-hosts", this.AgentsHosts)
 	this.registerAPIRequest(m, "agent/:host", this.Agent)
+	this.registerAPIRequest(m, "agent-data/:host", this.AgentData)
+	this.registerAPIRequest(m, "agent-update/:host", this.UpdateAgent)
+	this.registerAPIRequest(m, "agent-mysql-error-log/:host", this.AgentTailMySQLErrorLog)
 	this.registerAPIRequest(m, "agent-umount/:host", this.AgentUnmount)
 	this.registerAPIRequest(m, "agent-mount/:host", this.AgentMountLV)
 	this.registerAPIRequest(m, "agent-create-snapshot/:host", this.AgentCreateSnapshot)
 	this.registerAPIRequest(m, "agent-removelv/:host", this.AgentRemoveLV)
 	this.registerAPIRequest(m, "agent-mysql-stop/:host", this.AgentMySQLStop)
 	this.registerAPIRequest(m, "agent-mysql-start/:host", this.AgentMySQLStart)
-	this.registerAPIRequest(m, "agent-seed/:targetHost/:sourceHost", this.AgentSeed)
+	this.registerAPIRequest(m, "agent-seed/:seedMethod/:targetHost/:sourceHost", this.AgentSeed)
 	this.registerAPIRequest(m, "agent-active-seeds/:host", this.AgentActiveSeeds)
 	this.registerAPIRequest(m, "agent-recent-seeds/:host", this.AgentRecentSeeds)
+	this.registerAPIRequest(m, "agents-failed-seeds", this.AgentFailedSeeds)
 	this.registerAPIRequest(m, "agent-seed-details/:seedId", this.AgentSeedDetails)
 	this.registerAPIRequest(m, "agent-seed-states/:seedId", this.AgentSeedStates)
 	this.registerAPIRequest(m, "agent-abort-seed/:seedId", this.AbortSeed)
 	this.registerAPIRequest(m, "agent-custom-command/:host/:command", this.AgentCustomCommand)
 	this.registerAPIRequest(m, "seeds", this.Seeds)
+	this.registerAPIRequest(m, "seeds-statuses", this.SeedsStatuses)
 
 	// Configurable status check endpoint
 	m.Get(config.Config.StatusEndpoint, this.StatusCheck)

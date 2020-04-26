@@ -17,9 +17,9 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-martini/martini"
@@ -35,15 +35,17 @@ type HttpAgentsAPI struct {
 
 var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
-// SubmitAgent registeres an agent. It is initiated by an agent to register itself.
-func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
-	port, err := strconv.Atoi(params["port"])
+// RegisterAgent registeres an agent. It is initiated by an agent to register itself.
+func (this *HttpAgentsAPI) RegisterAgent(params martini.Params, r render.Render, req *http.Request) {
+	var agentInfo agent.Info
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&agentInfo)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	output, err := agent.SubmitAgent(params["host"], port, params["token"])
+	output, err := agent.RegisterAgent(&agentInfo)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -76,33 +78,12 @@ func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params
 	r.JSON(200, output)
 }
 
-// AgentsHosts provides list of agent host names
-func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request) string {
-	agents, err := agent.ReadAgents()
-	hostnames := []string{}
-	for _, agent := range agents {
-		hostnames = append(hostnames, agent.Hostname)
-	}
-
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return ""
-	}
-
-	if req.URL.Query().Get("format") == "txt" {
-		return strings.Join(hostnames, "\n")
-	} else {
-		r.JSON(200, hostnames)
-	}
-	return ""
-}
-
 // AgentsInstances provides list of assumed MySQL instances (host:port)
 func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Render, req *http.Request) string {
-	agents, err := agent.ReadAgents()
+	agents, err := agent.ReadAgentsInfo()
 	hostnames := []string{}
 	for _, agent := range agents {
-		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Hostname, agent.MySQLPort))
+		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Info.Hostname, agent.Info.MySQLPort))
 	}
 
 	if err != nil {
@@ -124,10 +105,9 @@ func (this *HttpAgentsAPI) AgentPing(params martini.Params, r render.Render, req
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get(this.URLPrefix+"/api/submit-agent/:host/:port/:token", this.SubmitAgent)
+	m.Post(this.URLPrefix+"/api/register-agent", this.RegisterAgent)
 	m.Get(this.URLPrefix+"/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
 	m.Get(this.URLPrefix+"/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
-	m.Get(this.URLPrefix+"/api/agents-hosts", this.AgentsHosts)
 	m.Get(this.URLPrefix+"/api/agents-instances", this.AgentsInstances)
 	m.Get(this.URLPrefix+"/api/agent-ping", this.AgentPing)
 }

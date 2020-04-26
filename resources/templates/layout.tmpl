@@ -10,6 +10,7 @@
 	<link rel="shortcut icon" href="../../assets/ico/favicon.ico">
 	<title>Orchestrator - {{.title}}</title>
 	<script type="text/javascript" src="{{.prefix}}/js/jquery.min.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/jquery-ui.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/jquery.cookie-1.4.1.min.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/corex.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/corex-jquery.js"></script>
@@ -90,7 +91,15 @@
 						<li><a href="{{.prefix}}/web/audit">General</a></li>
 						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
 						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
-						<li role="presentation" class="divider"></li>
+					</ul>
+				</li>
+
+				<li class="dropdown" data-nav-page="agents" id="agents_menu">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                            Agents
+                            <b class="caret"></b>
+                        </a>
+					<ul class="dropdown-menu">
 						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
 						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
 					</ul>
@@ -248,6 +257,7 @@
 
 	<script src="{{.prefix}}/bootstrap/js/bootstrap.min.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/bootbox.min.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/moment.min.js"></script>
 	<script>
 		function autoshowProblems() {
 			return "{{.autoshow_problems}}";

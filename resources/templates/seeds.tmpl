@@ -2,32 +2,96 @@
 
 </style>
 
-<div class="container" id="seed">
-  <div class="panel panel-default">
-    <div class="panel-heading">
-      Seeds
-    </div>
-    <div class="panel-body">
-      <div class="seed_details panel panel-default">
+<div class="container" id="seeds">
+    <div class="panel panel-default">
         <div class="panel-heading">
-          Seed details
+            Seeds
         </div>
-        <table class="table table-condensed table-bordered table-striped ">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Id</th>
-              <th>Target host</th>
-              <th>Source host</th>
-              <th>Seed start time</th>
-              <th>Seed end time</th>
-            </tr>
-          </thead>
-          <tbody data-agent="seed_details"></tbody>
-        </table>
-      </div>
+        <div class="panel-body">
+            <div class="input-group agent-filter-group" id="seeds_filter_input">
+                <select class="form-control" id="seeds_filter_type">
+                    <option value="targethostname" selected="">Target host = </option>
+                    <option value="sourcehostname">Source host = </option>
+                    <option value="status">Status =</option>
+                </select>
+                <span class="agent-filter-empty-space input-group-addon"></span>
+                <input type="text" class="form-control agent-filter" id="seeds_filter">
+                <span class="input-group-addon agent-filter-empty-space"></span>
+                <span class="input-group-btn">
+                    <button id="seeds_filter_button" class="btn btn-info" type="button">Filter</button>
+                </span>
+                <span class="input-group-addon agent-filter-empty-space"></span>
+                <span class="input-group-btn">
+                    <button type="button" id="seeds_new_seed" class="btn btn-primary dropdown-toggle agent-filter" data-toggle="dropdown">
+                        New Seed 
+                        <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-right new-seed-dropdown" role="menu">
+                        <li class="dropdown">
+                            <form class="form-horizontal">
+                                <div class="form-group" id="seeds_new_seed_form_group">
+                                    <div id="source_agent_input">
+                                        <label for="source_hostname">
+                                            <i class="glyphicon glyphicon-hdd"></i> 
+                                            Source Agent
+                                        </label>
+                                        <input class="form-control" id="source_agent_hostname" placeholder="Enter source hostname" />
+                                    </div>
+                                </div>
+                                <div class="form-group" id="seeds_new_seed_form_group">
+                                    <div id="target_agent_input">
+                                        <label for="target_hostname">
+                                            <i class="glyphicon glyphicon-hdd"></i> 
+                                            Target Agent
+                                        </label>
+                                        <input class="form-control" id="target_agent_hostname" placeholder="Enter target hostname" />
+                                    </div>
+                                </div>
+                                <div class="form-group" id="seeds_new_seed_form_group">
+                                    <div>
+                                        <label for="seeds_seed_method">
+                                            <i class="glyphicon glyphicon-cog"></i> 
+                                            Seed Method
+                                        </label>
+                                        <select disabled id="seeds_seed_method" class="form-control">
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group" id="seeds_new_seed_form_group">
+                                    <div>
+                                        <button type="button" class="btn btn-success" id="seeds_start_seed">Start Seed</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </li>
+                    </ul>
+                </span>
+            </div>
+            <div class="seeds_info panel panel-default">
+                <table class="table table-condensed table-bordered table-striped ">
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Status</th>
+                            <th>Target host</th>
+                            <th>Source host</th>
+                            <th>Seed method</th>
+                            <th>Seed stage</th>
+                            <th>Retries</th>
+                            <th>Last update time</th>
+                            <th>Start time</th>
+                            <th>End time</th>
+                        </tr>
+                    </thead>
+                    <tbody data-agent="seeds_seed_details"></tbody>
+                </table>
+            </div>
+            <ul class="pager">
+                <li class="previous small"><a href="#"><span class="glyphicon glyphicon-chevron-left"></span></a></li>
+                <li class="next small"><a href="#"><span class="glyphicon glyphicon-chevron-right"></span></a></li>
+              </ul>
+        </div>
     </div>
-  </div>
 </div>
 
 <script src="{{.prefix}}/js/seeds.js"></script>

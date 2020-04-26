@@ -34,7 +34,7 @@ import (
 	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	orcraft "github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
@@ -71,6 +71,8 @@ var isElectedNode int64 = 0
 var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 var kvFoundCache = cache.New(10*time.Minute, time.Minute)
+
+var continuousSeedProcessRunning uint32
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -617,20 +619,20 @@ func ContinuousDiscovery() {
 	}
 }
 
-func pollAgent(hostname string) error {
-	polledAgent, err := agent.GetAgent(hostname)
-	agent.UpdateAgentLastChecked(hostname)
-
-	if err != nil {
-		return log.Errore(err)
+// ContinuousSeedProcess starts an asynchronuous infinite process of active seeds processing
+func ContinuousSeedProcess() {
+	tick := time.Tick(time.Duration(config.Config.SeedProcessIntervalSeconds) * time.Second)
+	for range tick {
+		if IsLeader() {
+			if atomic.CompareAndSwapUint32(&continuousSeedProcessRunning, 0, 1) {
+				agent.ProcessSeeds()
+				atomic.StoreUint32(&continuousSeedProcessRunning, 0)
+			} else {
+				inst.AuditOperation("process-seeds", nil, "Unable to start seed processing as it is already running")
+			}
+		}
 	}
 
-	err = agent.UpdateAgentInfo(hostname, polledAgent)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return nil
 }
 
 // ContinuousAgentsPoll starts an asynchronuous infinite process where agents are
@@ -641,19 +643,22 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(config.HealthPollSeconds * time.Second)
+	tick := time.Tick(time.Duration(config.Config.AgentPollMinutes) * time.Minute)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
-		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
-		log.Debugf("outdated agents hosts: %+v", agentsHosts)
-		for _, hostname := range agentsHosts {
-			go pollAgent(hostname)
+		outdatedAgents, _ := agent.ReadOutdatedAgents()
+
+		for _, outdatedAgent := range outdatedAgents {
+			go func(agent *agent.Agent) {
+				if err := agent.UpdateAgent(); err != nil {
+					log.Errore(fmt.Errorf("Unable to update agent data for agent %s: %+v", agent.Info.Hostname, err))
+				}
+			}(outdatedAgent)
 		}
 		// See if we should also forget agents (lower frequency)
 		select {
 		case <-caretakingTick:
 			agent.ForgetLongUnseenAgents()
-			agent.FailStaleSeeds()
 		default:
 		}
 	}
@@ -661,7 +666,7 @@ func ContinuousAgentsPoll() {
 
 func discoverSeededAgents() {
 	for seededAgent := range agent.SeededAgents {
-		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
+		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Info.Hostname, Port: int(seededAgent.Info.MySQLPort)}
 		go inst.ReadTopologyInstance(instanceKey)
 	}
 }

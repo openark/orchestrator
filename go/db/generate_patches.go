@@ -546,4 +546,174 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
 	`,
+	`
+		DROP INDEX last_submitted_idx_host_agent ON host_agent
+	`,
+	`
+		DROP INDEX token_idx_host_agent ON host_agent
+	`,
+	`
+		ALTER TABLE
+			host_agent /* sqlite3-skip */
+			DROP COLUMN count_mysql_snapshots
+	`,
+	`
+		ALTER TABLE
+			host_agent /* sqlite3-skip */
+			DROP COLUMN last_submitted
+	`,
+	`
+		ALTER TABLE
+			host_agent /* sqlite3-skip */
+			ADD COLUMN status varchar(16) CHARACTER SET ascii NOT NULL AFTER mysql_port
+	`,
+	`
+		ALTER TABLE
+			host_agent /* sqlite3-skip */
+			ADD COLUMN data TEXT CHARACTER SET ascii NOT NULL AFTER status
+	`,
+	`
+		DROP INDEX is_complete_idx_agent_seed ON agent_seed
+	`,
+	`
+		DROP INDEX is_successful_idx_agent_seed ON agent_seed
+	`,
+	`
+		DROP INDEX start_timestamp_idx_agent_seed ON agent_seed
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			DROP COLUMN is_successful
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			DROP COLUMN is_complete
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER source_hostname
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN backup_side varchar(8) NOT NULL AFTER seed_method
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN stage varchar(16) NOT NULL AFTER backup_side
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN status varchar(16) NOT NULL AFTER stage
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN retries int(10) unsigned NOT NULL AFTER status
+	`,
+	`
+		ALTER TABLE
+			agent_seed /* sqlite3-skip */
+			ADD COLUMN updated_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER end_timestamp
+	`,
+	`
+		DROP INDEX agent_seed_idx_agent_seed_state ON agent_seed_state
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			DROP COLUMN state_action
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			DROP COLUMN error_message
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			ADD COLUMN agent_hostname varchar(128) NOT NULL DEFAULT '' AFTER agent_seed_id
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			ADD COLUMN stage varchar(16) NOT NULL AFTER agent_hostname
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			ADD COLUMN status varchar(16) NOT NULL AFTER state_timestamp
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state /* sqlite3-skip */
+			ADD COLUMN details text NOT NULL AFTER status
+	`,
+	`
+		DROP TABLE host_agent; /* mysql-skip */
+	`,
+	`
+		DROP TABLE agent_seed; /* mysql-skip */
+	`,
+	`
+		DROP TABLE agent_seed_state; /* mysql-skip */
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS host_agent /* mysql-skip */ (
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			token varchar(128) NOT NULL,
+			last_checked timestamp NULL DEFAULT NULL,
+			last_seen timestamp NULL DEFAULT NULL,
+			mysql_port smallint(5) unsigned DEFAULT NULL,
+			status varchar(16) NOT NULL,
+			data text NOT NULL,
+			PRIMARY KEY (hostname)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS agent_seed /* mysql-skip */ (
+			agent_seed_id int(10) unsigned NOT NULL AUTO_INCREMENT,
+			target_hostname varchar(128) NOT NULL,
+			source_hostname varchar(128) NOT NULL,
+			seed_method varchar(32) NOT NULL,
+			backup_side varchar(8) NOT NULL,
+			stage varchar(16) NOT NULL,
+			status varchar(16) NOT NULL,
+			retries int(10) unsigned NOT NULL,
+			start_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			end_timestamp timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			updated_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			PRIMARY KEY (agent_seed_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS agent_seed_state /* mysql-skip */ (
+			agent_seed_state_id int(10) unsigned NOT NULL AUTO_INCREMENT,
+			agent_seed_id int(10) unsigned NOT NULL,
+			agent_hostname varchar(128) NOT NULL DEFAULT '',
+			stage varchar(16) NOT NULL,
+			state_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			status varchar(16) NOT NULL,
+			details text NOT NULL,
+			PRIMARY KEY (agent_seed_state_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX status_idx_host_agent ON host_agent (status)
+	`,
+	`
+		CREATE INDEX status_idx_agent_seed ON agent_seed (status)
+	`,
+	`
+		CREATE INDEX agent_seed_id_idx_agent_seed_state ON agent_seed_state (agent_seed_id)
+	`,
+	`
+		CREATE INDEX agent_seed_id_idx_agent_hostname ON agent_seed_state (agent_hostname)
+	`,
 }

@@ -47,6 +47,7 @@ var sqlite3CreateTableConversions = []regexpMap{
 	rmap(`(?i)add column (.*int) not null[\s]*$`, `add column $1 not null default 0`),
 	rmap(`(?i)add column (.* text) not null[\s]*$`, `add column $1 not null default ''`),
 	rmap(`(?i)add column (.* varchar.*) not null[\s]*$`, `add column $1 not null default ''`),
+	rmap(`(?i)([/][*] mysql-skip [*][/])`, ``),
 }
 
 var sqlite3InsertConversions = []regexpMap{

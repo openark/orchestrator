@@ -19,6 +19,7 @@ package inst
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -67,6 +68,10 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
 
+type agentSnapshots struct {
+	LogicalVolumes []struct{} `json:"LogicalVolumes"`
+}
+
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
@@ -90,10 +95,10 @@ func init() {
 	writeBufferLatency.AddMany([]string{"wait", "write"})
 	writeBufferLatency.Start("wait")
 
-	go initializeInstanceDao()
+	go InitializeInstanceDao()
 }
 
-func initializeInstanceDao() {
+func InitializeInstanceDao() {
 	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
@@ -604,7 +609,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 				replicaKey, err := NewResolveInstanceKey(host, port)
 				if err == nil && replicaKey.IsValid() {
-					instance.AddReplicaKey(replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(replicaKey)
+					}
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -632,7 +639,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
 					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-					instance.AddReplicaKey(&replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(&replicaKey)
+					}
 					return err
 				})
 
@@ -1979,7 +1988,9 @@ func ResolveUnknownMasterHostnameResolves() error {
 }
 
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
+// as json funcs are only on MySQL 5.7+, so we will unmarshall result into a struct
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
+	agentLogicalVolumes := &agentSnapshots{}
 	res := make(map[string]int)
 	if !config.Config.ServeAgentsHttp {
 		return res, nil
@@ -1987,7 +1998,7 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	query := fmt.Sprintf(`
 		select
 			hostname,
-			count_mysql_snapshots
+			data
 		from
 			host_agent
 		where
@@ -1997,7 +2008,11 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 		`, sqlutils.InClauseStringValues(hostnames))
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
+		err := json.Unmarshal([]byte(m.GetString("data")), agentLogicalVolumes)
+		if err != nil {
+			return log.Errore(err)
+		}
+		res[m.GetString("hostname")] = len(agentLogicalVolumes.LogicalVolumes)
 		return nil
 	})
 
@@ -2065,6 +2080,58 @@ func ReadClusters() (clusterNames []string, err error) {
 		clusterNames = append(clusterNames, clusterInfo.ClusterName)
 	}
 	return clusterNames, nil
+}
+
+// ReadClustersAliases reads names of all known clusters aliases with possible filtering
+func ReadClustersAliases(clusterAlias string) (clusterAliases []string, err error) {
+	var clusters []ClusterInfo
+	if len(clusterAlias) == 0 {
+		clusters, err = ReadClustersInfoFiltrable(``, sqlutils.Args())
+	} else {
+		clusters, err = ReadClustersInfoFiltrable(`WHERE alias RLIKE ?`, sqlutils.Args(fmt.Sprintf("^"+clusterAlias)))
+	}
+	if err != nil {
+		return clusterAliases, err
+	}
+	for _, clusterInfo := range clusters {
+		clusterAliases = append(clusterAliases, clusterInfo.ClusterAlias)
+	}
+	return clusterAliases, nil
+}
+
+// ReadClustersInfoFiltrable reads names of all known clusters and some aggregated info using specified where condition
+func ReadClustersInfoFiltrable(whereCondition string, args []interface{}) ([]ClusterInfo, error) {
+	clusters := []ClusterInfo{}
+
+	query := fmt.Sprintf(`
+		select
+			cluster_name,
+			count(*) as count_instances,
+			ifnull(min(alias), cluster_name) as alias,
+			ifnull(min(domain_name), '') as domain_name
+		from
+			database_instance
+			left join cluster_alias using (cluster_name)
+			left join cluster_domain_name using (cluster_name)
+		%s
+		group by
+			cluster_name`, whereCondition)
+
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		clusterInfo := ClusterInfo{
+			ClusterName:    m.GetString("cluster_name"),
+			CountInstances: m.GetUint("count_instances"),
+			ClusterAlias:   m.GetString("alias"),
+			ClusterDomain:  m.GetString("domain_name"),
+		}
+		clusterInfo.ApplyClusterAlias()
+		clusterInfo.ReadRecoveryInfo()
+
+		clusters = append(clusters, clusterInfo)
+		return nil
+	})
+
+	return clusters, err
 }
 
 // ReadClusterInfo reads some info about a given cluster

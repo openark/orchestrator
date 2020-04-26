@@ -197,6 +197,11 @@ type Configuration struct {
 	AgentSSLCertFile                           string            // Name of Agent SSL certification file, applies only when AgentsUseSSL = true
 	AgentSSLCAFile                             string            // Name of the Agent Certificate Authority file, applies only when AgentsUseSSL = true
 	AgentSSLValidOUs                           []string          // Valid organizational units when using mutual TLS to communicate with the agents
+	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
+	AgentPollMinutes                           uint              // Minutes between agent polling
+	MaxRetriesForSeedStage                     int               // Number of maximum retries for each of the seed stages, after which seed will be marked as failed
+	SeedProcessIntervalSeconds                 uint              // Interval in seconds between processing active seeds
+	SeedBackupStaleFailMinutes                 uint              // Number of minutes after which a stale (no progress) seed in Backup stage is considered failed
 	UseSSL                                     bool              // Use SSL on the server web port
 	UseMutualTLS                               bool              // When "true" Use mutual TLS for the server's web and API connections
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -206,11 +211,6 @@ type Configuration struct {
 	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
 	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
 	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
-	AgentPollMinutes                           uint              // Minutes between agent polling
-	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
-	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
-	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
-	SeedWaitSecondsBeforeSend                  int64             // Number of seconds for waiting before start send data command on agent
 	AutoPseudoGTID                             bool              // Should orchestrator automatically inject Pseudo-GTID entries to the masters
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	PseudoGTIDPatternIsFixedSubstring          bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
@@ -376,11 +376,11 @@ func newConfiguration() *Configuration {
 		SSLPrivateKeyFile:                          "",
 		SSLCertFile:                                "",
 		SSLCAFile:                                  "",
-		AgentPollMinutes:                           60,
+		AgentPollMinutes:                           30,
+		SeedBackupStaleFailMinutes:                 60,
 		UnseenAgentForgetHours:                     6,
-		StaleSeedFailMinutes:                       60,
-		SeedAcceptableBytesDiff:                    8192,
-		SeedWaitSecondsBeforeSend:                  2,
+		MaxRetriesForSeedStage:                     3,
+		SeedProcessIntervalSeconds:                 60,
 		AutoPseudoGTID:                             false,
 		PseudoGTIDPattern:                          "",
 		PseudoGTIDPatternIsFixedSubstring:          false,
