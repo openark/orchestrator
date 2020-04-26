@@ -25,7 +25,7 @@
   "DetectInstanceAliasQuery": "",
   "DetectPromotionRuleQuery": "",
   "DetectDataCenterQuery": "select IF(@@port <= 10112, 'dc-east', 'dc-west')",
-  "DetectRegionQuery": "select @@hostname",
+  "DetectRegionQuery": "select IF(@@port <= 10112, 'rgn-east', 'rgn-west')",
   "DetectPhysicalEnvironmentQuery": "select 'prod'",
   "DetectSemiSyncEnforcedQuery": "",
   "DiscoverySeeds": [
@@ -76,7 +76,7 @@
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
-  "PreventCrossRegionMasterFailover": false,
+  "PreventCrossRegionMasterFailover": true,
   "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeReplicaRecoveryOnLagMinutes": 0,
