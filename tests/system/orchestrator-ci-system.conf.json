@@ -12,7 +12,7 @@
   "DiscoverySeeds": [
     "127.0.0.1:10111"
   ],
-  "InstancePollSeconds": 2,
+  "InstancePollSeconds": 1,
   "DiscoveryIgnoreReplicaHostnameFilters": [],
   "UnseenInstanceForgetHours": 24,
   "SnapshotTopologiesIntervalHours": 0,

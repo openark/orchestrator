@@ -53,3 +53,17 @@ $ bin/orchestrator --config=conf/orchestrator-ci-env.conf.json --debug http
 [`conf/orchestrator-ci-env.conf.json`](https://github.com/openark/orchestrator/blob/master/conf/orchestrator-ci-env.conf.json) is designed to work with `orchestrator-ci-env`.
 
 You may choose to change the value of `SQLite3DataFile`, which is by default on `/tmp`.
+
+# Running system tests with environment
+
+While `orchestrator` is running (see above), open another terminal in `orchestrator`'s repo path.
+
+Run:
+```shell
+$ ./tests/system/test.sh
+```
+for all tests, or
+```shell
+$ ./tests/system/test.sh <name-or-regex>
+```
+for a specific test, e.g. `./tests/system/test.sh relocate-single`

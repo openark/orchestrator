@@ -9,7 +9,7 @@
   "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
-  "InstancePollSeconds": 2,
+  "InstancePollSeconds": 1,
   "HostnameResolveMethod": "none",
   "MySQLHostnameResolveMethod": "@@report_host",
   "SkipBinlogServerUnresolveCheck": true,
