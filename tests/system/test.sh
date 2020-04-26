@@ -38,6 +38,19 @@ check_environment() {
       exit 1
     fi
   fi
+  echo "checking mysqladmin"
+  if ! which mysqladmin ; then
+    echo "+ not found in PATH"
+    mysqladmin_file=$(find ~/opt/mysql -type f -name "mysqladmin" | head -n 1)
+    if [ -n "$mysqladmin_file" ] ; then
+      mysqladmin_path="$(dirname "$mysqladmin_file")"
+      echo "found in $mysqladmin_path. Updating PATH"
+      export PATH="$PATH:$mysqladmin_path"
+    else
+      echo "mysqladmin not found"
+      exit 1
+    fi
+  fi
 }
 
 test_step() {
