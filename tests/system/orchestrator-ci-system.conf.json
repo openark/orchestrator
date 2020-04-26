@@ -80,7 +80,7 @@
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
-  "PreventCrossRegionMasterFailover": false,
+  "PreventCrossRegionMasterFailover": true,
   "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeReplicaRecoveryOnLagMinutes": 0,
