@@ -39,9 +39,9 @@
   "StatusOUVerify": false,
   "BinlogEventsChunkSize": 10000,
   "SkipBinlogEventsContaining": [],
-  "ReduceReplicationAnalysisCount": true,
+  "ReduceReplicationAnalysisCount": false,
   "FailureDetectionPeriodBlockMinutes": 5,
-  "FailMasterPromotionOnLagMinutes": 0,
+  "FailMasterPromotionOnLagMinutes": 1,
   "RecoveryPeriodBlockSeconds": 5,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
