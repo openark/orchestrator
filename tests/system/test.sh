@@ -106,6 +106,9 @@ test_step() {
     if [ -f $test_path/expect_failure ] ; then
       if [ $execution_result -eq 0 ] ; then
         echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
+        echo "---"
+        cat $test_logfile
+        echo "---"
         return 1
       fi
       if [ -s $test_path/expect_failure ] ; then
@@ -115,6 +118,9 @@ test_step() {
           return 0
         fi
         echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
+        echo "---"
+        cat $test_logfile
+        echo "---"
         return 1
       fi
       # 'expect_failure' file has no content. We generally agree that the failure is correct
@@ -123,6 +129,9 @@ test_step() {
 
     if [ $execution_result -ne 0 ] ; then
       echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
+      echo "---"
+      cat $test_logfile
+      echo "---"
       return 1
     fi
 
