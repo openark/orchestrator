@@ -94,12 +94,7 @@ test_step() {
     fi
   fi
   if [ -f $test_path/teardown_redeploy ] ; then
-    if [ -f orchestrator-ci-env/script/deploy-replication ] ; then
-      (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1 && sleep 10)
-    else
-      echo "ERROR: teardown_redeploy indicated, but orchestrator-ci-env not found
-      return 1"
-    fi
+    bash $tests_path/deploy-replication || return 1
   fi
 
   if [ -f $test_path/run ] ; then
