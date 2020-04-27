@@ -1,6 +1,6 @@
 #!/bin/bash
 
-orchestrator-client -c end-downtime -i 127.0.0.1:10111
-orchestrator-client -c end-downtime -i 127.0.0.1:10112
-orchestrator-client -c end-downtime -i 127.0.0.1:10113
-orchestrator-client -c end-downtime -i 127.0.0.1:10114
+orchestrator-client -c all-instances | while read i ; do
+  orchestrator-client -c end-downtime -i $i
+  orchestrator-client -c register-candidate -i $i --promotion-rule neutral
+done
