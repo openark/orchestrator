@@ -21,3 +21,5 @@ main
 .vendor/go19
 /bin
 /build
+*.swp
+*.code-workspace

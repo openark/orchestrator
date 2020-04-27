@@ -163,6 +163,7 @@ type Configuration struct {
 	AuditPurgeDays                             uint     // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
+	WebInterfaceReadOnly                       bool   // Restrict the GUI frontend to be read-only, even when authenticating with one of the PowerUsers
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
 	OAuthClientId                              string
 	OAuthClientSecret                          string

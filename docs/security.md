@@ -59,4 +59,10 @@ Or, regardless, you may turn the entire `orchestrator` process to be read only v
 
         "ReadOnly": "true",
 
-You may combine `ReadOnly` with any authentication method you like.
+You may combine `ReadOnly` with any authentication method you like. Should you wish to maintain access to the API
+whilst disabling write access via the web interface then you can apply:
+
+
+        "WebInterfaceReadOnly": "true",
+
+This will force *even PowerUsers* to be forced into read-only mode via the web interface.
