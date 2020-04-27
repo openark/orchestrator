@@ -5,9 +5,11 @@ if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
   exit 1
 fi
 
+echo "# Redeploying replication"
 (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
 # orchestrator's cached connections will have been invalid now. Force refresh by
 # probing all instances:
+echo "# Refreshing connections"
 for counter in 1 2 3 ; do
   for port in 10111 10112 10113 10114 ; do
     orchestrator-client -c discover -i 127.0.0.1:$port > /dev/null 2>&1
