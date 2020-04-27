@@ -15,7 +15,7 @@ test_diff_file=/tmp/orchestrator-test.diff
 test_query_file=/tmp/orchestrator-test.sql
 test_restore_outfile=/tmp/orchestrator-test-restore.out
 test_restore_diff_file=/tmp/orchestrator-test-restore.diff
-deploy_replication_file=/tmp/deploy_replication.log
+export deploy_replication_file=/tmp/deploy_replication.log
 
 exec_cmd() {
   echo "$@"
