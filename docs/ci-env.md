@@ -67,3 +67,5 @@ for all tests, or
 $ ./tests/system/test.sh <name-or-regex>
 ```
 for a specific test, e.g. `./tests/system/test.sh relocate-single`
+
+Destructive tests (e.g. a failover) require a full rebuild of the replication topology. The system tests CI runs both orchestrator and the ci-env together, and the tests can instruct the ci-env to rebuild replication. However, if you run ci-env on a local docker, your tests cannot instruct a replication rebuild. You will need to manually run `./script/deploy-replication` on your ci-env container at the end of a destructive test.
