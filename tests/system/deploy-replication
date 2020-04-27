@@ -15,4 +15,6 @@ for counter in 1 2 3 ; do
     orchestrator-client -c discover -i 127.0.0.1:$port > /dev/null 2>&1
   done
 done
+orchestrator-client -c relocate-replicas -i 127.0.0.1:10111 -d 127.0.0.1:10111
+orchestrator-client -c set-writeable -i 127.0.0.1:10111
 sleep 10
