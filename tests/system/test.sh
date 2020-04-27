@@ -159,17 +159,17 @@ test_all() {
       test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
       if [ $? -ne 0 ] ; then
         echo "+ FAIL"
+        bash $tests_path/debug_dump
         return 1
       fi
       echo "+ pass"
-    done
-    if [ $? -ne 0 ] ; then
-      return 1
-    fi
+    done || return 1
+
     # test main step:
     test_step "$tests_path/$test_name" "$test_name" "main"
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
+      bash $tests_path/debug_dump
       return 1
     fi
     echo "+ pass"
@@ -192,7 +192,7 @@ test_all() {
       echo "---"
       return 1
     fi
-  done
+  done || return 1
 }
 
 main() {
