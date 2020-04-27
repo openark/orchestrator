@@ -5,8 +5,7 @@ if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
   return 1
 fi
 
-cd orchestrator-ci-env
-script/deploy-replication > $deploy_replication_file 2>&1
+(cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
 orchestrator-client -c discover -i 127.0.0.1:10111
 orchestrator-client -c discover -i 127.0.0.1:10112
 orchestrator-client -c discover -i 127.0.0.1:10113
