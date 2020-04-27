@@ -10,9 +10,14 @@ echo "# Redeploying replication"
 # orchestrator's cached connections will have been invalid now. Force refresh by
 # probing all instances:
 echo "# Refreshing connections"
-for counter in 1 2 3; do
+for counter in $(seq 1 3); do
   orchestrator-client -c all-instances | while read i ; do
-    orchestrator-client -c flush-binary-logs -i $i
+    orchestrator-client -c flush-binary-logs -i $i > /dev/null 2>&1
   done
+done
+orchestrator-client -c all-instances | while read i ; do
+  if ! orchestrator-client -c flush-binary-logs -i $i > /dev/null ; then
+    echo "ERROR refreshing connection on $i"
+  fi
 done
 sleep 5
