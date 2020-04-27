@@ -46,6 +46,10 @@ Clusters' master entries are populated on:
 
 Both actual failover and manual request will override any existing KV entries, internal and external.
 
+#### Removing master entries
+
+If `RemoveForgottenClustersFromKV` is set to `true` in config, then information about cluster will be deleted from KV store when the last instance of this cluster is removed.
+
 ### KV and orchestrator/raft
 
 On an [orchestrator/raft](raft.md) setup, all KV writes go through the `raft` protocol. Thus, once the leader determines a write needs to be made to KV stores, it publishes the request to all `raft` nodes. Each of the nodes will apply the write independently, based on its own configuration.

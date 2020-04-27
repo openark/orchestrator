@@ -263,6 +263,7 @@ type Configuration struct {
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
+	RemoveForgottenClustersFromKV              bool              // If true, clusters forgotten by Orchestrator will be removed from KV
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
 }
@@ -428,6 +429,7 @@ func newConfiguration() *Configuration {
 		ConsulCrossDataCenterDistribution:          false,
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
+		RemoveForgottenClustersFromKV:              false,
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
 	}

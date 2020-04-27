@@ -86,6 +86,14 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
+func (this *consulStore) DeleteRecursive(key string) (err error) {
+	if this.client == nil {
+		return nil
+	}
+	_, err = this.client.KV().DeleteTree(key, nil)
+	return err
+}
+
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
 	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {

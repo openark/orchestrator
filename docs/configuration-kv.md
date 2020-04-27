@@ -13,6 +13,7 @@
   "ConsulAddress": "127.0.0.1:8500",
   "ZkAddress": "srv-a,srv-b:12181,srv-c",
   "ConsulCrossDataCenterDistribution": true,
+  "RemoveForgottenClustersFromKV": false,
 ```
 
 `KVClusterMasterPrefix` is the prefix to use for master discovery entries. As example, your cluster alias is `mycluster` and the master host is `some.host-17.com` then you will expect an entry where:

@@ -1889,9 +1889,12 @@ func InjectUnseenMasters() error {
 // appears on the hostname_resolved table; this means some time in the past their hostname was unresovled, and now
 // resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
 func ForgetUnseenInstancesDifferentlyResolved() error {
+	unseenInstances := [](*Instance){}
 	query := `
 			select
-				database_instance.hostname, database_instance.port
+				database_instance.hostname,
+				database_instance.port,
+				database_instance.cluster_name
 			from
 					hostname_resolve
 					JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
@@ -1899,23 +1902,26 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 					hostname_resolve.hostname != hostname_resolve.resolved_hostname
 					AND ifnull(last_checked <= last_seen, 0) = 0
 	`
-	keys := NewInstanceKeyMap()
 	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
-		key := InstanceKey{
-			Hostname: m.GetString("hostname"),
-			Port:     m.GetInt("port"),
-		}
-		keys.AddKey(key)
+		instance := NewInstance()
+		instance.Key.Hostname = m.GetString("hostname")
+		instance.Key.Port = m.GetInt("port")
+		instance.ClusterName = m.GetString("cluster_name")
+		unseenInstances = append(unseenInstances, instance)
 		return nil
 	})
-	var rowsAffected int64 = 0
-	for _, key := range keys.GetInstanceKeys() {
+	var rowsAffected int64
+	for _, instance := range unseenInstances {
+		clusterInfo, err := ReadClusterInfo(instance.ClusterName)
+		if err != nil {
+			return err
+		}
 		sqlResult, err := db.ExecOrchestrator(`
 			delete from
 				database_instance
 			where
 		    hostname = ? and port = ?
-			`, key.Hostname, key.Port,
+			`, instance.Key.Hostname, instance.Key.Port,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -1925,6 +1931,11 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 			return log.Errore(err)
 		}
 		rowsAffected = rowsAffected + rows
+		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
+			if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
+				return log.Errore(err)
+			}
+		}
 	}
 	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rowsAffected))
 	return err
@@ -2668,10 +2679,19 @@ func InstanceIsForgotten(instanceKey *InstanceKey) bool {
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
+// If this instance is the only instance in cluster, it will also remove all cluster information from kv.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
 	if instanceKey == nil {
 		return log.Errorf("ForgetInstance(): nil instanceKey")
+	}
+	clusterName, err := GetClusterName(instanceKey)
+	if err != nil {
+		return log.Errore(err)
+	}
+	clusterInfo, err := ReadClusterInfo(clusterName)
+	if err != nil {
+		return log.Errore(err)
 	}
 	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
 	sqlResult, err := db.ExecOrchestrator(`
@@ -2692,11 +2712,16 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 	if rows == 0 {
 		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
 	}
+	if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
+		if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
+			return log.Errore(err)
+		}
+	}
 	AuditOperation("forget", instanceKey, "")
 	return nil
 }
 
-// ForgetInstance removes an instance entry from the orchestrator backed database.
+// ForgetInstance removes an instance entry from the orchestrator backed database and removes all data about cluster from kv if RemoveForgottenClustersFromKV is set to true in config.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetCluster(clusterName string) error {
 	clusterInstances, err := ReadClusterInstances(clusterName)
@@ -2706,37 +2731,82 @@ func ForgetCluster(clusterName string) error {
 	if len(clusterInstances) == 0 {
 		return nil
 	}
+	clusterInfo, err := ReadClusterInfo(clusterName)
+	if err != nil {
+		return err
+	}
 	for _, instance := range clusterInstances {
 		forgetInstanceKeys.Set(instance.Key.StringCode(), true, cache.DefaultExpiration)
 		AuditOperation("forget", &instance.Key, "")
 	}
-	_, err = db.ExecOrchestrator(`
+	if _, err = db.ExecOrchestrator(`
 			delete
 				from database_instance
 			where
 				cluster_name = ?`,
 		clusterName,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+
+	if config.Config.RemoveForgottenClustersFromKV {
+		if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
 func ForgetLongUnseenInstances() error {
-	sqlResult, err := db.ExecOrchestrator(`
-			delete
-				from database_instance
+	unseenInstances := [](*Instance){}
+	instancesQuery := `
+		select
+			cluster_name,
+			hostname,
+			port
+		from database_instance
+		where last_seen < NOW() - interval ? hour;
+		`
+	err := db.QueryOrchestrator(instancesQuery, sqlutils.Args(config.Config.UnseenInstanceForgetHours), func(m sqlutils.RowMap) error {
+		instance := NewInstance()
+		instance.Key.Hostname = m.GetString("hostname")
+		instance.Key.Port = m.GetInt("port")
+		instance.ClusterName = m.GetString("cluster_name")
+		unseenInstances = append(unseenInstances, instance)
+		return nil
+	})
+	if err != nil {
+		return log.Errore(err)
+	}
+	var rowsAffected int64
+	for _, instance := range unseenInstances {
+		clusterInfo, err := ReadClusterInfo(instance.ClusterName)
+		if err != nil {
+			return err
+		}
+		sqlResult, err := db.ExecOrchestrator(`
+			delete from
+				database_instance
 			where
-				last_seen < NOW() - interval ? hour`,
-		config.Config.UnseenInstanceForgetHours,
-	)
-	if err != nil {
-		return log.Errore(err)
+		    hostname = ? and port = ?
+			`, instance.Key.Hostname, instance.Key.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return log.Errore(err)
+		}
+		rowsAffected = rowsAffected + rows
+		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
+			if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
+				return log.Errore(err)
+			}
+		}
 	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return log.Errore(err)
-	}
-	AuditOperation("forget-unseen", nil, fmt.Sprintf("Forgotten instances: %d", rows))
+	AuditOperation("forget-unseen", nil, fmt.Sprintf("Forgotten instances: %d", rowsAffected))
 	return err
 }
 
