@@ -20,4 +20,6 @@ orchestrator-client -c all-instances | while read i ; do
     echo "ERROR refreshing connection on $i"
   fi
 done
+orchestrator-client -c submit-masters-to-kv-stores
 sleep 5
+orchestrator-client -c submit-masters-to-kv-stores
