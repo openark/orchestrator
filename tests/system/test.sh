@@ -15,6 +15,7 @@ test_diff_file=/tmp/orchestrator-test.diff
 test_query_file=/tmp/orchestrator-test.sql
 test_restore_outfile=/tmp/orchestrator-test-restore.out
 test_restore_diff_file=/tmp/orchestrator-test-restore.diff
+deploy_replication_file=/tmp/deploy_replication.log
 
 exec_cmd() {
   echo "$@"
@@ -94,7 +95,7 @@ test_step() {
   fi
   if [ -f $test_path/teardown_redeploy ] ; then
     if [ -f orchestrator-ci-env/script/deploy-replication ] ; then
-      (cd orchestrator-ci-env && script/deploy-replication && sleep 10)
+      (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file && sleep 10)
     else
       echo "ERROR: teardown_redeploy indicated, but orchestrator-ci-env not found
       return 1"
