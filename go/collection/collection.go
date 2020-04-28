@@ -68,7 +68,7 @@ import (
 
 	//	"github.com/openark/golib/log"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 )
 
 // Metric is an interface containing a metric

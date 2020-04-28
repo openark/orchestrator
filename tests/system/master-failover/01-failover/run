@@ -1,0 +1,1 @@
+orchestrator-client -c which-cluster-master -alias ci | grep -v ":10111" | cut -d: -f1

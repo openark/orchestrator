@@ -7,7 +7,7 @@
 Thank you! We are open to PRs, but please understand if for technical reasons we are unable to accept each and any PR
 -->
 
-Related issue: https://github.com/github/orchestrator/issues/0123456789
+Related issue: https://github.com/openark/orchestrator/issues/0123456789
 
 
 ### Description

@@ -9,7 +9,7 @@ RUN apt-get install -y numactl
 RUN apt-get install -y sqlite3
 RUN rm -rf /var/lib/apt/lists/*
 
-ENV WORKPATH /go/src/github.com/github/orchestrator
+ENV WORKPATH /go/src/github.com/openark/orchestrator
 WORKDIR $WORKPATH
 
 RUN curl -L -O "https://github.com/github/gh-ost-ci-env/raw/master/bin/linux/dbdeployer"

@@ -30,8 +30,8 @@ RUN apt-get install -y git
 RUN apt-get install -y tar
 RUN apt-get install -y rpm
 
-RUN mkdir -p $GOPATH/src/github.com/github/orchestrator
-WORKDIR $GOPATH/src/github.com/github/orchestrator
+RUN mkdir -p $GOPATH/src/github.com/openark/orchestrator
+WORKDIR $GOPATH/src/github.com/openark/orchestrator
 COPY . .
 RUN bash build.sh -b -P
 RUN bash build.sh -R -N -i sysv

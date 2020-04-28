@@ -53,3 +53,19 @@ $ bin/orchestrator --config=conf/orchestrator-ci-env.conf.json --debug http
 [`conf/orchestrator-ci-env.conf.json`](https://github.com/openark/orchestrator/blob/master/conf/orchestrator-ci-env.conf.json) is designed to work with `orchestrator-ci-env`.
 
 You may choose to change the value of `SQLite3DataFile`, which is by default on `/tmp`.
+
+# Running system tests with environment
+
+While `orchestrator` is running (see above), open another terminal in `orchestrator`'s repo path.
+
+Run:
+```shell
+$ ./tests/system/test.sh
+```
+for all tests, or
+```shell
+$ ./tests/system/test.sh <name-or-regex>
+```
+for a specific test, e.g. `./tests/system/test.sh relocate-single`
+
+Destructive tests (e.g. a failover) require a full rebuild of the replication topology. The system tests CI runs both orchestrator and the ci-env together, and the tests can instruct the ci-env to rebuild replication. However, if you run ci-env on a local docker, your tests cannot instruct a replication rebuild. You will need to manually run `./script/deploy-replication` on your ci-env container at the end of a destructive test.
