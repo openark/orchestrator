@@ -26,14 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/agent"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/logic"
-	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
+	"github.com/openark/orchestrator/go/agent"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/logic"
+	"github.com/openark/orchestrator/go/process"
 )
 
 var thisInstanceKey *inst.InstanceKey

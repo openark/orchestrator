@@ -23,11 +23,11 @@ import (
 
 	"github.com/martini-contrib/auth"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/os"
-	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/os"
+	"github.com/openark/orchestrator/go/process"
+	"github.com/openark/orchestrator/go/raft"
 )
 
 func getProxyAuthUser(req *http.Request) string {

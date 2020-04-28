@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/math"
+	"github.com/openark/orchestrator/go/config"
 )
 
 const ReasonableDiscoveryLatency = 500 * time.Millisecond

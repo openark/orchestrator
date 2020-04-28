@@ -2,7 +2,7 @@
 
 Documenting and explaining all configuration variables turns to be a daunting task, as goes as deep as explain-the-code-in-words. There is an ongoing effort in pruning and simplifying the configuration.
 
-The de-facto configuration list is located in [config.go](https://github.com/github/orchestrator/blob/master/go/config/config.go).
+The de-facto configuration list is located in [config.go](https://github.com/openark/orchestrator/blob/master/go/config/config.go).
 
 You are undoubtedly interested in configuring some basic components: the backend database, hosts discoveries. You may choose to use Pseudo-GTID. You may want `orchestrator` to notify upon failure, or you may wish to run full blown automated recovery.
 
