@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "topology:"
+orchestrator-client -c topology-tabulated -alias ci
+echo "replication-analysis:"
+orchestrator-client -c replication-analysis

@@ -15,6 +15,7 @@ test_diff_file=/tmp/orchestrator-test.diff
 test_query_file=/tmp/orchestrator-test.sql
 test_restore_outfile=/tmp/orchestrator-test-restore.out
 test_restore_diff_file=/tmp/orchestrator-test-restore.diff
+export deploy_replication_file=/tmp/deploy_replication.log
 
 exec_cmd() {
   echo "$@"
@@ -26,6 +27,32 @@ echo_dot() {
   echo -n "."
 }
 
+check_environment() {
+  echo "checking orchestrator-client"
+  if ! which orchestrator-client ; then
+    echo "+ not found in PATH"
+    if [ -f resources/bin/orchestrator-client ] ; then
+      echo "found in resources/bin. Updating PATH"
+      export PATH="$PATH:$(pwd)/resources/bin"
+    else
+      echo "orchestrator-client not found"
+      exit 1
+    fi
+  fi
+  echo "checking mysqladmin"
+  if ! which mysqladmin ; then
+    echo "+ not found in PATH"
+    mysqladmin_file=$(find ~/opt/mysql -type f -name "mysqladmin" | head -n 1)
+    if [ -n "$mysqladmin_file" ] ; then
+      mysqladmin_path="$(dirname "$mysqladmin_file")"
+      echo "found in $mysqladmin_path. Updating PATH"
+      export PATH="$PATH:$mysqladmin_path"
+    else
+      echo "mysqladmin not found"
+      exit 1
+    fi
+  fi
+}
 
 test_step() {
   local test_path
@@ -67,13 +94,16 @@ test_step() {
     fi
   fi
   if [ -f $test_path/teardown_redeploy ] ; then
-    script/deploy-replication
+    bash $tests_path/deploy-replication || return 1
   fi
 
   if [ -f $test_path/run ] ; then
     if [ -f $test_path/expect_failure ] ; then
       if [ $execution_result -eq 0 ] ; then
         echo "ERROR $test_name/$test_step_name execution was expected to exit on error but did not. cat $test_logfile"
+        echo "---"
+        cat $test_logfile
+        echo "---"
         return 1
       fi
       if [ -s $test_path/expect_failure ] ; then
@@ -83,6 +113,9 @@ test_step() {
           return 0
         fi
         echo "ERROR $test_name/$test_step_name execution was expected to exit with error message '${expected_error_message}' but did not. cat $test_logfile"
+        echo "---"
+        cat $test_logfile
+        echo "---"
         return 1
       fi
       # 'expect_failure' file has no content. We generally agree that the failure is correct
@@ -91,6 +124,9 @@ test_step() {
 
     if [ $execution_result -ne 0 ] ; then
       echo "ERROR $test_name/$test_step_name execution failure. cat $test_logfile"
+      echo "---"
+      cat $test_logfile
+      echo "---"
       return 1
     fi
 
@@ -114,26 +150,41 @@ test_step() {
 test_all() {
   test_pattern="${1:-.}"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+
+    bash $tests_path/setup 1> $setup_teardown_logfile 2>&1
+    if [ $? -ne 0 ] ; then
+      echo "ERROR global setup failed"
+      cat $setup_teardown_logfile
+      return 1
+    fi
+
     # test steps:
     find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
       [ "$test_step_name" == "." ] && continue
       test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
       if [ $? -ne 0 ] ; then
         echo "+ FAIL"
+        bash $tests_path/debug_dump
         return 1
       fi
       echo "+ pass"
-    done
-    if [ $? -ne 0 ] ; then
-      return 1
-    fi
+    done || return 1
+
     # test main step:
     test_step "$tests_path/$test_name" "$test_name" "main"
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
+      bash $tests_path/debug_dump
       return 1
     fi
     echo "+ pass"
+
+    bash $tests_path/teardown 1> $setup_teardown_logfile 2>&1
+    if [ $? -ne 0 ] ; then
+      echo "ERROR global teardown failed"
+      cat $setup_teardown_logfile
+      return 1
+    fi
 
     bash $tests_path/check_restore > $test_restore_outfile
     diff -b $tests_path/expect_restore $test_restore_outfile > $test_restore_diff_file
@@ -146,10 +197,11 @@ test_all() {
       echo "---"
       return 1
     fi
-  done
+  done || return 1
 }
 
 main() {
+  check_environment
   test_all "$@"
 }
 

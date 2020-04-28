@@ -1689,6 +1689,12 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 
 // Created this function to allow a hook to be called after a successful TakeMaster event
 func TakeMasterHook(successor *Instance, demoted *Instance) {
+	if demoted == nil {
+		return
+	}
+	if successor == nil {
+		return
+	}
 	successorKey := successor.Key
 	demotedKey := demoted.Key
 	env := goos.Environ()
