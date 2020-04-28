@@ -21,7 +21,7 @@ package discovery
 import (
 	"time"
 
-	"github.com/github/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/inst"
 )
 
 // Metric holds a set of information of instance discovery metrics

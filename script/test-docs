@@ -3,20 +3,21 @@
 validate_documentation() {
   echo "# Validating documentation"
   echo "## docs/toc.md and docs/README.md must be identical"
-  diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
+  diff docs/toc.md docs/README.md > /dev/null 2> /dev/null || exit 1
+  echo "OK"
 
   echo "## Checking if all local links are backed by doc files"
   egrep -R '[(][^/()]+.md[)]' docs/ -o --no-file | sort | uniq | tr -d '()' | while read link ; do
     echo "### Checking link: $link"
     ls docs/$link > /dev/null && echo "## - yes" || exit 1
-  done
+  done || exit 1
 
   echo "## Checking every doc page has an inbound link"
   ls docs/*.md | grep -v README.md | while read f ; do
     docfile="$(basename $f)"
     echo "### Checking if doc file $docfile is linked from another doc"
     egrep -c -R "[(]$docfile[)]" docs/ -q && echo "## - yes" || exit 1
-  done
+  done || exit 1
 }
 
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Local integration tests. To be used by CI.
-# See https://github.com/github/orchestrator/tree/doc/local-tests.md
+# See https://github.com/openark/orchestrator/tree/doc/local-tests.md
 #
 
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
