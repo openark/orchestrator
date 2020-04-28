@@ -907,19 +907,19 @@ body {
 }
 
 #cluster_legend {
-    margin-top: 20px;
+  margin-top: 20px;
 }
 
 #cluster_legend span {
-    margin-right: 10px;
-    padding: 3px 5px;
-    white-space: nowrap;
-    font-size: 12px;
+  padding: 3px 5px;
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 #cluster_legend span.dc {
-    border:2px solid;
-    border-radius: 5px;
+  margin-right: 10px;
+  border: 2px solid;
+  border-radius: 5px;
 }
 
 #clusters_analysis .popover {
