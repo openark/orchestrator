@@ -36,13 +36,13 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/sjmudd/stopwatch"
 
-	"github.com/github/orchestrator/go/attributes"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/metrics/query"
-	"github.com/github/orchestrator/go/util"
+	"github.com/openark/orchestrator/go/attributes"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/metrics/query"
+	"github.com/openark/orchestrator/go/util"
 )
 
 const (
@@ -604,7 +604,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 				replicaKey, err := NewResolveInstanceKey(host, port)
 				if err == nil && replicaKey.IsValid() {
-					instance.AddReplicaKey(replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(replicaKey)
+					}
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -632,7 +634,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
 					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-					instance.AddReplicaKey(&replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(&replicaKey)
+					}
 					return err
 				})
 

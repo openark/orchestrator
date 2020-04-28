@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 	"github.com/outbrain/zookeepercli/zk"
 	zkconstants "github.com/samuel/go-zookeeper/zk"
 )
