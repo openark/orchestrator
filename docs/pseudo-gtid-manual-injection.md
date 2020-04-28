@@ -18,7 +18,7 @@ for more detail.
 
 Injecting Pseudo GTID can be done via:
 - MySQL's [event_scheduler](https://dev.mysql.com/doc/refman/5.7/en/event-scheduler.html) (see examples below)
-- External injection, see [sample files](https://github.com/github/orchestrator/tree/master/resources/pseudo-gtid):
+- External injection, see [sample files](https://github.com/openark/orchestrator/tree/master/resources/pseudo-gtid):
   - script to inject pseudo-gtid
   - start-stop script to serve as daemon on `/etc/init.d/pseudo-gtid`
   - a puppet module.
