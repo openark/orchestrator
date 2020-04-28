@@ -313,7 +313,7 @@ func newConfiguration() *Configuration {
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
 		InstanceFlushIntervalMilliseconds:          100,
-		SkipMaxScaleCheck:                          false,
+		SkipMaxScaleCheck:                          true,
 		UnseenInstanceForgetHours:                  240,
 		SnapshotTopologiesIntervalHours:            0,
 		DiscoverByShowSlaveHosts:                   false,
