@@ -906,14 +906,20 @@ body {
     z-index: 50;
 }
 
-#dc_legend {
+#cluster_legend {
     margin-top: 20px;
 }
 
-#dc_legend span {
+#cluster_legend span {
     margin-right: 10px;
     padding: 3px 5px;
     white-space: nowrap;
+    font-size: 12px;
+}
+
+#cluster_legend span.dc {
+    border:2px solid;
+    border-radius: 5px;
 }
 
 #clusters_analysis .popover {
