@@ -58,4 +58,4 @@ If you wish to inject Pseudo-GTID yourself, we suggest you should configure as f
 The above assumes:
 
 - You have a `meta` schema
-- You will inject Pseudo-GTID entries via [this sample script](https://github.com/github/orchestrator/tree/master/resources/pseudo-gtid)
+- You will inject Pseudo-GTID entries via [this sample script](https://github.com/openark/orchestrator/tree/master/resources/pseudo-gtid)
