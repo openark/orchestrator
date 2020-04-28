@@ -32,15 +32,15 @@ import (
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
 
-	"github.com/github/orchestrator/go/agent"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/discovery"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/logic"
-	"github.com/github/orchestrator/go/metrics/query"
-	"github.com/github/orchestrator/go/process"
-	orcraft "github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/agent"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/discovery"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/logic"
+	"github.com/openark/orchestrator/go/metrics/query"
+	"github.com/openark/orchestrator/go/process"
+	orcraft "github.com/openark/orchestrator/go/raft"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -2428,7 +2428,7 @@ func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r rende
 	r.JSON(http.StatusOK, aggregated)
 }
 
-// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
+// Agents provides complete list of registered agents (See https://github.com/openark/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})

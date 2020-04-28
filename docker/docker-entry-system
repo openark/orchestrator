@@ -1,0 +1,35 @@
+#!/bin/bash
+
+echo "setting up orchestrator..."
+sudo cp etc/systemd/orchestrator.service /etc/systemd/system/
+sudo mkdir -p /usr/local/orchestrator
+sudo cp bin/orchestrator /usr/local/orchestrator/
+sudo cp -R resources /usr/local/orchestrator/
+sudo cp resources/bin/orchestrator-client /usr/bin
+sudo cp tests/system/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
+
+echo "starting orchestrator service..."
+sudo systemctl daemon-reload
+sudo systemctl start orchestrator
+sudo systemctl status orchestrator
+echo "checking if service is healthy..."
+orchestrator-client -c api -path status | jq .Details.Healthy
+
+echo "Sleeping gracefully to let orchestrator detect the topology..."
+sleep 20
+
+echo ""
+echo "==============================================="
+echo "Welcome to orchestrator system test environment"
+echo "==============================================="
+echo ""
+echo "There is a MySQL cluster named 'ci' up and running."
+echo "Here's how to invoke orchestrator-client:"
+echo "---"
+echo ""
+echo "orchestrator-client -c clusters-alias"
+orchestrator-client -c clusters-alias
+echo "orchestrator-client -c topology-tabulated -alias ci"
+orchestrator-client -c topology-tabulated -alias ci
+echo "---"
+echo ""

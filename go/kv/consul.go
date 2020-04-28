@@ -23,7 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 
 	consulapi "github.com/armon/consul-api"
 	"github.com/patrickmn/go-cache"

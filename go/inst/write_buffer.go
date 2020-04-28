@@ -23,8 +23,8 @@ package inst
 import (
 	"time"
 
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
 
 	"github.com/montanaflynn/stats"
 )

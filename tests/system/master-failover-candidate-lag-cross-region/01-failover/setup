@@ -1,0 +1,7 @@
+orchestrator-client -c stop-replica -i 127.0.0.1:10112
+orchestrator-client -c stop-replica -i 127.0.0.1:10113
+orchestrator-client -c register-candidate -i 127.0.0.1:10113 --promotion-rule prefer
+mysql -uci -pci -h 127.0.0.1 --port=10111 -e "delete from test.heartbeat where id<0"
+sleep 2
+mysqladmin -uci -pci -h 127.0.0.1 --port=10111 shutdown
+sleep 20

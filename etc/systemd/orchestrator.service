@@ -1,6 +1,6 @@
 [Unit]
 Description=orchestrator: MySQL replication management and visualization
-Documentation=https://github.com/github/orchestrator
+Documentation=https://github.com/openark/orchestrator
 After=syslog.target network.target mysqld.service mysql.service 
 
 [Service]

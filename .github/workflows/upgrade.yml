@@ -3,7 +3,7 @@ name: upgrade
 on: [pull_request]
 
 jobs:
-  build:
+  upgrade:
 
     runs-on: ubuntu-latest
     # strategy:
