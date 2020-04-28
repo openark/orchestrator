@@ -32,7 +32,7 @@ usage() {
   echo "-a (amd64|386) Arch Default:(amd64)"
   echo "-d debug output"
   echo "-b build only, do not generate packages"
-  echo "-N do not build; use existing ./buld/bin/orchestrator binary"
+  echo "-N do not build; use existing ./build/bin/orchestrator binary"
   echo "-P create build/deployment paths"
   echo "-R retain existing build/deployment paths"
   echo "-p build prefix Default:(/usr/local)"
