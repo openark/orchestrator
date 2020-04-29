@@ -20,8 +20,8 @@ ENV GOPATH=/tmp/go
 
 RUN apk --no-cache add libcurl rsync gcc g++ build-base bash git
 
-RUN mkdir -p $GOPATH/src/github.com/github/orchestrator
-WORKDIR $GOPATH/src/github.com/github/orchestrator
+RUN mkdir -p $GOPATH/src/github.com/openark/orchestrator
+WORKDIR $GOPATH/src/github.com/openark/orchestrator
 COPY . .
 RUN bash build.sh -b -P
 RUN rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator -maxdepth 2)/ /
