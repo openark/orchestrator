@@ -906,6 +906,22 @@ body {
     z-index: 50;
 }
 
+#cluster_legend {
+  margin-top: 20px;
+}
+
+#cluster_legend span {
+  padding: 3px 5px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+#cluster_legend span.dc {
+  margin-right: 10px;
+  border: 2px solid;
+  border-radius: 5px;
+}
+
 #clusters_analysis .popover {
     width: 430px;
     max-width: 430px;
