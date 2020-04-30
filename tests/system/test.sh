@@ -7,7 +7,7 @@
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
-tests_path=$(dirname $0)
+export tests_path=$(dirname $0)
 setup_teardown_logfile=/tmp/orchestrator-setup-teardown.log
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
@@ -51,6 +51,15 @@ check_environment() {
       echo "mysqladmin not found"
       exit 1
     fi
+  fi
+  export PATH="$PATH:$tests_path"
+  if ! which test-retry ; then
+    echo "test-retry not found"
+    exit 1
+  fi
+  if ! which test-refresh-connections ; then
+    echo "test-refresh-connections not found"
+    exit 1
   fi
 }
 

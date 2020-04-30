@@ -1,2 +1,6 @@
+#!/bin/bash
+
+set -e
+
 mysqladmin -uci -pci -h 127.0.0.1 --port=10111 shutdown
 sleep 20
