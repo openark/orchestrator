@@ -9,9 +9,6 @@ fi
 echo "# Redeploying replication"
 (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
 
-# orchestrator's cached connections will have been invalid now. Force refresh by
-# probing all instances:
-
 if ! test-refresh-connections ; then
   echo "ERROR refreshing connections"
   exit 1
@@ -21,6 +18,13 @@ sleep 5
 orchestrator-client -c submit-masters-to-kv-stores
 
 (cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
+sleep 2
+if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "show create table test.heartbeat" > /dev/null ; then
+  echo "ERROR: cannot find heartbeat table"
+  cat $deploy_replication_file
+  exit 1
+fi
+
 if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "select * from test.heartbeat" | grep -q . ; then
   echo "ERROR: cannot read heartbeat value"
   cat $deploy_replication_file
