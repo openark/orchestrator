@@ -2,10 +2,7 @@
 
 if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
   echo "ERROR: teardown_redeploy indicated, but orchestrator-ci-env not found"
-  echo "# Cleanup: refreshing connections"
-  orchestrator-client -c all-instances | while read i ; do
-    test-retry orchestrator-client -c flush-binary-logs -i $i > /dev/null 2>&1
-  done
+  test-refresh-connections
   exit 1
 fi
 
@@ -14,15 +11,9 @@ echo "# Redeploying replication"
 # orchestrator's cached connections will have been invalid now. Force refresh by
 # probing all instances:
 
-echo "# Cleanup: refreshing connections"
-orchestrator-client -c all-instances | while read i ; do
-  test-retry orchestrator-client -c flush-binary-logs -i $i > /dev/null 2>&1
-done
-orchestrator-client -c all-instances | while read i ; do
-  if ! orchestrator-client -c flush-binary-logs -i $i > /dev/null ; then
-    echo "ERROR refreshing connection on $i"
-  fi
-done
+if ! test-refresh-connections ; then
+  echo "ERROR refreshing connections"
+fi
 orchestrator-client -c submit-masters-to-kv-stores
 sleep 5
 orchestrator-client -c submit-masters-to-kv-stores
