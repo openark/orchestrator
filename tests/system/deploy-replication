@@ -14,6 +14,7 @@ echo "# Redeploying replication"
 
 if ! test-refresh-connections ; then
   echo "ERROR refreshing connections"
+  exit 1
 fi
 orchestrator-client -c submit-masters-to-kv-stores
 sleep 5
@@ -22,5 +23,6 @@ orchestrator-client -c submit-masters-to-kv-stores
 (cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
 if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "select * from test.heartbeat" | grep -q . ; then
   echo "ERROR: cannot read heartbeat value"
+  cat $deploy_replication_file
   exit 1
 fi
