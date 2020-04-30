@@ -1306,8 +1306,15 @@ function Cluster() {
       })
     }
     knownDCs = uniq(knownDCs);
+    if (isColorizeDC() && !isAnonymized()) {
+      $('<span>Data centers:</span>').appendTo('#cluster_legend');
+    }
     for (i = 0; i < knownDCs.length; ++i) {
-      dcColorsMap[knownDCs[i]] = renderColors[i % renderColors.length];
+      var color = renderColors[i % renderColors.length]
+      dcColorsMap[knownDCs[i]] = color;
+      if (isColorizeDC() && !isAnonymized()) {
+        $('<span>' + (knownDCs[i] || 'n/a') + '</span>').addClass("dc").css('border-color', color).appendTo('#cluster_legend');
+      }
     }
   }
 
