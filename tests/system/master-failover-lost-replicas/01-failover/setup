@@ -1,11 +1,19 @@
 #!/bin/bash
 
 set -e
+echo "...1"
 test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10113
+echo "...2"
 test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10114
+echo "...3"
 orchestrator-client -c register-candidate -i 127.0.0.1:10112 --promotion-rule must_not
+echo "...4"
 mysql -uci -pci -h 127.0.0.1 --port=10111 -e "update test.heartbeat set hint='mysql-failover-lost-replicas'"
+echo "...5"
 sleep 2
+echo "...6"
 
 mysqladmin -uci -pci -h 127.0.0.1 --port=10111 shutdown
+echo "...7"
 sleep 20
+echo "...8"
