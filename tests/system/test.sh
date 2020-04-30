@@ -53,6 +53,14 @@ check_environment() {
     fi
   fi
   export PATH="$PATH:$tests_path"
+  if ! which test-retry ; then
+    echo "test-retry not found"
+    exit 1
+  fi
+  if ! which test-refresh-connections ; then
+    echo "test-refresh-connections not found"
+    exit 1
+  fi
 }
 
 test_step() {
