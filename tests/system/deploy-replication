@@ -8,6 +8,13 @@ fi
 
 echo "# Redeploying replication"
 (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
+(cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
+
+if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "select * test.heartbeat" | grep -q . ; then
+  echo "ERROR: cannot read heartbeat value"
+  exit 1
+fi
+
 # orchestrator's cached connections will have been invalid now. Force refresh by
 # probing all instances:
 
