@@ -1,5 +1,5 @@
-while ! orchestrator-client -c stop-replica -i 127.0.0.1:10113 ; do sleep 0.2 ; done
-while ! orchestrator-client -c stop-replica -i 127.0.0.1:10114 ; do sleep 0.2 ; done
+test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10113
+test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10114
 orchestrator-client -c register-candidate -i 127.0.0.1:10112 --promotion-rule must_not
 mysql -uci -pci -h 127.0.0.1 --port=10111 -e "update test.heartbeat set hint='mysql-failover-lost-replicas'"
 sleep 2
