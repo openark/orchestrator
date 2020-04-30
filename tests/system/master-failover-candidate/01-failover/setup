@@ -1,3 +1,7 @@
+#!/bin/bash
+
+set -e
+
 orchestrator-client -c register-candidate -i 127.0.0.1:10113 --promotion-rule prefer
 mysqladmin -uci -pci -h 127.0.0.1 --port=10111 shutdown
 sleep 20

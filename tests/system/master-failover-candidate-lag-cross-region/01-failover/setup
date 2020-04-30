@@ -1,5 +1,9 @@
-orchestrator-client -c stop-replica -i 127.0.0.1:10112
-orchestrator-client -c stop-replica -i 127.0.0.1:10113
+#!/bin/bash
+
+set -e
+
+test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10112
+test-retry orchestrator-client -c stop-replica -i 127.0.0.1:10113
 orchestrator-client -c register-candidate -i 127.0.0.1:10113 --promotion-rule prefer
 mysql -uci -pci -h 127.0.0.1 --port=10111 -e "update test.heartbeat set hint='mysql-failover-candidate-lag-cross-region'"
 sleep 2
