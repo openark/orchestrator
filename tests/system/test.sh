@@ -172,8 +172,6 @@ test_all() {
       cat $setup_teardown_logfile
       return 1
     fi
-    echo "# Reloading configuration"
-    orchestrator-client -c api -path "reload-configuration" | jq -r '.Code'
 
     # test steps:
     find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
