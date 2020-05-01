@@ -596,18 +596,22 @@ func (this *Configuration) IsMySQL() bool {
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
 func read(fileName string) (*Configuration, error) {
+	if fileName == "" {
+		return Config, fmt.Errorf("Empty file name")
+	}
 	file, err := os.Open(fileName)
+	if err != nil {
+		return Config, err
+	}
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(Config)
 	if err == nil {
-		decoder := json.NewDecoder(file)
-		err := decoder.Decode(Config)
-		if err == nil {
-			log.Infof("Read config: %s", fileName)
-		} else {
-			log.Fatal("Cannot read config file:", fileName, err)
-		}
-		if err := Config.postReadAdjustments(); err != nil {
-			log.Fatale(err)
-		}
+		log.Infof("Read config: %s", fileName)
+	} else {
+		log.Fatal("Cannot read config file:", fileName, err)
+	}
+	if err := Config.postReadAdjustments(); err != nil {
+		log.Fatale(err)
 	}
 	return Config, err
 }
@@ -633,8 +637,11 @@ func ForceRead(fileName string) *Configuration {
 }
 
 // Reload re-reads configuration from last used files
-func Reload() *Configuration {
+func Reload(extraFileNames ...string) *Configuration {
 	for _, fileName := range readFileNames {
+		read(fileName)
+	}
+	for _, fileName := range extraFileNames {
 		read(fileName)
 	}
 	return Config

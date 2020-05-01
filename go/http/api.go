@@ -2961,10 +2961,11 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	config.Reload()
+	extraConfigFile := req.URL.Query().Get("config")
+	config.Reload(extraConfigFile)
 	inst.AuditOperation("reload-configuration", nil, "Triggered via API")
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded")})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded"), Details: extraConfigFile})
 }
 
 // ReplicationAnalysis retuens list of issues
