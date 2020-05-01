@@ -77,7 +77,9 @@ test_step() {
 
   if [ -f $test_path/config.json ] ; then
     echo "- applying configuration: $test_path/config.json"
-    orchestrator-client -c api -path "reload-configuration?config=$test_path/config.json" | jq -c .
+    real_config_path="$(realpath $test_path/config.json)"
+    echo "- applying configuration: $real_path"
+    orchestrator-client -c api -path "reload-configuration?config=$real_config_path" | jq -c .
   fi
 
   if [ -f $test_path/setup ] ; then
