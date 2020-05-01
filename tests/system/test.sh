@@ -77,7 +77,7 @@ test_step() {
 
   if [ -f $test_path/config.json ] ; then
     echo "- applying configuration: $test_path/config.json"
-    orchestrator-client -c api -path "reload-configuration?config=$test_path/config.json" > /dev/null 2>&1
+    orchestrator-client -c api -path "reload-configuration?config=$test_path/config.json" | jq -c .
   fi
 
   if [ -f $test_path/setup ] ; then
@@ -171,7 +171,8 @@ test_all() {
       cat $setup_teardown_logfile
       return 1
     fi
-    orchestrator-client -c api -path "reload-configuration" > /dev/null 2>&1
+    echo "# Reloading configuration"
+    orchestrator-client -c api -path "reload-configuration" | jq -c .
 
     # test steps:
     find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
