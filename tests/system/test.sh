@@ -75,6 +75,13 @@ test_step() {
 
   echo "Testing: $test_name/$test_step_name"
 
+  if [ -f $test_path/config.json ] ; then
+    echo "- applying configuration: $test_path/config.json"
+    orchestrator-client -c api -path "reload-configuration?config=$test_path/config.json" > /dev/null 2>&1
+  else
+    orchestrator-client -c api -path "reload-configuration" > /dev/null 2>&1
+  fi
+
   if [ -f $test_path/setup ] ; then
     bash $test_path/setup 1> $setup_teardown_logfile 2>&1
     if [ $? -ne 0 ] ; then
