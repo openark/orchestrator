@@ -1,6 +1,10 @@
 #!/bin/bash
 
-echo "topology:"
+echo "# topology:"
 orchestrator-client -c topology-tabulated -alias ci
-echo "replication-analysis:"
+echo "# replication-analysis:"
 orchestrator-client -c replication-analysis
+if [ -f /etc/haproxy/haproxy.cfg ] ; then
+  echo "# haproxy"
+  cat /etc/haproxy/haproxy.cfg
+fi

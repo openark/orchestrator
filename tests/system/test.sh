@@ -7,7 +7,7 @@
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
-tests_path=$(dirname $0)
+export tests_path=$(dirname $0)
 setup_teardown_logfile=/tmp/orchestrator-setup-teardown.log
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
@@ -52,6 +52,15 @@ check_environment() {
       exit 1
     fi
   fi
+  export PATH="$PATH:$tests_path"
+  if ! which test-retry ; then
+    echo "test-retry not found"
+    exit 1
+  fi
+  if ! which test-refresh-connections ; then
+    echo "test-refresh-connections not found"
+    exit 1
+  fi
 }
 
 test_step() {
@@ -65,6 +74,12 @@ test_step() {
   test_step_name="$3"
 
   echo "Testing: $test_name/$test_step_name"
+
+  if [ -f $test_path/config.json ] ; then
+    echo "- applying configuration: $test_path/config.json"
+    real_config_path="$(realpath $test_path/config.json)"
+    orchestrator-client -c api -path "reload-configuration?config=$real_config_path" | jq -r '.Code'
+  fi
 
   if [ -f $test_path/setup ] ; then
     bash $test_path/setup 1> $setup_teardown_logfile 2>&1
