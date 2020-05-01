@@ -4,5 +4,7 @@ echo "# topology:"
 orchestrator-client -c topology-tabulated -alias ci
 echo "# replication-analysis:"
 orchestrator-client -c replication-analysis
-echo "# haproxy"
-cat /etc/haproxy/haproxy.cfg
+if [ -f /etc/haproxy/haproxy.cfg ] ; then
+  echo "# haproxy"
+  cat /etc/haproxy/haproxy.cfg
+fi
