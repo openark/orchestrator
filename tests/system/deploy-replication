@@ -6,6 +6,8 @@ if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
   exit 1
 fi
 
+orchestrator-client -c api -path "reload-configuration" | jq -r '.Code'
+
 echo "# Redeploying replication"
 (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
 
