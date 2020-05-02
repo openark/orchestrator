@@ -225,7 +225,6 @@ test_single() {
     echo "---"
     return 1
   fi
-  echo "# marking test as successful"
 }
 
 test_listed_as_successful() {
