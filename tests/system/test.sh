@@ -293,7 +293,6 @@ test_all() {
 
     find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
       if ! test_listed_as_attempted "$test_name" ; then
-        echo "# test $test_name hasn't been executed before"
         echo "$test_name" >> $tests_todo_file
       fi
       if should_attempt_test "$test_name" "$test_pattern" ; then
@@ -305,10 +304,9 @@ test_all() {
           exit 1
         fi
       else
-        echo "# should not attempt $test_name"
+        : # echo "# should not attempt $test_name"
       fi
     done || return 1
-    echo "# Iterated: $(cat $tests_todo_file)"
   done
 }
 
