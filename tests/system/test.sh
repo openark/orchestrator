@@ -272,15 +272,15 @@ should_attempt_test() {
     if test_listed_as_failed $dependency ; then
       # dependency has failed; fail this test, too
       echo "$check_test_name" >> $tests_failed_file
-      return 1
+      exit 1
     fi
-  done
+  done || return 1
   (cat ${tests_path}/${check_test_name}/depends-on 2> /dev/null || echo -n "") | while read dependency ; do
     if ! test_listed_as_successful $dependency ; then
       # dependency hasn't been successful (yet?)
-      return 1
+      exit 1
     fi
-  done
+  done || return 1
   return 0
 }
 
