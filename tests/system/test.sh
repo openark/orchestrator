@@ -225,7 +225,7 @@ test_single() {
     echo "---"
     return 1
   fi
-  echo "$check_test_name" >> $tests_successful_file  
+  echo "$check_test_name" >> $tests_successful_file
 }
 
 test_listed_as_successful() {
@@ -238,13 +238,34 @@ test_listed_as_failed() {
   cat $tests_failed_file | egrep -q "^$check_test_name\$"
 }
 
+test_listed_as_attempted() {
+  local check_test_name="$1"
+  if test_listed_as_successful $check_test_name ; then
+    return 0
+  fi
+  if test_listed_as_failed $check_test_name ; then
+    return 0
+  fi
+  return 1
+}
+
+test_listed_as_failed() {
+  local check_test_name="$1"
+  cat $tests_failed_file | egrep -q "^$check_test_name\$"
+}
+
 should_attempt_test() {
   local check_test_name="$1"
+  local force_test_pattern="${2:-}"
+
   if test_listed_as_successful $check_test_name ; then
     return 1
   fi
   if test_listed_as_failed $check_test_name ; then
     return 1
+  fi
+  if [ "$force_test_pattern" != "." ] ; then
+    return 0
   fi
   # iterate dependencies
   (cat ${tests_path}/${check_test_name}/depends-on 2> /dev/null || echo -n "") | while read dependency ; do
@@ -264,10 +285,22 @@ should_attempt_test() {
 }
 
 test_all() {
-  test_pattern="${1:-.}"
-  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
-    test_single "$test_name" || exit 1
-  done || return 1
+  local test_pattern="${1:-.}"
+
+  found_remaining_tests=1
+  while ((found_remaining_tests > 0)) ; do
+    found_remaining_tests=0
+
+    find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+      if ! test_listed_as_attempted "$test_name" ; then
+        found_remaining_tests=$((found_remaining_tests + 1))
+      fi
+      if should_attempt_test "$test_name" "$test_pattern" ; then
+        test_single "$test_name" || exit 1
+      fi
+    done || return 1
+    echo "# Iterated $found_remaining_tests tests"
+  done
 }
 
 main() {
