@@ -318,6 +318,12 @@ test_all() {
       fi
     done || return 1
   done
+  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+    if ! test_listed_as_attempted "$test_name" ; then
+      echo "# ERROR: tests completed by $test_name seems to have been skipped"
+      exit 1
+    fi
+  done || exit 1
 }
 
 main() {
