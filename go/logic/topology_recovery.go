@@ -845,10 +845,6 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&analysisEntry, promotedReplica); !satisfied {
 			return nil, fmt.Errorf("RecoverDeadMaster: failed %+v promotion; %s", promotedReplica.Key, reason)
 		}
-		log.Debugf("===================")
-		log.Debugf("++ FailMasterPromotionOnLagMinutes: %+v", config.Config.FailMasterPromotionOnLagMinutes)
-		log.Debugf("++ promotedReplica.SlaveLagSeconds.Int64: %+v", promotedReplica.SlaveLagSeconds.Int64)
-		log.Debugf("++ lag > config?: %+v", (time.Duration(promotedReplica.SlaveLagSeconds.Int64)*time.Second >= time.Duration(config.Config.FailMasterPromotionOnLagMinutes)*time.Minute))
 		if config.Config.FailMasterPromotionOnLagMinutes > 0 &&
 			time.Duration(promotedReplica.SlaveLagSeconds.Int64)*time.Second >= time.Duration(config.Config.FailMasterPromotionOnLagMinutes)*time.Minute {
 			// candidate replica lags too much
