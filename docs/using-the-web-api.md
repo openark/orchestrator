@@ -136,7 +136,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
     `"Valid": false` indicates a `NULL`
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
-* `SlaveLagSeconds`: when `SlaveLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
+* `SlaveLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `SlaveHosts`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable

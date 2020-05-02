@@ -6,6 +6,8 @@ if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
   exit 1
 fi
 
+orchestrator-client -c api -path "reload-configuration" | jq -r '.Code'
+
 echo "# Redeploying replication"
 (cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
 
@@ -13,9 +15,14 @@ if ! test-refresh-connections ; then
   echo "ERROR refreshing connections"
   exit 1
 fi
-orchestrator-client -c submit-masters-to-kv-stores
-sleep 5
-orchestrator-client -c submit-masters-to-kv-stores
+echo "# Discovering all instances"
+orchestrator-client -c all-instances | while read i ; do
+  test-retry orchestrator-client -c discover -i $i | grep -q . || echo "+ ERROR discovering $i"
+done
+orchestrator-client -c submit-masters-to-kv-stores | egrep ':.*:'
+echo "# Validating replicas"
+test-retry bash -c 'sleep 2 ; orchestrator-client -c which-replicas -i 127.0.0.1:10111 | wc -l | grep -q 3' || echo "+ ERROR validating replicas"
+orchestrator-client -c submit-masters-to-kv-stores | egrep ':.*:'
 
 (cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
 sleep 2

@@ -39,6 +39,7 @@ Different environments require different actions taken on recovery/promotion
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
+  "FailMasterPromotionOnLagMinutes": 0,
   "FailMasterPromotionIfSQLThreadNotUpToDate": true,
   "DelayMasterPromotionIfSQLThreadNotUpToDate": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 10,
@@ -52,6 +53,8 @@ Different environments require different actions taken on recovery/promotion
 - `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`. When `true`, overrides `MasterFailoverDetachSlaveMasterHost`.
 - `PreventCrossDataCenterMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same DC. It will do its best to find a replacement from same DC, and will abort (fail) the failover if it cannot find one. See also `DetectDataCenterQuery` and `DataCenterPattern` configuration variables.
 - `PreventCrossRegionMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same region. It will do its best to find a replacement from same region, and will abort (fail) the failover if it cannot find one. See also `DetectRegionQuery` and `RegionPattern` configuration variables.
+- `FailMasterPromotionOnLagMinutes`: defaults `0` (not failing promotion). Can be used to fail a promotion if the candidate replica is too far behind. Example: replicas were broken for 5 hours, and then master failed. One might want to prevent the failover in order to recover the binary logs / relay logs for those lost 5 hours.
+  To use this flag, you must set `ReplicationLagQuery` and use a heartbeat mechanism such as `pt-heartbeat`. The MySQL built-in `Seconds_behind_master` output of `SHOW SLAVE STATUS` (pre 8.0) does not report replication lag when replication is broken.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
 - `DelayMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. When `true`, 'orchestrator' will wait for the SQL thread to catch up before promoting a new master.
   `FailMasterPromotionIfSQLThreadNotUpToDate` and `DelayMasterPromotionIfSQLThreadNotUpToDate` are mutually exclusive.

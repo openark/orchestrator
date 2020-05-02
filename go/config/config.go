@@ -244,6 +244,7 @@ type Configuration struct {
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	FailMasterPromotionOnLagMinutes            uint              // when > 0, fail a master promotion if the candidate replica is lagging >= configured number of minutes.
 	FailMasterPromotionIfSQLThreadNotUpToDate  bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
 	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
@@ -412,6 +413,7 @@ func newConfiguration() *Configuration {
 		PreventCrossRegionMasterFailover:           false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
+		FailMasterPromotionOnLagMinutes:            0,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
 		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
@@ -494,12 +496,14 @@ func (this *Configuration) postReadAdjustments() error {
 		if this.ReplicationLagQuery != "" && this.SlaveLagQuery != "" && this.ReplicationLagQuery != this.SlaveLagQuery {
 			return fmt.Errorf("config's ReplicationLagQuery and SlaveLagQuery are synonyms and cannot both be defined")
 		}
-		// Make sure both are turned identical:
-		if this.SlaveLagQuery != "" {
+		// ReplicationLagQuery is the replacement param to SlaveLagQuery
+		if this.ReplicationLagQuery == "" {
 			this.ReplicationLagQuery = this.SlaveLagQuery
-		} else {
-			this.SlaveLagQuery = this.ReplicationLagQuery
 		}
+		// We reset SlaveLagQuery because we want to support multiple config file loading;
+		// One of the next config files may indicate a new value for ReplicationLagQuery.
+		// If we do not reset SlaveLagQuery, then the two will have a conflict.
+		this.SlaveLagQuery = ""
 	}
 
 	{
@@ -515,6 +519,9 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.FailMasterPromotionIfSQLThreadNotUpToDate && this.DelayMasterPromotionIfSQLThreadNotUpToDate {
 		return fmt.Errorf("Cannot have both FailMasterPromotionIfSQLThreadNotUpToDate and DelayMasterPromotionIfSQLThreadNotUpToDate enabled")
+	}
+	if this.FailMasterPromotionOnLagMinutes > 0 && this.ReplicationLagQuery == "" {
+		return fmt.Errorf("nonzero FailMasterPromotionOnLagMinutes requires ReplicationLagQuery to be set")
 	}
 	{
 		if this.PostponeReplicaRecoveryOnLagMinutes != 0 && this.PostponeSlaveRecoveryOnLagMinutes != 0 &&
