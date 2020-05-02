@@ -1,5 +1,1 @@
-cluster_master="$(orchestrator-client -c which-cluster-master -alias ci)"
-cluster_master_path="$(echo $cluster_master | tr ':' '/')"
-orchestrator-client -c api -path instance/$cluster_master_path | jq '.SlaveHosts | length'
-
 orchestrator-client -c api -path all-instances | jq -r '.[] | select(.MasterKey.Port == 10111) | .MasterKey.Port'
