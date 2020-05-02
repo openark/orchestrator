@@ -226,7 +226,6 @@ test_single() {
     return 1
   fi
   echo "# marking test as successful"
-  echo "$test_name" >> $tests_successful_file
 }
 
 test_listed_as_successful() {
@@ -298,7 +297,13 @@ test_all() {
         echo "$test_name" >> $tests_todo_file
       fi
       if should_attempt_test "$test_name" "$test_pattern" ; then
-        test_single "$test_name" || exit 1
+        test_single "$test_name"
+        if [ $? -eq 0 ] ; then
+          echo "$test_name" >> $tests_successful_file
+        else
+          echo "$test_name" >> $tests_failed_file
+          exit 1
+        fi
       else
         echo "# should not attempt $test_name"
       fi
