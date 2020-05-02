@@ -17,8 +17,8 @@ test_restore_outfile=/tmp/orchestrator-test-restore.out
 test_restore_diff_file=/tmp/orchestrator-test-restore.diff
 export deploy_replication_file=/tmp/deploy_replication.log
 tests_todo_file=/tmp/system-tests-todo.txt
-tests_successful_file=/tmp/system-tests-todo.txt
-tests_failed_file=/tmp/system-tests-todo.txt
+tests_successful_file=/tmp/system-tests-successful.txt
+tests_failed_file=/tmp/system-tests-failed.txt
 
 exec_cmd() {
   echo "$@"
@@ -31,15 +31,15 @@ echo_dot() {
 }
 
 check_environment() {
-  if ! echo "" > $tests_todo_file ; then
+  if ! echo -n "" > $tests_todo_file ; then
     echo "ERROR: unable to write to $tests_todo_file"
     exit 1
   fi
-  if ! echo "" > $tests_successful_file ; then
+  if ! echo -n "" > $tests_successful_file ; then
     echo "ERROR: unable to write to $tests_successful_file"
     exit 1
   fi
-  if ! echo "" > $tests_failed_file ; then
+  if ! echo -n "" > $tests_failed_file ; then
     echo "ERROR: unable to write to $tests_failed_file"
     exit 1
   fi
@@ -225,7 +225,8 @@ test_single() {
     echo "---"
     return 1
   fi
-  echo "$check_test_name" >> $tests_successful_file
+  echo "# marking test as successful"
+  echo "$test_name" >> $tests_successful_file
 }
 
 test_listed_as_successful() {
@@ -287,19 +288,22 @@ should_attempt_test() {
 test_all() {
   local test_pattern="${1:-.}"
 
-  found_remaining_tests=1
-  while ((found_remaining_tests > 0)) ; do
-    found_remaining_tests=0
+  echo "." > $tests_todo_file
+  while [ -s $tests_todo_file ] ; do
+    echo -n > $tests_todo_file
 
     find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
       if ! test_listed_as_attempted "$test_name" ; then
-        found_remaining_tests=$((found_remaining_tests + 1))
+        echo "# test $test_name hasn't been executed before"
+        echo "$test_name" >> $tests_todo_file
       fi
       if should_attempt_test "$test_name" "$test_pattern" ; then
         test_single "$test_name" || exit 1
+      else
+        echo "# should not attempt $test_name"
       fi
     done || return 1
-    echo "# Iterated $found_remaining_tests tests"
+    echo "# Iterated: $(cat $tests_todo_file)"
   done
 }
 
