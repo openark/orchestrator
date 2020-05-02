@@ -16,7 +16,7 @@ if ! test-refresh-connections ; then
   exit 1
 fi
 orchestrator-client -c submit-masters-to-kv-stores
-sleep 8
+test-retry bash -c 'sleep 1 ; resources/bin/orchestrator-client -c which-replicas -i 127.0.0.1:10111 | wc -l | grep 3'
 orchestrator-client -c submit-masters-to-kv-stores
 
 (cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
