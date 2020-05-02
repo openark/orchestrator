@@ -267,6 +267,17 @@ should_attempt_test() {
   if [ "$force_test_pattern" != "." ] ; then
     return 0
   fi
+  # validate dependencies
+  (cat ${tests_path}/${check_test_name}/depends-on 2> /dev/null || echo -n "") | while read dependency ; do
+    if [ "$dependency" == "$check_test_name" ] ; then
+      echo "# ERROR: test $check_test_name depends on itself"
+      exit 1
+    fi
+    if [ ! -d ${tests_path}/$dependency ] ; then
+      echo "# ERROR: test $check_test_name depends on $dependency, but $dependency does not exist"
+      exit 1
+    fi
+  done || exit 1 # completely bail out
   # iterate dependencies
   (cat ${tests_path}/${check_test_name}/depends-on 2> /dev/null || echo -n "") | while read dependency ; do
     if test_listed_as_failed $dependency ; then
