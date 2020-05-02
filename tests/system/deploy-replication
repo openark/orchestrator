@@ -17,7 +17,7 @@ if ! test-refresh-connections ; then
 fi
 echo "# Discovering all instances"
 orchestrator-client -c all-instances | while read i ; do
-  test-retry orchestrator-client -c discover -i $i || echo "+ ERROR discovering $i"
+  test-retry orchestrator-client -c discover -i $i | grep -q . || echo "+ ERROR discovering $i"
 done
 orchestrator-client -c submit-masters-to-kv-stores | egrep ':.*:'
 echo "# Validating replicas"
