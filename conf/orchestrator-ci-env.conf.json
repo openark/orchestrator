@@ -34,6 +34,7 @@
   "ServeAgentsHttp": false,
   "UseSSL": false,
   "UseMutualTLS": false,
+  "MySQLTopologyUseMixedTLS": false,
   "StatusEndpoint": "/api/status",
   "StatusSimpleHealth": true,
   "StatusOUVerify": false,
