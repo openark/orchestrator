@@ -151,6 +151,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			    	MIN(
 				    		master_instance.supports_oracle_gtid
 				    	) AS supports_oracle_gtid,
+						SUM(
+								replica_instance.is_co_master
+							) AS count_co_master_replicas,
 			    	SUM(
 				    		replica_instance.oracle_gtid
 				    	) AS count_oracle_gtid_slaves,
@@ -256,7 +259,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		}
 
 		a.IsMaster = m.GetBool("is_master")
-		a.IsCoMaster = m.GetBool("is_co_master")
+		countCoMasterReplicas := m.GetUint("count_co_master_replicas")
+		a.IsCoMaster = m.GetBool("is_co_master") || (countCoMasterReplicas > 0)
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
