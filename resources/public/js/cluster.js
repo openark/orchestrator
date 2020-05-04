@@ -1312,8 +1312,8 @@ function Cluster() {
     for (i = 0; i < knownDCs.length; ++i) {
       var color = renderColors[i % renderColors.length]
       dcColorsMap[knownDCs[i]] = color;
-      if (isColorizeDC() && !isAnonymized()) {
-        $('<span>' + (knownDCs[i] || 'n/a') + '</span>').addClass("dc").css('border-color', color).appendTo('#cluster_legend');
+      if (isColorizeDC() && !isAnonymized() && knownDCs[i]) {
+        $('<span>' + knownDCs[i] + '</span>').addClass("dc").css('border-color', color).appendTo('#cluster_legend');
       }
     }
   }
