@@ -1774,8 +1774,12 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 	// swap is done!
 
 Cleanup:
-	instance, _ = StartSlave(&instance.Key)
-	masterInstance, _ = StartSlave(&masterInstance.Key)
+	if instance != nil {
+		instance, _ = StartSlave(&instance.Key)
+	}
+	if masterInstance != nil {
+		masterInstance, _ = StartSlave(&masterInstance.Key)
+	}
 	if err != nil {
 		return instance, err
 	}
