@@ -512,7 +512,11 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 			extraTokens = append(extraTokens, ">>")
 		}
 		if this.UsingGTID() || this.SupportsOracleGTID {
-			extraTokens = append(extraTokens, "GTID")
+			token := "GTID"
+			if this.GtidErrant != "" {
+				token = fmt.Sprintf("%s:errant", token)
+			}
+			extraTokens = append(extraTokens, token)
 		}
 		if this.UsingPseudoGTID {
 			extraTokens = append(extraTokens, "P-GTID")
