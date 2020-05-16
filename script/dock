@@ -39,6 +39,6 @@ case "$command" in
     docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
     ;;
   *)
-    >&2 echo "Usage: dock dock <test|alpine|packages> [arg]"
+    >&2 echo "Usage: dock dock <test|alpine|packages|system> [arg]"
     exit 1
 esac
