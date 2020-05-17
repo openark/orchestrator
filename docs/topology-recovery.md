@@ -146,20 +146,16 @@ There are two flavors of graceful takeover:
 Invoke graceful takeover via:
 
 - Command line; examples:
-  - Indicate designated replica; `orchestrator` does not start replication on demoted master:
-    `orchestrator-client -c graceful-master-takeover -alias mycluster -d designated.master.to.promote:3306`
-  - Indicate designated replica; `orchestrator` starts replication on demoted master:
-    `orchestrator-client -c graceful-master-takeover-auto -alias mycluster -d designated.master.to.promote:3306`
-  - Let `orchestrator` choose replica to promote; `orchestrator` starts replication on demoted master:
-    `orchestrator-client -c graceful-master-takeover-auto -alias mycluster`
+  - `orchestrator-client -c graceful-master-takeover -alias mycluster -d designated.master.to.promote:3306`: indicate designated replica; `orchestrator` does not start replication on demoted master
+  - `orchestrator-client -c graceful-master-takeover-auto -alias mycluster -d designated.master.to.promote:3306`: indicate designated replica; `orchestrator` starts replication on demoted master
+  - `orchestrator-client -c graceful-master-takeover-auto -alias mycluster`: let `orchestrator` choose replica to promote; `orchestrator` starts replication on demoted master
 
-* Web API:
-
+- Web API; examples:
   - `/api/graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort`: gracefully promote a new master (planned failover), indicating the designated master to promote.
   - `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
   - `/api/graceful-master-takeover-auto/:clusterHint`: gracefully promote a new master (planned failover). `orchestrator` picks replica to promote. `orchestrator` starts replication on demoted master:
 
-* Web interface: drag a direct master's replica onto the left half of the master's box.
+- Web interface: drag a direct master's replica onto the left half of the master's box.
 
 ## Manual recovery
 
