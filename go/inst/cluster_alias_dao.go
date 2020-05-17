@@ -195,7 +195,7 @@ func ReplaceAliasClusterName(oldClusterName string, newClusterName string) (err 
 	return err
 }
 
-// ReadUnambiguousSuggestedClusterAliases reads hostname:port who have suggested cluster aliases,
+// ReadUnambiguousSuggestedClusterAliases reads potential master hostname:port who have suggested cluster aliases,
 // where no one else shares said suggested cluster alias. Such hostname:port are likely true owners
 // of the alias.
 func ReadUnambiguousSuggestedClusterAliases() (result map[string]InstanceKey, err error) {
@@ -210,6 +210,7 @@ func ReadUnambiguousSuggestedClusterAliases() (result map[string]InstanceKey, er
 			database_instance
 		where
 			suggested_cluster_alias != ''
+			and replication_depth=0
 		group by
 			suggested_cluster_alias
 		having
