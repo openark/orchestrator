@@ -712,8 +712,17 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		}
 	} else if instance.IsMariaDB() && gtidHint == GTIDHintForce {
 		// Is MariaDB; not using GTID, turn into GTID
+		mariadbGTIDHint := "slave_pos"
+		if !instance.ReplicationThreadsExist() {
+			// This instance is currently a master. As per https://mariadb.com/kb/en/change-master-to/#master_use_gtid
+			// we should be using current_pos.
+			// See also:
+			// - https://github.com/openark/orchestrator/issues/1146
+			// - https://dba.stackexchange.com/a/234323
+			mariadbGTIDHint = "current_pos"
+		}
 		changeMasterFunc = func() error {
-			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_use_gtid=slave_pos",
+			_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host=?, master_port=?, master_use_gtid=%s", mariadbGTIDHint),
 				changeToMasterKey.Hostname, changeToMasterKey.Port)
 			return err
 		}
