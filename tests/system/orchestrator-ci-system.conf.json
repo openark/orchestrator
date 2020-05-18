@@ -81,6 +81,13 @@
   "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeReplicaRecoveryOnLagMinutes": 0,
+  "RaftEnabled": true,
+  "RaftDataDir": "/tmp",
+  "RaftBind": "127.0.0.1",
+  "DefaultRaftPort": 10008,
+  "RaftNodes": [
+    "127.0.0.1"
+  ],
   "ConsulAddress": "127.0.0.1:8500",
   "ConsulAclToken": ""
 }
