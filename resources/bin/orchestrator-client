@@ -250,6 +250,7 @@ function api {
   local curl_auth_params="$(get_curl_auth_params)"
 
   path="$1"
+  raw_output="${2:-}"
 
   uri="$leader_api/$path"
   # echo $uri
@@ -281,8 +282,12 @@ function api {
   fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
-    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
-    [ "$api_details" != "null" ] && echo $api_details
+    if [ -n "$raw_output" ] ; then
+      echo $api_response
+    else
+      echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
+      [ "$api_details" != "null" ] && echo $api_details
+    fi
     exit 1
   fi
 }
@@ -329,7 +334,7 @@ function which_api {
 
 function api_call {
   assert_nonempty "path" "$api_path"
-  api "$api_path"
+  api "$api_path" "true"
   print_response
 }
 
