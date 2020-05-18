@@ -3081,11 +3081,10 @@ func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Rend
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
 	}
-	if topologyRecovery.SuccessorKey == nil {
+	if topologyRecovery == nil || topologyRecovery.SuccessorKey == nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: "graceful-master-takeover: no successor promoted", Details: topologyRecovery})
 		return
 	}
-
 	Respond(r, &APIResponse{Code: OK, Message: "graceful-master-takeover: successor promoted", Details: topologyRecovery})
 }
 

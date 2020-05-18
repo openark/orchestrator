@@ -777,7 +777,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	masterIsAccessible := (err == nil)
 	if !masterIsAccessible {
 		master, _, err = ReadInstance(masterKey)
-		if err != nil {
+		if master == nil || err != nil {
 			return instance, err
 		}
 	}
