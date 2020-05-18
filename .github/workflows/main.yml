@@ -1,6 +1,11 @@
 name: CI
 
-on: [pull_request]
+on:
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron:  '13 */4 * * *'
 
 jobs:
   build:
