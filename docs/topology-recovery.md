@@ -132,7 +132,7 @@ We find that some operations are similar between graceful-takeover and real fail
 
 From within the normal pre-, post- failover processes, you may use the `{command}` placeholder, or `ORC_COMMAND` environment variable to check whether this is a graceful takeover. You will see the value `graceful-master-takeover`.
 
-There are two flavors of graceful takeover:
+There are two variations of graceful takeover:
 
 - `graceful-master-takeover`:
   - The user must indicate the designated replica to be promoted
@@ -155,7 +155,7 @@ Invoke graceful takeover via:
   - `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
   - `/api/graceful-master-takeover-auto/:clusterHint`: gracefully promote a new master (planned failover). `orchestrator` picks replica to promote. `orchestrator` starts replication on demoted master:
 
-- Web interface: drag a direct master's replica onto the left half of the master's box.
+- Web interface: drag a direct master's replica onto the left half of the master's box. The web interface uses the `graceful-master-takeover` variation; the replication on demoted master will not kick in.
 
 ## Manual recovery
 
