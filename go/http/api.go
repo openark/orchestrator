@@ -3064,7 +3064,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 }
 
 // GracefulMasterTakeover gracefully fails over a master onto its single replica.
-func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, auto bool) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -3076,7 +3076,7 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 	}
 	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
 	// designatedKey may be empty/invalid
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey, auto)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
@@ -3087,6 +3087,18 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 	}
 
 	Respond(r, &APIResponse{Code: OK, Message: "graceful-master-takeover: successor promoted", Details: topologyRecovery})
+}
+
+// GracefulMasterTakeover gracefully fails over a master, either:
+// - onto its single replica, or
+// - onto a replica indicated by the user
+func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.gracefulMasterTakeover(params, r, req, user, false)
+}
+
+// GracefulMasterTakeoverAuto gracefully fails over a master onto a replica of orchestrator's choosing
+func (this *HttpAPI) GracefulMasterTakeoverAuto(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.gracefulMasterTakeover(params, r, req, user, true)
 }
 
 // ForceMasterFailover fails over a master (even if there's no particular problem with the master)
@@ -3734,6 +3746,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:host/:port", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:clusterHint", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:clusterHint/:designatedHost/:designatedPort", this.GracefulMasterTakeoverAuto)
 	this.registerAPIRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-failover/:clusterHint", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-takeover/:clusterHint/:designatedHost/:designatedPort", this.ForceMasterTakeover)
