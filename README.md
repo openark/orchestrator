@@ -1,8 +1,12 @@
-# orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
+![](https://github.com/openark/orchestrator/workflows/CI/badge.svg)
+![](https://github.com/openark/orchestrator/workflows/upgrade/badge.svg)
+![](https://github.com/openark/orchestrator/workflows/system%20tests/badge.svg)
+[![downloads](https://img.shields.io/github/downloads/openark/orchestrator/total.svg)](https://github.com/openark/orchestrator/releases) [![release](https://img.shields.io/github/release/openark/orchestrator.svg)](https://github.com/openark/orchestrator/releases)
 
-[![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
+# orchestrator [[Documentation]](https://github.com/openark/orchestrator/tree/master/docs)
 
-![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
+
+![Orchestrator logo](https://github.com/openark/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
 `orchestrator` is a MySQL high availability and replication management tool, runs as a service and provides command line access, HTTP API and Web interface. `orchestrator` supports:
 
@@ -53,7 +57,7 @@ recovery itself.
 - There is also an [orchestrator-mysql](https://groups.google.com/forum/#!forum/orchestrator-mysql) Google groups forum to discuss topics related to orchestrator
 - More...
 
-Read the [Orchestrator documentation](https://github.com/github/orchestrator/tree/master/docs)
+Read the [Orchestrator documentation](https://github.com/openark/orchestrator/tree/master/docs)
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach):
 

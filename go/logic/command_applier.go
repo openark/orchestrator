@@ -19,9 +19,9 @@ package logic
 import (
 	"encoding/json"
 
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )

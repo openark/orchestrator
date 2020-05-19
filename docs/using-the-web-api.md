@@ -22,9 +22,9 @@ By way of example:
 
 ### Full listing
 
-The de-facto listing is the code, please see [api.go](https://github.com/github/orchestrator/blob/master/go/http/api.go) (scroll down to `RegisterRequests`).
+The de-facto listing is the code, please see [api.go](https://github.com/openark/orchestrator/blob/master/go/http/api.go) (scroll down to `RegisterRequests`).
 
-You may also appreciate looking at [orchestrator-client](orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
+You may also appreciate looking at [orchestrator-client](orchestrator-client.md) ([source code](https://github.com/openark/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
 
 Or, just use the [orchestrator-client](orchestrator-client.md) as your API client, this is what it was made for.
 
@@ -137,7 +137,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
     `"Valid": false` indicates a `NULL`
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
-* `SlaveLagSeconds`: when `SlaveLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
+* `SlaveLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `SlaveHosts`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, determined by `DataCenterPattern`, `DataCenterMap`, and `DetectDataCenterQuery`config variables

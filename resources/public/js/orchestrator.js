@@ -362,6 +362,9 @@ function openNodeModal(node) {
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
   addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
+  addNodeModalDataAttribute("Region", node.Region);
+  addNodeModalDataAttribute("Data center", node.DataCenter);
+  addNodeModalDataAttribute("Physical environment", node.PhysicalEnvironment);
   addNodeModalDataAttribute("Cluster",
     '<a href="' + appUrl('/web/cluster/' + node.ClusterName) + '">' + node.ClusterName + '</a>');
   addNodeModalDataAttribute("Audit",
@@ -811,7 +814,16 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.title));
+  var tooltip = "";
+  if (isAnonymized()) {
+    tooltip = anonymizedInstanceId;
+  } else {
+    tooltip = (isAliased() ? instance.InstanceAlias : instance.title);
+    if (instance.Region) { tooltip += "\nRegion: " + instance.Region; }
+    if (instance.DataCenter) { tooltip += "\nData center: " + instance.DataCenter; }
+    if (instance.PhysicalEnvironment) { tooltip += "\nPhysical environment: " + instance.PhysicalEnvironment; }
+  }
+  popoverElement.find("h3").attr('title', tooltip);
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
     (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.canonicalTitle) +
     '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');

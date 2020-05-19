@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 )
 
 type AnalysisCode string
