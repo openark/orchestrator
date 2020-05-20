@@ -549,21 +549,21 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN semi_sync_master_timeout INT UNSIGNED NOT NULL AFTER semi_sync_master_enabled
+			ADD COLUMN semi_sync_master_timeout INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_enabled
 	`,
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN semi_sync_master_wait_for_slave_count INT UNSIGNED NOT NULL AFTER semi_sync_master_timeout
+			ADD COLUMN semi_sync_master_wait_for_slave_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_timeout
 	`,
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN semi_sync_master_status TINYINT UNSIGNED NOT NULL AFTER semi_sync_master_wait_for_slave_count
+			ADD COLUMN semi_sync_master_status TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_wait_for_slave_count
 	`,
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN semi_sync_replica_status TINYINT UNSIGNED NOT NULL AFTER semi_sync_master_status
+			ADD COLUMN semi_sync_replica_status TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_status
 	`,
 }
