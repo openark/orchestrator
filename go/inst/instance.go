@@ -74,22 +74,24 @@ type Instance struct {
 
 	masterExecutedGtidSet string // Not exported
 
-	SlaveLagSeconds                 sql.NullInt64
-	SlaveHosts                      InstanceKeyMap
-	ClusterName                     string
-	SuggestedClusterAlias           string
-	DataCenter                      string
-	Region                          string
-	PhysicalEnvironment             string
-	ReplicationDepth                uint
-	IsCoMaster                      bool
-	HasReplicationCredentials       bool
-	ReplicationCredentialsAvailable bool
-	SemiSyncEnforced                bool
-	SemiSyncMasterEnabled           bool
-	SemiSyncReplicaEnabled          bool
-	SemiSyncMasterTimeout           uint
-	SemiSyncMasterWaitForSlaveCount uint
+	SlaveLagSeconds                   sql.NullInt64
+	SlaveHosts                        InstanceKeyMap
+	ClusterName                       string
+	SuggestedClusterAlias             string
+	DataCenter                        string
+	Region                            string
+	PhysicalEnvironment               string
+	ReplicationDepth                  uint
+	IsCoMaster                        bool
+	HasReplicationCredentials         bool
+	ReplicationCredentialsAvailable   bool
+	SemiSyncEnforced                  bool
+	SemiSyncMasterEnabled             bool
+	SemiSyncReplicaEnabled            bool
+	SemiSyncMasterTimeout             uint
+	SemiSyncMasterWaitForReplicaCount uint
+	SemiSyncMasterStatus              bool
+	SemiSyncReplicaStatus             bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool

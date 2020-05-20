@@ -422,10 +422,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
-					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "rpl_semi_sync_master_enabled" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
-					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
+						instance.SemiSyncMasterTimeout = m.GetUint("Value")
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
+						instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_slave_enabled" {
 						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
 					}
 					return nil
@@ -437,11 +441,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
-					if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
-						instance.SemiSyncMasterTimeout = m.GetUint("Value")
-					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
-						instance.SemiSyncMasterWaitForSlaveCount = m.GetUint("Value")
+				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+						instance.SemiSyncMasterStatus = (m.GetString("Value") == "ON")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+						instance.SemiSyncReplicaStatus = (m.GetString("Value") == "ON")
 					}
 					return nil
 				})
@@ -1127,8 +1131,10 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 	instance.SemiSyncMasterTimeout = m.GetUint("semi_sync_master_timeout")
-	instance.SemiSyncMasterWaitForSlaveCount = m.GetUint("semi_sync_master_wait_for_slave_count")
+	instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
+	instance.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
+	instance.SemiSyncReplicaStatus = m.GetBool("semi_sync_replica_status")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -2418,6 +2424,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"semi_sync_master_timeout",
 		"semi_sync_master_wait_for_slave_count",
 		"semi_sync_replica_enabled",
+		"semi_sync_master_status",
+		"semi_sync_replica_status",
 		"instance_alias",
 		"last_discovery_latency",
 	}
@@ -2498,8 +2506,10 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SemiSyncEnforced)
 		args = append(args, instance.SemiSyncMasterEnabled)
 		args = append(args, instance.SemiSyncMasterTimeout)
-		args = append(args, instance.SemiSyncMasterWaitForSlaveCount)
+		args = append(args, instance.SemiSyncMasterWaitForReplicaCount)
 		args = append(args, instance.SemiSyncReplicaEnabled)
+		args = append(args, instance.SemiSyncMasterStatus)
+		args = append(args, instance.SemiSyncReplicaStatus)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
