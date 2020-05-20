@@ -66,6 +66,8 @@ const (
 	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
 	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
 	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
+	NoValidSemiSyncReplicasStructureWarning                                  = "NoValidSemiSyncReplicasStructureWarning"
+	NotEnoughValidSemiSyncReplicasStructureWarning                           = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -140,6 +142,8 @@ type ReplicationAnalysis struct {
 	OracleGTIDImmediateTopology               bool
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
+	SemiSyncMasterEnabled                     bool
+	CountSemiSyncReplicasEnabled              uint
 	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
 	CountMixedBasedLoggingReplicas            uint
