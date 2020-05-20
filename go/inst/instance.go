@@ -88,6 +88,8 @@ type Instance struct {
 	SemiSyncEnforced                bool
 	SemiSyncMasterEnabled           bool
 	SemiSyncReplicaEnabled          bool
+	SemiSyncMasterTimeout           uint
+	SemiSyncMasterWaitForSlaveCount uint
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool

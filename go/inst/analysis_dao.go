@@ -151,6 +151,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			    	MIN(
 				    		master_instance.supports_oracle_gtid
 				    	) AS supports_oracle_gtid,
+						MIN(
+				    		master_instance.semi_sync_master_enabled
+				    	) AS semi_sync_master_enabled,
 						SUM(
 								replica_instance.is_co_master
 							) AS count_co_master_replicas,
@@ -166,6 +169,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
                   AND replica_instance.binlog_server != 0),
               0) AS count_valid_binlog_server_replicas,
+						SUM(
+				    		replica_instance.semi_sync_replica_enabled
+							) AS count_semi_sync_replicas,
+				    IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+				        AND replica_instance.semi_sync_replica_enabled != 0),
+				      0) AS count_valid_semi_sync_replicas,
 			    	MIN(
 				    		master_instance.mariadb_gtid
 				    	) AS is_mariadb_gtid,
@@ -295,6 +304,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_replicas")
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
+		a.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+		a.CountSemiSyncReplicasEnabled = m.GetUint("count_semi_sync_replicas")
+		countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
@@ -499,6 +511,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 			if a.IsMaster && a.IsReadOnly {
 				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
+			}
+
+			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled == 0 {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoValidSemiSyncReplicasStructureWarning)
 			}
 
 		}

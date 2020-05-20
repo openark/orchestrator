@@ -546,4 +546,14 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_timeout INT UNSIGNED NOT NULL AFTER semi_sync_master_enabled
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_wait_for_slave_count INT UNSIGNED NOT NULL AFTER semi_sync_master_timeout
+	`,
 }
