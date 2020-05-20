@@ -422,18 +422,23 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
+				semiSyncMasterPluginLoaded := false
+				semiSyncReplicaPluginLoaded := false
 				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
 					if m.GetString("Variable_name") == "rpl_semi_sync_master_enabled" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
+						semiSyncMasterPluginLoaded = true
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
 						instance.SemiSyncMasterTimeout = m.GetUint("Value")
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
 						instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_slave_enabled" {
 						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
+						semiSyncReplicaPluginLoaded = true
 					}
 					return nil
 				})
+				instance.SemiSyncAvailable = (semiSyncMasterPluginLoaded && semiSyncReplicaPluginLoaded)
 				errorChan <- err
 			}()
 		}
@@ -1132,6 +1137,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
+	instance.SemiSyncAvailable = m.GetBool("semi_sync_available")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 	instance.SemiSyncMasterTimeout = m.GetUint("semi_sync_master_timeout")
 	instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
@@ -2424,6 +2430,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"has_replication_credentials",
 		"allow_tls",
 		"semi_sync_enforced",
+		"semi_sync_available",
 		"semi_sync_master_enabled",
 		"semi_sync_master_timeout",
 		"semi_sync_master_wait_for_slave_count",
@@ -2509,6 +2516,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.HasReplicationCredentials)
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.SemiSyncAvailable)
 		args = append(args, instance.SemiSyncMasterEnabled)
 		args = append(args, instance.SemiSyncMasterTimeout)
 		args = append(args, instance.SemiSyncMasterWaitForReplicaCount)

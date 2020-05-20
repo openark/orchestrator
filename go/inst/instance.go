@@ -85,6 +85,7 @@ type Instance struct {
 	IsCoMaster                        bool
 	HasReplicationCredentials         bool
 	ReplicationCredentialsAvailable   bool
+	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
 	SemiSyncEnforced                  bool
 	SemiSyncMasterEnabled             bool
 	SemiSyncReplicaEnabled            bool
