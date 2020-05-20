@@ -67,6 +67,7 @@ const (
 	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
 	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
 	NoValidSemiSyncReplicasStructureWarning                                  = "NoValidSemiSyncReplicasStructureWarning"
+	NotEnoughValidSemiSyncReplicasStructureWarning                           = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
 type InstanceAnalysis struct {

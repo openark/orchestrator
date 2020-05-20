@@ -154,6 +154,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 						MIN(
 				    		master_instance.semi_sync_master_enabled
 				    	) AS semi_sync_master_enabled,
+						MIN(
+				    		master_instance.semi_sync_master_wait_for_slave_count
+				    	) AS semi_sync_master_wait_for_slave_count,
 						SUM(
 								replica_instance.is_co_master
 							) AS count_co_master_replicas,
@@ -307,6 +310,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 		a.CountSemiSyncReplicasEnabled = m.GetUint("count_semi_sync_replicas")
 		countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
+		semiSyncMasterWaitForReplicaCount := m.GetUint("semi_sync_master_wait_for_slave_count")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
@@ -515,6 +519,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled == 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, NoValidSemiSyncReplicasStructureWarning)
+			}
+			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled > 0 && countValidSemiSyncReplicasEnabled < semiSyncMasterWaitForReplicaCount {
+				a.StructureAnalysis = append(a.StructureAnalysis, NotEnoughValidSemiSyncReplicasStructureWarning)
 			}
 
 		}
