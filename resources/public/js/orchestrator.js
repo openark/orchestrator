@@ -877,10 +877,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.SemiSyncMasterEnabled) {
+    if (instance.SemiSyncMasterStatus) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-check" title="Semi sync enabled (master side)"></span> ');
     }
-    if (instance.SemiSyncReplicaEnabled) {
+    if (instance.SemiSyncReplicaStatus) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-saved" title="Semi sync enabled (replica side)"></span> ');
     }
     if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
