@@ -566,4 +566,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN semi_sync_replica_status TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_status
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_clients INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_status
+	`,
 }

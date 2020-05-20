@@ -91,6 +91,7 @@ type Instance struct {
 	SemiSyncMasterTimeout             uint
 	SemiSyncMasterWaitForReplicaCount uint
 	SemiSyncMasterStatus              bool
+	SemiSyncMasterClients             uint
 	SemiSyncReplicaStatus             bool
 
 	LastSeenTimestamp    string

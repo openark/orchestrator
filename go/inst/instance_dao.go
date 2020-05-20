@@ -441,12 +441,15 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
+				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
 					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
 						instance.SemiSyncMasterStatus = (m.GetString("Value") == "ON")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_master_clients" {
+						instance.SemiSyncMasterClients = m.GetUint("Value")
 					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
 						instance.SemiSyncReplicaStatus = (m.GetString("Value") == "ON")
 					}
+
 					return nil
 				})
 				errorChan <- err
@@ -1134,6 +1137,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
 	instance.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
+	instance.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
 	instance.SemiSyncReplicaStatus = m.GetBool("semi_sync_replica_status")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
@@ -2425,6 +2429,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"semi_sync_master_wait_for_slave_count",
 		"semi_sync_replica_enabled",
 		"semi_sync_master_status",
+		"semi_sync_master_clients",
 		"semi_sync_replica_status",
 		"instance_alias",
 		"last_discovery_latency",
@@ -2509,6 +2514,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SemiSyncMasterWaitForReplicaCount)
 		args = append(args, instance.SemiSyncReplicaEnabled)
 		args = append(args, instance.SemiSyncMasterStatus)
+		args = append(args, instance.SemiSyncMasterClients)
 		args = append(args, instance.SemiSyncReplicaStatus)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
