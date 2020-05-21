@@ -152,11 +152,20 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				    		master_instance.supports_oracle_gtid
 				    	) AS supports_oracle_gtid,
 						MIN(
+				    		master_instance.slave_lag_seconds
+				    	) AS master_replication_lag_seconds,
+						MIN(
 				    		master_instance.semi_sync_master_enabled
 				    	) AS semi_sync_master_enabled,
 						MIN(
 				    		master_instance.semi_sync_master_wait_for_slave_count
 				    	) AS semi_sync_master_wait_for_slave_count,
+						MIN(
+				    		master_instance.semi_sync_master_clients
+				    	) AS semi_sync_master_clients,
+						MIN(
+				    		master_instance.semi_sync_master_status
+				    	) AS semi_sync_master_status,
 						SUM(
 								replica_instance.is_co_master
 							) AS count_co_master_replicas,
@@ -308,9 +317,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
 		a.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+		a.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
 		a.CountSemiSyncReplicasEnabled = m.GetUint("count_semi_sync_replicas")
-		countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
-		semiSyncMasterWaitForReplicaCount := m.GetUint("semi_sync_master_wait_for_slave_count")
+		// countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
+		a.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
+		a.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
+		masterReplicationLagSeconds := m.GetInt("master_replication_lag_seconds")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
@@ -358,6 +370,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		} else if a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
+			//
+		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount && masterReplicationLagSeconds > config.Config.ReasonableReplicationLagSeconds {
+			a.Analysis = LockedSemiSyncMaster
+			a.Description = "Semi sync master is locked since it doesn't get enough replica acknowledgements"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
 			a.Analysis = MasterSingleSlaveNotReplicating
@@ -517,10 +533,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
 			}
 
-			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled == 0 {
+			if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients == 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, NoValidSemiSyncReplicasStructureWarning)
 			}
-			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled > 0 && countValidSemiSyncReplicasEnabled < semiSyncMasterWaitForReplicaCount {
+			if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount {
 				a.StructureAnalysis = append(a.StructureAnalysis, NotEnoughValidSemiSyncReplicasStructureWarning)
 			}
 

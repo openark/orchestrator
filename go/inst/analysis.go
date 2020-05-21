@@ -38,6 +38,7 @@ const (
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
+	LockedSemiSyncMaster                                               = "LockedSemiSyncMaster"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
 	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
@@ -143,6 +144,9 @@ type ReplicationAnalysis struct {
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
 	SemiSyncMasterEnabled                     bool
+	SemiSyncMasterStatus                      bool
+	SemiSyncMasterWaitForReplicaCount         uint
+	SemiSyncMasterClients                     uint
 	CountSemiSyncReplicasEnabled              uint
 	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
