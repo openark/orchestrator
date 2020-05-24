@@ -322,7 +322,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		// countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
 		a.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 		a.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
-		masterReplicationLagSeconds := m.GetInt("master_replication_lag_seconds")
+		// masterReplicationLagSeconds := m.GetInt("master_replication_lag_seconds")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
@@ -371,7 +371,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
-		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount && masterReplicationLagSeconds > config.Config.ReasonableReplicationLagSeconds {
+		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount /*&& masterReplicationLagSeconds > config.Config.ReasonableReplicationLagSeconds */ {
 			a.Analysis = LockedSemiSyncMaster
 			a.Description = "Semi sync master is locked since it doesn't get enough replica acknowledgements"
 			//

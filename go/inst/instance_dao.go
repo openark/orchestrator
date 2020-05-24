@@ -2846,8 +2846,8 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 }
 
 // RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances
-func RecordInstanceCoordinatesHistory() error {
-	{
+func RecordInstanceCoordinatesHistory(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
 		writeFunc := func() error {
 			_, err := db.ExecOrchestrator(`
         	delete from database_instance_coordinates_history
@@ -2859,23 +2859,35 @@ func RecordInstanceCoordinatesHistory() error {
 		}
 		ExecDBWriteFunc(writeFunc)
 	}
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-    	insert into
-    		database_instance_coordinates_history (
-					hostname, port,	last_seen, recorded_timestamp,
-					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
-				)
-    	select
-    		hostname, port, last_seen, NOW(),
+	args := sqlutils.Args()
+	whereClause := ""
+	if instanceKey != nil {
+		whereClause = "and hostname=? and port=?"
+		args = append(args, instanceKey.Hostname, instanceKey.Port)
+	}
+	query := fmt.Sprintf(`
+		insert into
+			database_instance_coordinates_history (
+				hostname, port,	last_seen, recorded_timestamp,
 				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
-			from
-				database_instance
-			where
+			)
+		select
+			hostname, port, last_seen, NOW(),
+			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+		from
+			database_instance
+		where
+			(
 				binary_log_file != ''
-				OR relay_log_file != ''
-				`,
-		)
+				or relay_log_file != ''
+			)
+			%s
+			`,
+		whereClause,
+	)
+
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, args...)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -2903,6 +2915,67 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 		return nil
 	})
 	return selfCoordinates, relayLogCoordinates, err
+}
+
+// GetRecentCoordinatesSummaryForInstance returns the amount of recorded coordinates
+// in given past seconds, and the amount of unique coordinates during that time.
+func AreInstanceBinlogCoordinatesStaleInPastSeconds(instanceKey *InstanceKey, seconds int64, minExpectedSamples int64) (stale bool, err error) {
+	coordinatesMap := make(map[string]int64)
+	recentEntryMet := false
+	oldEntryMet := false
+	query := `
+		select
+			concat(binary_log_file, ':', binary_log_pos) as binlog_coordinates,
+			recorded_timestamp >= NOW() - INTERVAL ? SECOND as recent_entry_met,
+			recorded_timestamp < NOW() - INTERVAL ? SECOND as old_entry_met
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+		order by
+			history_id desc
+			`
+	err = db.QueryOrchestrator(query,
+		sqlutils.Args(seconds, seconds, instanceKey.Hostname, instanceKey.Port),
+		func(m sqlutils.RowMap) error {
+			if oldEntryMet {
+				// we're done. Stop collecting data.
+				return nil
+			}
+			coordinates := m.GetString("binlog_coordinates")
+			coordinatesMap[coordinates] = coordinatesMap[coordinates] + 1
+			if m.GetBool("recent_entry_met") {
+				recentEntryMet = true
+			}
+			if m.GetBool("old_entry_met") {
+				oldEntryMet = true
+			}
+			return nil
+		})
+	if err != nil {
+		return false, err
+	}
+	if !recentEntryMet {
+		// Not recent information. Irrelevant
+		return false, nil
+	}
+	if !oldEntryMet {
+		// Not enough history
+		return false, nil
+	}
+	if len(coordinatesMap) != 1 {
+		// either 0 (==no data) or >1 (==multiple different coordinates, so not stale)
+		return false, nil
+	}
+	for _, count := range coordinatesMap {
+		// We actually know coordinatesMap has 1 single row, iteration is over that row only
+		if count < minExpectedSamples {
+			// Not enough samples within time range
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the
