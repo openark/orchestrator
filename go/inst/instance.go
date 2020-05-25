@@ -527,6 +527,12 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 		if this.UsingPseudoGTID {
 			extraTokens = append(extraTokens, "P-GTID")
 		}
+		if this.SemiSyncMasterStatus {
+			extraTokens = append(extraTokens, "semi:master")
+		}
+		if this.SemiSyncReplicaStatus {
+			extraTokens = append(extraTokens, "semi:replica")
+		}
 		if this.IsDowntimed {
 			extraTokens = append(extraTokens, "downtimed")
 		}
