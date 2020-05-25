@@ -239,7 +239,6 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		}
 	}
 	return ReadTopologyInstance(instanceKey)
-
 }
 
 func RestartReplicationQuick(instanceKey *InstanceKey) error {
