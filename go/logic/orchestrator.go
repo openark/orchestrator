@@ -546,7 +546,7 @@ func ContinuousDiscovery() {
 			// Various periodic internal maintenance tasks
 			go func() {
 				if IsLeaderOrActive() {
-					go inst.RecordInstanceCoordinatesHistory(nil)
+					go inst.RecordInstanceCoordinatesHistory()
 					go inst.ReviewUnseenInstances()
 					go inst.InjectUnseenMasters()
 

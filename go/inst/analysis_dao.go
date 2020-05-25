@@ -55,7 +55,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
+	args := sqlutils.Args(config.Config.ReasonableReplicationLagSeconds, ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
 
 	if config.Config.ReduceReplicationAnalysisCount {
@@ -97,7 +97,22 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
-		        MIN(master_instance.cluster_name) AS cluster_name,
+						MIN(master_instance.cluster_name) AS cluster_name,
+						MIN(master_instance.binary_log_file) AS binary_log_file,
+		        MIN(master_instance.binary_log_pos) AS binary_log_pos,
+						MIN(
+							IFNULL(
+								master_instance.binary_log_file = database_instance_stale_binlog_coordinates.binary_log_file
+								AND master_instance.binary_log_pos = database_instance_stale_binlog_coordinates.binary_log_pos,
+								0
+							)
+						) AS is_stale_binlog_coordinates,
+						MIN(
+							IFNULL(
+								database_instance_stale_binlog_coordinates.first_seen < NOW() - interval ? second,
+								0
+							)
+						) AS is_stale_binlog_coordinates_first_seen_before_sentry_point,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(IFNULL(cluster_domain_name.domain_name, master_instance.cluster_name)) AS cluster_domain,
 		        MIN(
@@ -152,20 +167,17 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				    		master_instance.supports_oracle_gtid
 				    	) AS supports_oracle_gtid,
 						MIN(
-				    		master_instance.slave_lag_seconds
-				    	) AS master_replication_lag_seconds,
-						MIN(
 				    		master_instance.semi_sync_master_enabled
 				    	) AS semi_sync_master_enabled,
 						MIN(
 				    		master_instance.semi_sync_master_wait_for_slave_count
 				    	) AS semi_sync_master_wait_for_slave_count,
 						MIN(
-				    		master_instance.semi_sync_master_clients
-				    	) AS semi_sync_master_clients,
+							master_instance.semi_sync_master_clients
+						) AS semi_sync_master_clients,
 						MIN(
-				    		master_instance.semi_sync_master_status
-				    	) AS semi_sync_master_status,
+							master_instance.semi_sync_master_status
+						) AS semi_sync_master_status,
 						SUM(
 								replica_instance.is_co_master
 							) AS count_co_master_replicas,
@@ -247,6 +259,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
 							AND master_instance.port = database_instance_maintenance.port
 							AND database_instance_maintenance.maintenance_active = 1)
+					LEFT JOIN
+						database_instance_stale_binlog_coordinates ON (
+							master_instance.hostname = database_instance_stale_binlog_coordinates.hostname
+							AND master_instance.port = database_instance_stale_binlog_coordinates.port
+						)
           LEFT JOIN
 		        database_instance_downtime as master_downtime ON (master_instance.hostname = master_downtime.hostname
 							AND master_instance.port = master_downtime.port
@@ -287,6 +304,13 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
 		a.AnalyzedInstanceRegion = m.GetString("region")
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
+		a.AnalyzedInstanceBinlogCoordinates = BinlogCoordinates{
+			LogFile: m.GetString("binary_log_file"),
+			LogPos:  m.GetInt64("binary_log_pos"),
+			Type:    BinaryLog,
+		}
+		isStaleBinlogCoordinates := m.GetBool("is_stale_binlog_coordinates")
+		isStaleBinlogCoordinatesFirstSeenBeforeSentryPoint := m.GetBool("is_stale_binlog_coordinates_first_seen_before_sentry_point")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.ClusterDetails.ClusterDomain = m.GetString("cluster_domain")
@@ -322,7 +346,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		// countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
 		a.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 		a.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
-		// masterReplicationLagSeconds := m.GetInt("master_replication_lag_seconds")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")

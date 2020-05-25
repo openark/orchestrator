@@ -119,6 +119,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceDataCenter                string
 	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
+	AnalyzedInstanceBinlogCoordinates         BinlogCoordinates
 	IsMaster                                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool

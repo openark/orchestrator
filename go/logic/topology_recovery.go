@@ -1397,10 +1397,6 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
-	coordinatesAreStale, err := inst.AreInstanceBinlogCoordinatesStaleInPastSeconds(&analysisEntry.AnalyzedInstanceKey, int64(config.Config.ReasonableReplicationLagSeconds), 3)
-	if coordinatesAreStale {
-		log.Debugf(" =================BOOM, %+v ", err)
-	}
 	return false, nil, nil
 }
 
@@ -1478,8 +1474,8 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 	}
 }
 
-func emergentlyRecordBinlogCoordinates(instanceKey *inst.InstanceKey) {
-	err := inst.RecordInstanceCoordinatesHistory(instanceKey)
+func emergentlyRecordStaleBinlogCoordinates(instanceKey *inst.InstanceKey, binlogCoordinates *inst.BinlogCoordinates) {
+	err := inst.RecordStaleInstanceBinlogCoordinates(instanceKey, binlogCoordinates)
 	log.Errore(err)
 }
 
@@ -1567,7 +1563,7 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	case inst.UnreachableMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.LockedSemiSyncMaster:
-		go emergentlyRecordBinlogCoordinates(&analysisEntry.AnalyzedInstanceKey)
+		go emergentlyRecordStaleBinlogCoordinates(&analysisEntry.AnalyzedInstanceKey, &analysisEntry.AnalyzedInstanceBinlogCoordinates)
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
