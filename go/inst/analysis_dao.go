@@ -103,16 +103,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 						MIN(
 							IFNULL(
 								master_instance.binary_log_file = database_instance_stale_binlog_coordinates.binary_log_file
-								AND master_instance.binary_log_pos = database_instance_stale_binlog_coordinates.binary_log_pos,
+								AND master_instance.binary_log_pos = database_instance_stale_binlog_coordinates.binary_log_pos
+								AND database_instance_stale_binlog_coordinates.first_seen < NOW() - interval ? second,
 								0
 							)
 						) AS is_stale_binlog_coordinates,
-						MIN(
-							IFNULL(
-								database_instance_stale_binlog_coordinates.first_seen < NOW() - interval ? second,
-								0
-							)
-						) AS is_stale_binlog_coordinates_first_seen_before_sentry_point,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(IFNULL(cluster_domain_name.domain_name, master_instance.cluster_name)) AS cluster_domain,
 		        MIN(
@@ -310,7 +305,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			Type:    BinaryLog,
 		}
 		isStaleBinlogCoordinates := m.GetBool("is_stale_binlog_coordinates")
-		isStaleBinlogCoordinatesFirstSeenBeforeSentryPoint := m.GetBool("is_stale_binlog_coordinates_first_seen_before_sentry_point")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.ClusterDetails.ClusterDomain = m.GetString("cluster_domain")
@@ -394,9 +388,14 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
-		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount /*&& masterReplicationLagSeconds > config.Config.ReasonableReplicationLagSeconds */ {
-			a.Analysis = LockedSemiSyncMaster
-			a.Description = "Semi sync master is locked since it doesn't get enough replica acknowledgements"
+		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount {
+			if isStaleBinlogCoordinates {
+				a.Analysis = LockedSemiSyncMaster
+				a.Description = "Semi sync master is locked since it doesn't get enough replica acknowledgements"
+			} else {
+				a.Analysis = LockedSemiSyncMasterHypothesis
+				a.Description = "Semi sync master seems to be locked, more samplings needed to validate"
+			}
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
 			a.Analysis = MasterSingleSlaveNotReplicating

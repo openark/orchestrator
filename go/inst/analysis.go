@@ -38,6 +38,7 @@ const (
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
+	LockedSemiSyncMasterHypothesis                                     = "LockedSemiSyncMasterHypothesis"
 	LockedSemiSyncMaster                                               = "LockedSemiSyncMaster"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
