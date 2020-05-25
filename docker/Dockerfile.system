@@ -2,7 +2,7 @@ FROM golang:1.12.1
 LABEL maintainer="openark@github.com"
 
 RUN apt-get update -q -y
-RUN apt-get install -y sudo haproxy python git jq rsync libaio1 libnuma1 mysql-client bsdmainutils less
+RUN apt-get install -y sudo haproxy python git jq rsync libaio1 libnuma1 mysql-client bsdmainutils less vim
 
 RUN mkdir /orchestrator
 WORKDIR /orchestrator
