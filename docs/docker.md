@@ -63,7 +63,7 @@ Execute:
 $ script/dock system
 ```
 
-to run a full blown environment, consisting of:
+to run a full blown environment (see [ci-env.md](ci-env.md)), consisting of:
 - MySQL replication topology (via [`dbdeployer`](https://www.dbdeployer.com/)) with heartbeat injection
 - `orchestrator` as a service
 - `HAProxy`
@@ -74,6 +74,10 @@ All wired to work together. It's a good playground for testing `orchestrator`'s 
 
 Tips:
 
+- port `13306` routes to current topology master
+- MySQL topology available on ports `10111, 10112, 10113, 10114`
+- Connect to MySQL with user: `ci`, password: `ci`. e.g.:
+  `mysqladmin -uci -pci -h 127.0.0.1 --port 13306 processlist`
 - Use `redeploy-ci-env` to re-create the MySQL topology, and recreate and restart the heartbeat, consul, consul-template and haproxy services. This resets the services to their original state.
 
 Uses [`Dockerfile.system`](https://github.com/openark/orchestrator/blob/master/docker/Dockerfile.system)
