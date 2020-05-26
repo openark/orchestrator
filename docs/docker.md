@@ -72,4 +72,8 @@ to run a full blown environment, consisting of:
 
 All wired to work together. It's a good playground for testing `orchestrator`'s functionality.
 
+Tips:
+
+- Use `redeploy-ci-env` to re-create the MySQL topology, and recreate and restart the heartbeat, consul, consul-template and haproxy services. This resets the services to their original state.
+
 Uses [`Dockerfile.system`](https://github.com/openark/orchestrator/blob/master/docker/Dockerfile.system)
