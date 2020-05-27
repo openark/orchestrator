@@ -2942,8 +2942,8 @@ func RecordStaleInstanceBinlogCoordinates(instanceKey *InstanceKey, binlogCoordi
 
 func ExpireStaleInstanceBinlogCoordinates() error {
 	expireSeconds := config.Config.ReasonableReplicationLagSeconds * 2
-	if expireSeconds < 60 {
-		expireSeconds = 60
+	if expireSeconds < config.StaleInstanceCoordinatesExpireSeconds {
+		expireSeconds = config.StaleInstanceCoordinatesExpireSeconds
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
