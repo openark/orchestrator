@@ -27,6 +27,7 @@ function run_queries() {
     cat $queries_file |
       sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" |
       sed -e "s/current_timestamp + interval 1 minute/datetime('now', '+1 minute')/g" |
+      sed -e "s/current_timestamp - interval 1 minute/datetime('now', '-1 minute')/g" |
       sqlite3 $sqlite_file
   else
     # Assume mysql
