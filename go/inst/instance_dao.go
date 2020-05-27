@@ -2940,6 +2940,22 @@ func RecordStaleInstanceBinlogCoordinates(instanceKey *InstanceKey, binlogCoordi
 	return log.Errore(err)
 }
 
+func ExpireStaleInstanceBinlogCoordinates() error {
+	expireSeconds := config.Config.ReasonableReplicationLagSeconds * 2
+	if expireSeconds < 60 {
+		expireSeconds = 60
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+					delete from database_instance_stale_binlog_coordinates
+					where first_seen < NOW() - INTERVAL ? SECOND
+					`, expireSeconds,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
 // GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the
 // exact current coordinates
 func GetPreviousKnownRelayLogCoordinatesForInstance(instance *Instance) (relayLogCoordinates *BinlogCoordinates, err error) {
