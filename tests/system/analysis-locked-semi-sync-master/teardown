@@ -1,0 +1,6 @@
+#!/bin/bash
+
+orchestrator-client -c all-instances | while read i ; do
+  orchestrator-client -c disable-semi-sync-master -i $i
+  orchestrator-client -c disable-semi-sync-replica -i $i
+done
