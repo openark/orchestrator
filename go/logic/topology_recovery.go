@@ -1414,15 +1414,14 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
-func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) (instance *inst.Instance, err error) {
 	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
-		return
+		return nil, nil
 	}
-	go inst.ExecuteOnTopology(func() {
-		inst.ReadTopologyInstance(instanceKey)
-		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
-	})
+	instance, err = inst.ReadTopologyInstance(instanceKey)
+	inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
+	return instance, err
 }
 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
