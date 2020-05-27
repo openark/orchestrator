@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "export PS1=\"\\[\\e[0;33m\\]\\h \\[\\e[0;97m\\]\\w\\[\\e[0;37m\\]\\\$ \"" >> /etc/bash.bashrc
+echo "alias redeploy-ci-env='(cd /orchestrator/orchestrator-ci-env ; ./script/docker-entry)'" >> /etc/bash.bashrc
+
 echo "setting up orchestrator..."
 sudo cp etc/systemd/orchestrator.service /etc/systemd/system/
 sudo mkdir -p /usr/local/orchestrator
