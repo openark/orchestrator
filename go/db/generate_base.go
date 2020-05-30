@@ -838,4 +838,17 @@ var generateSQLBase = []string{
 	`
 		CREATE INDEX tag_name_idx_database_instance_tags ON database_instance_tags (tag_name)
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_stale_binlog_coordinates (
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			binary_log_file varchar(128) NOT NULL,
+			binary_log_pos bigint(20) unsigned NOT NULL,
+			first_seen timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX first_seen_idx_database_instance_stale_binlog_coordinates ON database_instance_stale_binlog_coordinates (first_seen)
+	`,
 }

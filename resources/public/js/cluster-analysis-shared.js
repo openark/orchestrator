@@ -6,6 +6,7 @@ var interestingAnalysis = {
 	"UnreachableMasterWithStaleSlaves": true,
 	"UnreachableMasterWithLaggingReplicas": true,
 	"UnreachableMaster" : true,
+	"LockedSemiSyncMaster" : true,
 	"AllMasterSlavesNotReplicating" : true,
 	"AllMasterSlavesNotReplicatingOrDead" : true,
 	"AllMasterSlavesStale" : true,

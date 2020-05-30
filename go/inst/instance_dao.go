@@ -2861,19 +2861,21 @@ func RecordInstanceCoordinatesHistory() error {
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-    	insert into
-    		database_instance_coordinates_history (
+			insert into
+				database_instance_coordinates_history (
 					hostname, port,	last_seen, recorded_timestamp,
 					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 				)
-    	select
-    		hostname, port, last_seen, NOW(),
+			select
+				hostname, port, last_seen, NOW(),
 				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 			from
 				database_instance
 			where
-				binary_log_file != ''
-				OR relay_log_file != ''
+				(
+					binary_log_file != ''
+					or relay_log_file != ''
+				)
 				`,
 		)
 		return log.Errore(err)
@@ -2903,6 +2905,55 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 		return nil
 	})
 	return selfCoordinates, relayLogCoordinates, err
+}
+
+// RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances
+func RecordStaleInstanceBinlogCoordinates(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinates) error {
+	args := sqlutils.Args(
+		instanceKey.Hostname, instanceKey.Port,
+		binlogCoordinates.LogFile, binlogCoordinates.LogPos,
+	)
+	_, err := db.ExecOrchestrator(`
+			delete from
+				database_instance_stale_binlog_coordinates
+			where
+				hostname=? and port=?
+				and (
+					binary_log_file != ?
+					or binary_log_pos != ?
+				)
+				`,
+		args...,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	_, err = db.ExecOrchestrator(`
+			insert ignore into
+				database_instance_stale_binlog_coordinates (
+					hostname, port,	binary_log_file, binary_log_pos, first_seen
+				)
+				values (
+					?, ?, ?, ?, NOW()
+				)`,
+		args...)
+	return log.Errore(err)
+}
+
+func ExpireStaleInstanceBinlogCoordinates() error {
+	expireSeconds := config.Config.ReasonableReplicationLagSeconds * 2
+	if expireSeconds < config.StaleInstanceCoordinatesExpireSeconds {
+		expireSeconds = config.StaleInstanceCoordinatesExpireSeconds
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+					delete from database_instance_stale_binlog_coordinates
+					where first_seen < NOW() - INTERVAL ? SECOND
+					`, expireSeconds,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the
