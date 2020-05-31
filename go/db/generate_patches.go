@@ -580,13 +580,36 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN replication_group_name VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER gtid_mode,
-			ADD COLUMN replication_group_is_single_primary_mode TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER replication_group_name,
-			ADD COLUMN replication_group_member_state VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_is_single_primary_mode,
-			ADD COLUMN replication_group_member_role VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_member_state,
-			ADD COLUMN replication_group_members text CHARACTER SET ascii NOT NULL AFTER replication_group_member_role,
-			ADD COLUMN replication_group_primary_host varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_members,
+			ADD COLUMN replication_group_name VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER gtid_mode
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_is_single_primary_mode TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER replication_group_name
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_member_state VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_is_single_primary_mode
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_member_role VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_member_state
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_members text CHARACTER SET ascii NOT NULL AFTER replication_group_member_role
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_primary_host varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_members
+	`,
+	`
+		ALTER TABLE
+		database_instance
             ADD COLUMN replication_group_primary_port smallint(5) unsigned NOT NULL DEFAULT 0 AFTER replication_group_primary_host
-
 	`,
 }
