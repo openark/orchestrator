@@ -764,6 +764,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	{
+		// wait for routines to finish before reading cluster attributes. This seems to be needed, as,
+		// otherwise, detecting whether a host is a replication group secondary to set up cluster attributes from its primary
+		// does not work. ToDo: Is there a better way to sync this?
+		waitGroup.Wait()
 		latency.Start("backend")
 		err = ReadInstanceClusterAttributes(instance)
 		latency.Stop("backend")
@@ -968,15 +972,15 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
-	var masterMasterKey InstanceKey
-	var masterClusterName string
-	var masterSuggestedClusterAlias string
-	var masterReplicationDepth uint
+	var masterOrGroupPrimaryKey InstanceKey
+	var masterOrGroupPrimaryClusterName string
+	var masterOrGroupPrimarySuggestedClusterAlias string
+	var masterOrGroupPrimaryReplicationDepth uint
 	var ancestryUUID string
-	var masterExecutedGtidSet string
-	masterDataFound := false
+	var masterOrGroupPrimaryExecutedGtidSet string
+	masterOrGroupPrimaryDataFound := false
 
-	// Read the cluster_name of the _master_ of our instance, derive it from there.
+	// Read the cluster_name of the _master_ or _group_primary_ of our instance, derive it from there.
 	query := `
 			select
 					cluster_name,
@@ -989,17 +993,26 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 				from database_instance
 				where hostname=? and port=?
 	`
-	args := sqlutils.Args(instance.MasterKey.Hostname, instance.MasterKey.Port)
-
+	// For instances that are part of a replication group, if the host is not the group's primary, we use the
+	// information from the group primary. If it is the group primary, we use the information of its master
+	// (if it has any). If it is not a group member, we use the information from the host's master.
+	if instance.IsReplicationGroupSecondary() {
+		log.Debugf("Instance %+v is a replication group secondary, using the group primary %+v as source of data", instance.Key, instance.ReplicationGroupPrimaryKey)
+		masterOrGroupPrimaryKey = instance.ReplicationGroupPrimaryKey
+	} else {
+		log.Debugf("Instance %+v is not a replication group secondary, using it's master %+v as source of data", instance.Key, instance.MasterKey)
+		masterOrGroupPrimaryKey = instance.MasterKey
+	}
+	args := sqlutils.Args(masterOrGroupPrimaryKey.Hostname, masterOrGroupPrimaryKey.Port)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		masterClusterName = m.GetString("cluster_name")
-		masterSuggestedClusterAlias = m.GetString("suggested_cluster_alias")
-		masterReplicationDepth = m.GetUint("replication_depth")
-		masterMasterKey.Hostname = m.GetString("master_host")
-		masterMasterKey.Port = m.GetInt("master_port")
+		masterOrGroupPrimaryClusterName = m.GetString("cluster_name")
+		masterOrGroupPrimarySuggestedClusterAlias = m.GetString("suggested_cluster_alias")
+		masterOrGroupPrimaryReplicationDepth = m.GetUint("replication_depth")
+		masterOrGroupPrimaryKey.Hostname = m.GetString("master_host")
+		masterOrGroupPrimaryKey.Port = m.GetInt("master_port")
 		ancestryUUID = m.GetString("ancestry_uuid")
-		masterExecutedGtidSet = m.GetString("executed_gtid_set")
-		masterDataFound = true
+		masterOrGroupPrimaryExecutedGtidSet = m.GetString("executed_gtid_set")
+		masterOrGroupPrimaryDataFound = true
 		return nil
 	})
 	if err != nil {
@@ -1008,9 +1021,9 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 
 	var replicationDepth uint = 0
 	var clusterName string
-	if masterDataFound {
-		replicationDepth = masterReplicationDepth + 1
-		clusterName = masterClusterName
+	if masterOrGroupPrimaryDataFound {
+		replicationDepth = masterOrGroupPrimaryReplicationDepth + 1
+		clusterName = masterOrGroupPrimaryClusterName
 	}
 	clusterNameByInstanceKey := instance.Key.StringCode()
 	if clusterName == "" {
@@ -1019,7 +1032,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	}
 
 	isCoMaster := false
-	if masterMasterKey.Equals(&instance.Key) {
+	if masterOrGroupPrimaryKey.Equals(&instance.Key) {
 		// co-master calls for special case, in fear of the infinite loop
 		isCoMaster = true
 		clusterNameByCoMasterKey := instance.MasterKey.StringCode()
@@ -1035,11 +1048,11 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
-	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
+	instance.SuggestedClusterAlias = masterOrGroupPrimarySuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
 	instance.AncestryUUID = ancestryUUID
-	instance.masterExecutedGtidSet = masterExecutedGtidSet
+	instance.masterExecutedGtidSet = masterOrGroupPrimaryExecutedGtidSet
 	return nil
 }
 
@@ -1188,6 +1201,16 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.Replicas.ReadJson(replicasJSON)
 	instance.applyFlavorName()
+
+	/* Read Group Replication variables below */
+	instance.ReplicationGroupName = m.GetString("replication_group_name")
+	instance.ReplicationGroupIsSinglePrimary = m.GetBool("replication_group_is_single_primary_mode")
+	instance.ReplicationGroupMemberState = m.GetString("replication_group_member_state")
+	instance.ReplicationGroupMemberRole = m.GetString("replication_group_member_role")
+	instance.ReplicationGroupPrimaryKey = InstanceKey{Hostname: m.GetString("replication_group_primary_host"),
+		Port: m.GetInt("replication_group_primary_port")}
+	instance.ReplicationGroupMembers.ReadJson(m.GetString("replication_group_members"))
+	//instance.ReplicationGroup = m.GetString("replication_group_")
 
 	// problems
 	if !instance.IsLastCheckValid {
@@ -3140,6 +3163,7 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 			groupMemberKey, err := NewResolveInstanceKey(host, int(port))
 			if err != nil {
 				log.Errorf("Unable to resolve instance for group member %v:%v", host, port)
+				continue
 			}
 			if role == GroupReplicationMemberRolePrimary && singlePrimaryGroup && groupMemberKey != nil {
 				instance.ReplicationGroupPrimaryKey = *groupMemberKey
@@ -3149,9 +3173,7 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 				instance.ReplicationGroupIsSinglePrimary = singlePrimaryGroup
 				instance.ReplicationGroupMemberRole = role
 				instance.ReplicationGroupMemberState = state
-				log.Debugf("Found GR member record for instance being discovered (%+v)", instance.Key)
 			} else {
-				log.Debugf("Found other GR member records for instance being discovered (%+v)", groupMemberKey)
 				//instance.AddReplicaKey(groupMemberKey)  // This helps us discover all group members
 				instance.AddGroupMemberKey(groupMemberKey) // This helps us keep info on all members of the same group as the instance
 			}

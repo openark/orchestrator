@@ -254,6 +254,14 @@ func (this *Instance) IsReplicationGroupMember() bool {
 	return this.ReplicationGroupName != ""
 }
 
+func (this *Instance) IsReplicationGroupPrimary() bool {
+	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryKey == this.Key
+}
+
+func (this *Instance) IsReplicationGroupSecondary() bool {
+	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryKey != this.Key
+}
+
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
