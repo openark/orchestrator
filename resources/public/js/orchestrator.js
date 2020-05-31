@@ -600,8 +600,14 @@ function normalizeInstance(instance) {
   instance.title = instance.Key.Hostname + ':' + instance.Key.Port;
   instance.canonicalTitle = instance.title;
   instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
-  instance.masterId = getInstanceId(instance.MasterKey.Hostname,
-    instance.MasterKey.Port);
+  // If this host is a replication group member, we set its masterId to the group primary, unless the instance is itself
+  // the primary. In that case, we set it to its async/semi-sync master (if configured)
+  if (instance.ReplicationGroupName != "" && instance.ReplicationGroupMemberRole == "SECONDARY")
+    masterKey = instance.ReplicationGroupPrimaryKey
+  else
+    masterKey = instance.MasterKey
+  instance.masterId = getInstanceId(masterKey.Hostname,
+    masterKey.Port);
 
   instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.ReplicationIOThreadRuning;
   instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.ReplicationIOThreadRuning;
