@@ -890,12 +890,15 @@ Cleanup:
 		} else {
 			instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID)
 		}
+		// Add replication group ancestry UUID as well. Otherwise, Orchestrator thinks there are errant GTIDs in group
+		// members and its slaves, even though they are not.
+		instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ReplicationGroupName)
 		instance.AncestryUUID = strings.Trim(instance.AncestryUUID, ",")
 		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
 			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
 			// This is because orchestrator may pool master and replica at an inconvenient timing,
 			// such that the replica may _seems_ to have more entries than the master, when in fact
-			// it's just that the naster's probing is stale.
+			// it's just that the master's probing is stale.
 			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
 			for _, uuid := range strings.Split(instance.AncestryUUID, ",") {
 				if uuid != instance.ServerUUID {
