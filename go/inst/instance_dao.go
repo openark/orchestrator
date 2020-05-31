@@ -61,11 +61,27 @@ var instanceWriteChan = make(chan bool, backendDBConcurrency)
 // InstancesByCountReplicas is a sortable type for Instance
 type InstancesByCountReplicas [](*Instance)
 
+
 func (this InstancesByCountReplicas) Len() int      { return len(this) }
 func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountReplicas) Less(i, j int) bool {
 	return len(this[i].Replicas) < len(this[j].Replicas)
 }
+
+	// Constant strings for Group Replication information
+// See https://dev.mysql.com/doc/refman/8.0/en/replication-group-members-table.html for additional information.
+const (
+	// Group member states
+	GroupReplicationMemberStateOnline     = "ONLINE"
+	GroupReplicationMemberStateRecovering = "RECOVERING"
+	GroupReplicationMemberStateOffline    = "OFFLINE"
+	GroupReplicationMemberStateError      = "ERROR"
+	// Group member roles
+	GroupReplicationMemberRolePrimary   = "PRIMARY"
+	GroupReplicationMemberRoleSecondary = "SECONDARY"
+)
+
+
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
@@ -477,6 +493,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					instance.ReplicationCredentialsAvailable = true
 				} else if masterInfoRepositoryOnTable {
 					_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
+				}
+				// Populate GR information for the instance in Oracle MySQL 5.7+
+				if !instance.IsSmallerMajorVersionByString("5.7") {
+					PopulateGroupReplicationInformation(instance, db)
 				}
 			}()
 		}
@@ -2440,6 +2460,13 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"semi_sync_replica_status",
 		"instance_alias",
 		"last_discovery_latency",
+		"replication_group_name",
+		"replication_group_is_single_primary_mode",
+		"replication_group_member_state",
+		"replication_group_member_role",
+		"replication_group_members",
+		"replication_group_primary_host",
+		"replication_group_primary_port",
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
@@ -2526,6 +2553,13 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SemiSyncReplicaStatus)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
+		args = append(args, instance.ReplicationGroupName)
+		args = append(args, instance.ReplicationGroupIsSinglePrimary)
+		args = append(args, instance.ReplicationGroupMemberState)
+		args = append(args, instance.ReplicationGroupMemberRole)
+		args = append(args, instance.ReplicationGroupMembers.ToJSONString())
+		args = append(args, instance.ReplicationGroupPrimaryKey.Hostname)
+		args = append(args, instance.ReplicationGroupPrimaryKey.Port)
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
@@ -3066,6 +3100,68 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 		return nil, log.Errorf("Cannot deduce instance %+v", instanceKey)
 	}
 	return figuredKey, nil
+}
+
+// Obtain information about Group Replication  for this host as well as other hosts who are members of the same group
+// (if any). This method swallows up any errors, interpreting them as if the host does not support group replication
+// (e.g. because the group replication plugin is not loaded, therefore the corresponding performance schema tables and
+// global variables are not known to the server.
+func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
+	q := `
+	SELECT
+		MEMBER_ID,
+		MEMBER_HOST,
+		MEMBER_PORT,
+		MEMBER_STATE, 
+		MEMBER_ROLE,
+		@@global.group_replication_group_name,
+		@@global.group_replication_single_primary_mode
+  	FROM
+		performance_schema.replication_group_members
+  	 `
+	rows, err := db.Query(q)
+	if err != nil || rows == nil {
+		log.Debugf("Unable to run GR query for instance %+v. err = %v, rows == nil = %v. Assuming the host is "+
+			"not part of replication group", instance.Key, err, rows == nil)
+		return
+	}
+	for rows.Next() {
+		var (
+			uuid               string
+			host               string
+			port               uint16
+			state              string
+			role               string
+			groupName          string
+			singlePrimaryGroup bool
+		)
+		err := rows.Scan(&uuid, &host, &port, &state, &role, &groupName, &singlePrimaryGroup)
+		if err == nil {
+			groupMemberKey, err := NewResolveInstanceKey(host, int(port))
+			if err != nil {
+				log.Errorf("Unable to resolve instance for group member %v:%v", host, port)
+			}
+			if role == GroupReplicationMemberRolePrimary && singlePrimaryGroup && groupMemberKey != nil {
+				instance.ReplicationGroupPrimaryKey = *groupMemberKey
+			}
+			if uuid == instance.ServerUUID {
+				instance.ReplicationGroupName = groupName
+				instance.ReplicationGroupIsSinglePrimary = singlePrimaryGroup
+				instance.ReplicationGroupMemberRole = role
+				instance.ReplicationGroupMemberState = state
+				log.Debugf("Found GR member record for instance being discovered (%+v)", instance.Key)
+			} else {
+				log.Debugf("Found other GR member records for instance being discovered (%+v)", groupMemberKey)
+				//instance.AddReplicaKey(groupMemberKey)  // This helps us discover all group members
+				instance.AddGroupMemberKey(groupMemberKey) // This helps us keep info on all members of the same group as the instance
+			}
+		} else {
+			log.Errorf("Unable to scan variables from GR query: %+v", err)
+		}
+	}
+
+	rows.Close()
+	return
 }
 
 // RegisterInjectedPseudoGTID

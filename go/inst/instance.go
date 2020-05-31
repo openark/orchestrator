@@ -129,13 +129,32 @@ type Instance struct {
 	LastDiscoveryLatency time.Duration
 
 	seed bool // Means we force this instance to be written to backend, even if it's invalid, empty or forgotten
+
+	/* All things Group Replication below */
+
+	// Group replication global variables
+	ReplicationGroupName            string
+	ReplicationGroupIsSinglePrimary bool
+
+	// Replication group members information. See
+	// https://dev.mysql.com/doc/refman/8.0/en/replication-group-members-table.html for details.
+	ReplicationGroupMemberState string
+	ReplicationGroupMemberRole  string
+
+	// List of all known members of the same group
+	ReplicationGroupMembers InstanceKeyMap
+
+	// Primary of the replication group
+	ReplicationGroupPrimaryKey InstanceKey
 }
 
 // NewInstance creates a new, empty instance
 func NewInstance() *Instance {
 	return &Instance{
 		Replicas: make(map[InstanceKey]bool),
+		ReplicationGroupMembers: make(map[InstanceKey]bool),
 		Problems: []string{},
+
 	}
 }
 
@@ -228,6 +247,13 @@ func (this *Instance) IsNDB() bool {
 	return strings.Contains(this.Version, "-ndb-")
 }
 
+// IsReplicationGroup checks whether the host thinks it is part of a known replication group. Notice that this might
+// return True even if the group has decided to expel the member represented by this instance, as the instance might not
+// know that under certain circumstances
+func (this *Instance) IsReplicationGroupMember() bool {
+	return this.ReplicationGroupName != ""
+}
+
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
@@ -295,7 +321,10 @@ func (this *Instance) IsReplica() bool {
 
 // IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
 func (this *Instance) IsMaster() bool {
-	return !this.IsReplica()
+	return !this.IsReplica() &&
+		((this.IsReplicationGroupMember() &&
+			this.ReplicationGroupMemberRole != GroupReplicationMemberRoleSecondary) ||
+			!this.IsReplicationGroupMember())
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
@@ -356,6 +385,11 @@ func (this *Instance) NextGTID() (string, error) {
 // AddReplicaKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
 	this.Replicas.AddKey(*replicaKey)
+}
+
+// AddGroupMemberKey adds a group member to the list of this instance's group members.
+func (this *Instance) AddGroupMemberKey(groupMemberKey *InstanceKey) {
+	this.ReplicationGroupMembers.AddKey(*groupMemberKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
