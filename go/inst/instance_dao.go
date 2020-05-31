@@ -3163,6 +3163,10 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 		)
 		err := rows.Scan(&uuid, &host, &port, &state, &role, &groupName, &singlePrimaryGroup)
 		if err == nil {
+			if !singlePrimaryGroup {
+				log.Debugf("This host seems to belong to a multi-primary replication group, which we don't support")
+				break
+			}
 			groupMemberKey, err := NewResolveInstanceKey(host, int(port))
 			if err != nil {
 				log.Errorf("Unable to resolve instance for group member %v:%v", host, port)

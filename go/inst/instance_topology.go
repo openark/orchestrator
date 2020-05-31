@@ -2695,9 +2695,18 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *instanceKey)
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("relocate: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	other, found, err := ReadInstance(otherKey)
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
+	}
+	// Disallow setting up a group primary to replicate from a group secondary
+	if instance.IsReplicationGroupPrimary() && other.ReplicationGroupName == instance.ReplicationGroupName {
+		return instance, log.Errorf("relocate: Setting a group primary to replicate from another member of its group is disallowed")
 	}
 	if other.IsDescendantOf(instance) {
 		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
