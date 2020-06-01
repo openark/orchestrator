@@ -1253,6 +1253,10 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	if instance.GtidErrant != "" {
 		instance.Problems = append(instance.Problems, "errant_gtid")
 	}
+	// Group replication problems
+	if instance.ReplicationGroupName != "" && instance.ReplicationGroupMemberState != "ONLINE" {
+		instance.Problems = append(instance.Problems, "group_replication_member_not_online")
+	}
 
 	return instance
 }
@@ -1445,6 +1449,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 				or (gtid_errant != '')
+				or (replication_group_name <> '' and replication_group_member_state <> 'ONLINE')
 			)
 		`
 
