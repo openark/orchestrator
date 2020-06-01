@@ -914,6 +914,26 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs replication updates"></span> ');
     }
+    // Icons for GR
+    var text_style;
+    if (instance.ReplicationGroupName != "") {
+      switch (instance.ReplicationGroupMemberState) {
+        case "ONLINE":
+          if (instance.ReplicationGroupMemberRole == "PRIMARY")
+            text_style = "";
+          else
+            text_style = "text-muted";
+          break;
+        case "RECOVERING":
+          text_style = "text-warning";
+          break;
+        default:
+          text_style = "text-danger";
+      }
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon '+ text_style +' glyphicon-tower" title="'+ instance.ReplicationGroupMemberRole + ' ' + instance.ReplicationGroupMemberState +'"></span> ');
+    }
+
+
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
