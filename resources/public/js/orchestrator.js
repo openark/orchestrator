@@ -602,7 +602,10 @@ function normalizeInstance(instance) {
   instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
   // If this host is a replication group member, we set its masterId to the group primary, unless the instance is itself
   // the primary. In that case, we set it to its async/semi-sync master (if configured)
-  if (instance.ReplicationGroupName != "" && instance.ReplicationGroupMemberRole == "SECONDARY")
+  if (instance.Key.Port == 4306) {
+    console.log(instance)
+  }
+  if (instance.ReplicationGroupName != "" && (instance.ReplicationGroupMemberRole == "SECONDARY" || instance.ReplicationGroupMemberRole == ""))
     masterKey = instance.ReplicationGroupPrimaryKey
   else
     masterKey = instance.MasterKey
@@ -930,9 +933,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
         default:
           text_style = "text-danger";
       }
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon '+ text_style +' glyphicon-tower" title="'+ instance.ReplicationGroupMemberRole + ' ' + instance.ReplicationGroupMemberState +'"></span> ');
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon '+ text_style +' glyphicon-tower" title="Group replication '+ instance.ReplicationGroupMemberRole + ' ' + instance.ReplicationGroupMemberState +'"></span> ');
     }
-
 
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');

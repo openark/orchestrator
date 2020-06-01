@@ -970,6 +970,31 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 	return err
 }
 
+func ReadReplicationGroupPrimary(instance *Instance) (err error) {
+	query := `
+	SELECT
+		replication_group_primary_host,
+		replication_group_primary_port
+	FROM
+		database_instance
+	WHERE
+		replication_group_name = ?
+		AND replication_group_member_role = 'PRIMARY'
+`
+	queryArgs := sqlutils.Args(instance.ReplicationGroupName)
+	err = db.QueryOrchestrator(query, queryArgs, func(row sqlutils.RowMap) error {
+		groupPrimaryHost := row.GetString("replication_group_primary_host")
+		groupPrimaryPort := row.GetInt("replication_group_primary_port")
+		resolvedGroupPrimary, err := NewResolveInstanceKey(groupPrimaryHost, groupPrimaryPort)
+		if err != nil {
+			return err
+		}
+		instance.ReplicationGroupPrimaryKey = *resolvedGroupPrimary
+		return nil
+	})
+	return err
+}
+
 // ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
 // and getting it from there.
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
@@ -3151,6 +3176,7 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 			"not part of replication group", instance.Key, err, rows == nil)
 		return
 	}
+	foundGroupPrimary := false
 	for rows.Next() {
 		var (
 			uuid               string
@@ -3172,8 +3198,11 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 				log.Errorf("Unable to resolve instance for group member %v:%v", host, port)
 				continue
 			}
-			if role == GroupReplicationMemberRolePrimary && singlePrimaryGroup && groupMemberKey != nil {
+			// Set the replication group primary from what we find in performance_schema.replication_group_members for
+			// the instance being discovered.
+			if role == GroupReplicationMemberRolePrimary && groupMemberKey != nil {
 				instance.ReplicationGroupPrimaryKey = *groupMemberKey
+				foundGroupPrimary = true
 			}
 			if uuid == instance.ServerUUID {
 				instance.ReplicationGroupName = groupName
@@ -3181,15 +3210,19 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 				instance.ReplicationGroupMemberRole = role
 				instance.ReplicationGroupMemberState = state
 			} else {
-				//instance.AddReplicaKey(groupMemberKey)  // This helps us discover all group members
 				instance.AddGroupMemberKey(groupMemberKey) // This helps us keep info on all members of the same group as the instance
 			}
 		} else {
 			log.Errorf("Unable to scan variables from GR query: %+v", err)
 		}
 	}
-
 	rows.Close()
+	// If we did not manage to find the primary of the group in performance_schema.replication_group_members, we are
+	// likely to have been expelled from the group. Still, try to find out the primary of the group and set it for the
+	// instance being discovered, so that it is identified as part of the same cluster
+	if !foundGroupPrimary {
+		err = ReadReplicationGroupPrimary(instance)
+	}
 	return
 }
 
