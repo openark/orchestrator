@@ -259,12 +259,12 @@ function openNodeModal(node) {
     } else {
       $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     }
-    $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=reset-replica]').appendTo(td.find("div"))
 
     td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
-    $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
-    $('#node_modal button[data-btn=restart-slave]').appendTo(td.find("div"))
-    $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=start-replica]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=restart-replica]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=stop-replica]').appendTo(td.find("div"))
 
     if (!node.replicationRunning) {
       if (node.LastSQLError) {
@@ -306,7 +306,7 @@ function openNodeModal(node) {
       $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
     }
   } else {
-    $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
+    $('#node_modal button[data-btn=reset-replica]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
@@ -391,17 +391,14 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=skip-query]').click(function() {
     apiCommand("/api/skip-query/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=start-slave]').click(function() {
-    apiCommand("/api/start-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=start-replica]').click(function() {
+    apiCommand("/api/start-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=restart-slave]').click(function() {
-    apiCommand("/api/restart-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=restart-replica]').click(function() {
+    apiCommand("/api/restart-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal [data-btn=stop-slave]').click(function() {
-    apiCommand("/api/stop-slave/" + node.Key.Hostname + "/" + node.Key.Port);
-  });
-  $('#node_modal [data-btn=stop-slave-nice]').click(function() {
-    apiCommand("/api/stop-slave-nice/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=stop-replica]').click(function() {
+    apiCommand("/api/stop-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=detach-replica]').click(function() {
     apiCommand("/api/detach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
@@ -412,14 +409,14 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=reattach-replica-master-host]').click(function() {
     apiCommand("/api/reattach-replica-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reset-slave]').click(function() {
+  $('#node_modal button[data-btn=reset-replica]').click(function() {
     var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?" +
       "<p>This will stop and break the replication." +
       "<p>FYI, this is a destructive operation that cannot be easily reverted";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/reset-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/reset-replica/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
     return false;
@@ -506,16 +503,16 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
-  $('#node_modal button[data-btn=start-slave]').hide();
-  $('#node_modal button[data-btn=restart-slave]').hide();
-  $('#node_modal [data-btn-group=stop-slave]').hide();
+  $('#node_modal button[data-btn=start-replica]').hide();
+  $('#node_modal button[data-btn=restart-replica]').hide();
+  $('#node_modal button[data-btn=stop-replica]').hide();
 
   if (node.MasterKey.Hostname) {
     if (node.replicationRunning || node.replicationAttemptingToRun) {
-      $('#node_modal [data-btn-group=stop-slave]').show();
-      $('#node_modal button[data-btn=restart-slave]').show();
+      $('#node_modal button[data-btn=stop-replica]').show();
+      $('#node_modal button[data-btn=restart-replica]').show();
     } else if (!node.replicationRunning) {
-      $('#node_modal button[data-btn=start-slave]').show();
+      $('#node_modal button[data-btn=start-replica]').show();
     }
     if (!node.Slave_SQL_Running && node.LastSQLError) {
       $('#node_modal button[data-btn=skip-query]').show();
