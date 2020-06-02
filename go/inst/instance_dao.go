@@ -3176,12 +3176,12 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 		performance_schema.replication_group_members
   	 `
 	rows, err := db.Query(q)
-	defer rows.Close()
-	if err != nil || rows == nil {
-		log.Debugf("Unable to run GR query for instance %+v. err = %v, rows == nil = %v. Assuming the host is "+
-			"not part of replication group", instance.Key, err, rows == nil)
+	if err != nil {
+		log.Debugf("Unable to run GR query for instance. err = %v. Assuming the host is "+
+			"not part of replication group", err)
 		return
 	}
+	defer rows.Close()
 	foundGroupPrimary := false
 	for rows.Next() {
 		var (
