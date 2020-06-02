@@ -327,12 +327,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.SlaveHosts = *NewInstanceKeyMap()
 		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
-		countValidOracleGTIDSlaves := m.GetUint("count_valid_oracle_gtid_replicas")
-		a.OracleGTIDImmediateTopology = countValidOracleGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
-		countValidMariaDBGTIDSlaves := m.GetUint("count_valid_mariadb_gtid_replicas")
-		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
-		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_replicas")
-		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidOracleGTIDReplicas := m.GetUint("count_valid_oracle_gtid_replicas")
+		a.OracleGTIDImmediateTopology = countValidOracleGTIDReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidMariaDBGTIDReplicas := m.GetUint("count_valid_mariadb_gtid_replicas")
+		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidBinlogServerReplicas := m.GetUint("count_valid_binlog_server_replicas")
+		a.BinlogServerImmediateTopology = countValidBinlogServerReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
 		a.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 		a.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
