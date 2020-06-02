@@ -3158,10 +3158,10 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 	return figuredKey, nil
 }
 
-// Obtain information about Group Replication  for this host as well as other hosts who are members of the same group
-// (if any). This method swallows up any errors, interpreting them as if the host does not support group replication
-// (e.g. because the group replication plugin is not loaded, therefore the corresponding performance schema tables and
-// global variables are not known to the server.
+// PopulateGroupReplicationInformation obtains information about Group Replication  for this host as well as other hosts
+// who are members of the same group (if any). This method swallows up any errors, interpreting them as if the host does
+// not support group replication (e.g. because the group replication plugin is not loaded, therefore the corresponding
+// performance schema tables and global variables are not known to the server.
 func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 	q := `
 	SELECT
@@ -3176,6 +3176,7 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 		performance_schema.replication_group_members
   	 `
 	rows, err := db.Query(q)
+	defer rows.Close()
 	if err != nil || rows == nil {
 		log.Debugf("Unable to run GR query for instance %+v. err = %v, rows == nil = %v. Assuming the host is "+
 			"not part of replication group", instance.Key, err, rows == nil)
@@ -3221,7 +3222,6 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) {
 			log.Errorf("Unable to scan variables from GR query: %+v", err)
 		}
 	}
-	rows.Close()
 	// If we did not manage to find the primary of the group in performance_schema.replication_group_members, we are
 	// likely to have been expelled from the group. Still, try to find out the primary of the group and set it for the
 	// instance being discovered, so that it is identified as part of the same cluster

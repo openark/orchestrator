@@ -600,7 +600,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 		database_instance
-			ADD COLUMN replication_group_members text CHARACTER SET ascii NOT NULL AFTER replication_group_member_role
+			ADD COLUMN replication_group_members text CHARACTER SET ascii NOT NULL DEFAULT '[]' AFTER replication_group_member_role
 	`,
 	`
 		ALTER TABLE
