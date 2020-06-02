@@ -365,7 +365,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			}
 		}
 		if a.IsMaster && !a.LastCheckValid && a.CountReplicas == 0 {
-			a.Analysis = DeadMasterWithoutSlaves
+			a.Analysis = DeadMasterWithoutReplicas
 			a.Description = "Master cannot be reached by orchestrator and has no slave"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -373,11 +373,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadMasterAndSlaves
+			a.Analysis = DeadMasterAndReplicas
 			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadMasterAndSomeSlaves
+			a.Analysis = DeadMasterAndSomeReplicas
 			a.Description = "Master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
@@ -398,19 +398,19 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			}
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = MasterSingleSlaveNotReplicating
+			a.Analysis = MasterSingleReplicaNotReplicating
 			a.Description = "Master is reachable but its single slave is not replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == 0 {
-			a.Analysis = MasterSingleSlaveDead
+			a.Analysis = MasterSingleReplicaDead
 			a.Description = "Master is reachable but its single slave is dead"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllMasterSlavesNotReplicating
+			a.Analysis = AllMasterReplicasNotReplicating
 			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllMasterSlavesNotReplicatingOrDead
+			a.Analysis = AllMasterReplicasNotReplicatingOrDead
 			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -418,7 +418,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Co-master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadCoMasterAndSomeSlaves
+			a.Analysis = DeadCoMasterAndSomeReplicas
 			a.Description = "Co-master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
@@ -426,15 +426,15 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Co-master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
 		} else if a.IsCoMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllCoMasterSlavesNotReplicating
+			a.Analysis = AllCoMasterReplicasNotReplicating
 			a.Description = "Co-master is reachable but none of its replicas is replicating"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountReplicasFailingToConnectToMaster == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterWithSingleSlaveFailingToConnect
+			a.Analysis = DeadIntermediateMasterWithSingleReplicaFailingToConnect
 			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is failing to connect"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterWithSingleSlave
+			a.Analysis = DeadIntermediateMasterWithSingleReplica
 			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is not replicating"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -442,11 +442,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterAndSomeSlaves
+			a.Analysis = DeadIntermediateMasterAndSomeReplicas
 			a.Description = "Intermediate master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterAndSlaves
+			a.Analysis = DeadIntermediateMasterAndReplicas
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
@@ -463,11 +463,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			// or completely dead.
 			// Must have at least two replicas to reach such conclusion -- do note that the intermediate master is still
 			// reachable to orchestrator, so we base our conclusion on replicas only at this point.
-			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
+			a.Analysis = AllIntermediateMasterReplicasFailingToConnectOrDead
 			a.Description = "Intermediate master is reachable but all of its replicas are failing to connect"
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllIntermediateMasterSlavesNotReplicating
+			a.Analysis = AllIntermediateMasterReplicasNotReplicating
 			a.Description = "Intermediate master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
@@ -475,12 +475,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Binlog server is unable to connect to its master"
 			//
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
-			a.Analysis = FirstTierSlaveFailingToConnectToMaster
+			a.Analysis = FirstTierReplicaFailingToConnectToMaster
 			a.Description = "1st tier slave (directly replicating from topology master) is unable to connect to the master"
 			//
 		}
 		//		 else if a.IsMaster && a.CountReplicas == 0 {
-		//			a.Analysis = MasterWithoutSlaves
+		//			a.Analysis = MasterWithoutReplicas
 		//			a.Description = "Master has no replicas"
 		//		}
 
@@ -498,16 +498,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			}
 			if a.CountReplicas == a.CountDowntimedReplicas {
 				switch a.Analysis {
-				case AllMasterSlavesNotReplicating,
-					AllMasterSlavesNotReplicatingOrDead,
-					MasterSingleSlaveDead,
-					AllCoMasterSlavesNotReplicating,
-					DeadIntermediateMasterWithSingleSlave,
-					DeadIntermediateMasterWithSingleSlaveFailingToConnect,
-					DeadIntermediateMasterAndSlaves,
-					DeadIntermediateMasterAndSomeSlaves,
-					AllIntermediateMasterSlavesFailingToConnectOrDead,
-					AllIntermediateMasterSlavesNotReplicating:
+				case AllMasterReplicasNotReplicating,
+					AllMasterReplicasNotReplicatingOrDead,
+					MasterSingleReplicaDead,
+					AllCoMasterReplicasNotReplicating,
+					DeadIntermediateMasterWithSingleReplica,
+					DeadIntermediateMasterWithSingleReplicaFailingToConnect,
+					DeadIntermediateMasterAndReplicas,
+					DeadIntermediateMasterAndSomeReplicas,
+					AllIntermediateMasterReplicasFailingToConnectOrDead,
+					AllIntermediateMasterReplicasNotReplicating:
 					a.IsReplicasDowntimed = true
 					a.SkippableDueToDowntime = true
 				}
@@ -532,16 +532,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, NoFailoverSupportStructureWarning)
 			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountMixedBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountMixedBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingReplicasStructureWarning)
 			}
 
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
