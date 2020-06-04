@@ -1,1 +1,1 @@
-testhost:22293 (cluster testhost:22293): NoValidSemiSyncReplicasStructureWarning
+testhost:22293 (cluster testhost:22293): NotEnoughValidSemiSyncReplicasStructureWarning

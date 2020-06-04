@@ -68,7 +68,6 @@ const (
 	ErrantGTIDStructureWarning                                                 = "ErrantGTIDStructureWarning"
 	NoFailoverSupportStructureWarning                                          = "NoFailoverSupportStructureWarning"
 	NoWriteableMasterStructureWarning                                          = "NoWriteableMasterStructureWarning"
-	NoValidSemiSyncReplicasStructureWarning                                    = "NoValidSemiSyncReplicasStructureWarning"
 	NotEnoughValidSemiSyncReplicasStructureWarning                             = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
