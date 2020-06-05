@@ -1509,7 +1509,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 ) {
 	switch analysisCode {
 	// master
-	case inst.DeadMaster, inst.DeadMasterAndSomeSlaves:
+	case inst.DeadMaster, inst.DeadMasterAndSomeReplicas:
 		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
 			return checkAndRecoverGenericProblem, false
 		} else {
@@ -1524,29 +1524,29 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSomeSlaves:
+	case inst.DeadIntermediateMasterAndSomeReplicas:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
+	case inst.DeadIntermediateMasterWithSingleReplicaFailingToConnect:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
+	case inst.AllIntermediateMasterReplicasFailingToConnectOrDead:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSlaves:
+	case inst.DeadIntermediateMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	// co-master
 	case inst.DeadCoMaster:
 		return checkAndRecoverDeadCoMaster, true
-	case inst.DeadCoMasterAndSomeSlaves:
+	case inst.DeadCoMasterAndSomeReplicas:
 		return checkAndRecoverDeadCoMaster, true
 	// master, non actionable
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMaster:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
@@ -1561,7 +1561,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 
 func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	switch analysisEntry.Analysis {
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
@@ -1573,11 +1573,11 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 		go emergentlyRecordStaleBinlogCoordinates(&analysisEntry.AnalyzedInstanceKey, &analysisEntry.AnalyzedInstanceBinlogCoordinates)
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.FirstTierSlaveFailingToConnectToMaster:
+	case inst.FirstTierReplicaFailingToConnectToMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	}
 }

@@ -32,23 +32,23 @@ Detection is independent of recovery, and is always enabled. `OnFailureDetection
 Observe the following list of potential failures:
 
 * DeadMaster
-* DeadMasterAndSlaves
-* DeadMasterAndSomeSlaves
-* DeadMasterWithoutSlaves
+* DeadMasterAndReplicas
+* DeadMasterAndSomeReplicas
+* DeadMasterWithoutReplicas
 * UnreachableMasterWithLaggingReplicas
 * UnreachableMaster
 * LockedSemiSyncMaster
-* AllMasterSlavesNotReplicating
-* AllMasterSlavesNotReplicatingOrDead
+* AllMasterReplicasNotReplicating
+* AllMasterReplicasNotReplicatingOrDead
 * DeadCoMaster
-* DeadCoMasterAndSomeSlaves
+* DeadCoMasterAndSomeReplicas
 * DeadIntermediateMaster
-* DeadIntermediateMasterWithSingleSlaveFailingToConnect
-* DeadIntermediateMasterWithSingleSlave
-* DeadIntermediateMasterAndSomeSlaves
-* DeadIntermediateMasterAndSlaves
-* AllIntermediateMasterSlavesFailingToConnectOrDead
-* AllIntermediateMasterSlavesNotReplicating
+* DeadIntermediateMasterWithSingleReplicaFailingToConnect
+* DeadIntermediateMasterWithSingleReplica
+* DeadIntermediateMasterAndSomeReplicas
+* DeadIntermediateMasterAndReplicas
+* AllIntermediateMasterReplicasFailingToConnectOrDead
+* AllIntermediateMasterReplicasNotReplicating
 * UnreachableIntermediateMasterWithLaggingReplicas
 * UnreachableIntermediateMaster
 * BinlogServerFailingToConnectToMaster
@@ -62,7 +62,7 @@ Briefly looking at some examples, here is how `orchestrator` reaches failure con
 
 This makes for a potential recovery process
 
-#### `DeadMasterAndSomeSlaves`:
+#### `DeadMasterAndSomeReplicas`:
 
 1. Master MySQL access failure
 2. Some of its replicas are also unreachable
