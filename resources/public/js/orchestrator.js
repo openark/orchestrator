@@ -805,6 +805,31 @@ function normalizeInstances(instances, maintenanceList) {
   return instancesMap;
 }
 
+function formattedInterval(n) {
+    var days = Math.floor(n / 24 / 3600);
+
+    n = n % (24 * 3600) ;
+    var hours = Math.floor(n / 3600);
+
+    n = n % 3600;
+    var minutes = Math.floor(n / 60);
+
+    n = n % 60;
+    var seconds = n;
+
+    var formatted = seconds.toString(10) + "s";
+    if (days != 0 || hours != 0 || minutes != 0) {
+        formatted = minutes.toString(10) + "m " + formatted;
+    }
+    if (days != 0 || hours != 0) {
+        formatted = hours.toString(10) + "h " + formatted;
+    }
+    if (days != 0) {
+        formatted = days.toString(10) + "d " + formatted;
+    }
+
+    return formatted;
+}
 
 function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
@@ -919,9 +944,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
     }
-    var statusMessage = instance.SlaveLagSeconds.Int64 + 's lag';
+    var statusMessage = formattedInterval(instance.SlaveLagSeconds.Int64) + ' lag';
     if (indicateLastSeenInStatus) {
-      statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+      statusMessage = 'seen ' + formattedInterval(instance.SecondsSinceLastSeen.Int64) + ' ago';
     }
     var identityHtml = '';
     if (isAnonymized()) {
