@@ -1,4 +1,4 @@
-FROM golang:1.12.1
+FROM golang:1.14.4-stretch
 LABEL maintainer="openark@github.com"
 
 RUN apt-get update -q -y
