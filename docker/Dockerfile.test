@@ -1,23 +1,20 @@
-FROM golang:1.12.1
+FROM golang:1.14.4-stretch
 LABEL maintainer="openark@github.com"
 
 RUN apt-get update
-RUN apt-get install -y lsb-release
-RUN apt-get install -y rsync
-RUN apt-get install -y libaio1
-RUN apt-get install -y numactl
-RUN apt-get install -y sqlite3
+RUN apt-get install -y lsb-release rsync libaio1 numactl sqlite3
 RUN rm -rf /var/lib/apt/lists/*
 
 ENV WORKPATH /go/src/github.com/openark/orchestrator
 WORKDIR $WORKPATH
 
-RUN curl -L -O "https://github.com/github/gh-ost-ci-env/raw/master/bin/linux/dbdeployer"
-RUN curl -L -O "https://github.com/github/gh-ost-ci-env/raw/master/mysql-tarballs/5.7.21.tar.gz"
+RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/bin/linux/dbdeployer.gz"
+RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/mysql-tarballs/mysql-5.7.26.tar.xz"
+RUN gunzip ./dbdeployer.gz
 RUN chmod +x ./dbdeployer
 RUN mkdir -p ./sandbox/binary
 
-RUN ./dbdeployer unpack 5.7.21.tar.gz --unpack-version="5.7.21" --sandbox-binary $WORKPATH/sandbox/binary
+RUN ./dbdeployer unpack mysql-5.7.26.tar.xz --sandbox-binary $WORKPATH/sandbox/binary
 
 COPY . .
 

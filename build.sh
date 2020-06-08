@@ -12,7 +12,6 @@ RELEASE_VERSION=
 RELEASE_SUBVERSION=
 release_base_path=/tmp/orchestrator-release
 export RELEASE_VERSION release_base_path
-export GO15VENDOREXPERIMENT=1
 
 binary_build_path="build"
 binary_artifact="$binary_build_path/bin/orchestrator"
@@ -85,8 +84,8 @@ function precheck() {
     ok=1
   fi
 
-  if ! go version | egrep -q 'go(1\.1[234])' ; then
-    echo "go version must be 1.12 or above"
+  if ! go version | egrep -q 'go(1\.1[456])' ; then
+    echo "go version must be 1.14 or above"
     ok=1
   fi
 

@@ -1396,21 +1396,32 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 }
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
+func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	return false, nil, nil
+}
+
+// checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil
 }
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
-func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) (instance *inst.Instance, err error) {
 	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
-		return
+		return nil, nil
 	}
-	go inst.ExecuteOnTopology(func() {
-		inst.ReadTopologyInstance(instanceKey)
-		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
-	})
+	instance, err = inst.ReadTopologyInstance(instanceKey)
+	inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
+	return instance, err
 }
 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
@@ -1469,6 +1480,11 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 	}
 }
 
+func emergentlyRecordStaleBinlogCoordinates(instanceKey *inst.InstanceKey, binlogCoordinates *inst.BinlogCoordinates) {
+	err := inst.RecordStaleInstanceBinlogCoordinates(instanceKey, binlogCoordinates)
+	log.Errore(err)
+}
+
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
@@ -1493,38 +1509,44 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 ) {
 	switch analysisCode {
 	// master
-	case inst.DeadMaster, inst.DeadMasterAndSomeSlaves:
+	case inst.DeadMaster, inst.DeadMasterAndSomeReplicas:
 		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
 			return checkAndRecoverGenericProblem, false
 		} else {
 			return checkAndRecoverDeadMaster, true
 		}
+	case inst.LockedSemiSyncMaster:
+		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
+			return checkAndRecoverGenericProblem, false
+		} else {
+			return checkAndRecoverLockedSemiSyncMaster, true
+		}
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSomeSlaves:
+	case inst.DeadIntermediateMasterAndSomeReplicas:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
+	case inst.DeadIntermediateMasterWithSingleReplicaFailingToConnect:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
+	case inst.AllIntermediateMasterReplicasFailingToConnectOrDead:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSlaves:
+	case inst.DeadIntermediateMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	// co-master
 	case inst.DeadCoMaster:
 		return checkAndRecoverDeadCoMaster, true
-	case inst.DeadCoMasterAndSomeSlaves:
+	case inst.DeadCoMasterAndSomeReplicas:
 		return checkAndRecoverDeadCoMaster, true
 	// master, non actionable
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMaster:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
@@ -1539,20 +1561,23 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 
 func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	switch analysisEntry.Analysis {
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.LockedSemiSyncMasterHypothesis:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+		go emergentlyRecordStaleBinlogCoordinates(&analysisEntry.AnalyzedInstanceKey, &analysisEntry.AnalyzedInstanceBinlogCoordinates)
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.FirstTierSlaveFailingToConnectToMaster:
+	case inst.FirstTierReplicaFailingToConnectToMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	}
 }

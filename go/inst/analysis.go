@@ -27,47 +27,48 @@ type AnalysisCode string
 type StructureAnalysisCode string
 
 const (
-	NoProblem                                             AnalysisCode = "NoProblem"
-	DeadMasterWithoutSlaves                                            = "DeadMasterWithoutSlaves"
-	DeadMaster                                                         = "DeadMaster"
-	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
-	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
-	UnreachableMasterWithLaggingReplicas                               = "UnreachableMasterWithLaggingReplicas"
-	UnreachableMaster                                                  = "UnreachableMaster"
-	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
-	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
-	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
-	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
-	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
-	DeadCoMaster                                                       = "DeadCoMaster"
-	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
-	UnreachableCoMaster                                                = "UnreachableCoMaster"
-	AllCoMasterSlavesNotReplicating                                    = "AllCoMasterSlavesNotReplicating"
-	DeadIntermediateMaster                                             = "DeadIntermediateMaster"
-	DeadIntermediateMasterWithSingleSlave                              = "DeadIntermediateMasterWithSingleSlave"
-	DeadIntermediateMasterWithSingleSlaveFailingToConnect              = "DeadIntermediateMasterWithSingleSlaveFailingToConnect"
-	DeadIntermediateMasterAndSomeSlaves                                = "DeadIntermediateMasterAndSomeSlaves"
-	DeadIntermediateMasterAndSlaves                                    = "DeadIntermediateMasterAndSlaves"
-	UnreachableIntermediateMasterWithLaggingReplicas                   = "UnreachableIntermediateMasterWithLaggingReplicas"
-	UnreachableIntermediateMaster                                      = "UnreachableIntermediateMaster"
-	AllIntermediateMasterSlavesFailingToConnectOrDead                  = "AllIntermediateMasterSlavesFailingToConnectOrDead"
-	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
-	FirstTierSlaveFailingToConnectToMaster                             = "FirstTierSlaveFailingToConnectToMaster"
-	BinlogServerFailingToConnectToMaster                               = "BinlogServerFailingToConnectToMaster"
+	NoProblem                                               AnalysisCode = "NoProblem"
+	DeadMasterWithoutReplicas                                            = "DeadMasterWithoutReplicas"
+	DeadMaster                                                           = "DeadMaster"
+	DeadMasterAndReplicas                                                = "DeadMasterAndReplicas"
+	DeadMasterAndSomeReplicas                                            = "DeadMasterAndSomeReplicas"
+	UnreachableMasterWithLaggingReplicas                                 = "UnreachableMasterWithLaggingReplicas"
+	UnreachableMaster                                                    = "UnreachableMaster"
+	MasterSingleReplicaNotReplicating                                    = "MasterSingleReplicaNotReplicating"
+	MasterSingleReplicaDead                                              = "MasterSingleReplicaDead"
+	AllMasterReplicasNotReplicating                                      = "AllMasterReplicasNotReplicating"
+	AllMasterReplicasNotReplicatingOrDead                                = "AllMasterReplicasNotReplicatingOrDead"
+	LockedSemiSyncMasterHypothesis                                       = "LockedSemiSyncMasterHypothesis"
+	LockedSemiSyncMaster                                                 = "LockedSemiSyncMaster"
+	MasterWithoutReplicas                                                = "MasterWithoutReplicas"
+	DeadCoMaster                                                         = "DeadCoMaster"
+	DeadCoMasterAndSomeReplicas                                          = "DeadCoMasterAndSomeReplicas"
+	UnreachableCoMaster                                                  = "UnreachableCoMaster"
+	AllCoMasterReplicasNotReplicating                                    = "AllCoMasterReplicasNotReplicating"
+	DeadIntermediateMaster                                               = "DeadIntermediateMaster"
+	DeadIntermediateMasterWithSingleReplica                              = "DeadIntermediateMasterWithSingleReplica"
+	DeadIntermediateMasterWithSingleReplicaFailingToConnect              = "DeadIntermediateMasterWithSingleReplicaFailingToConnect"
+	DeadIntermediateMasterAndSomeReplicas                                = "DeadIntermediateMasterAndSomeReplicas"
+	DeadIntermediateMasterAndReplicas                                    = "DeadIntermediateMasterAndReplicas"
+	UnreachableIntermediateMasterWithLaggingReplicas                     = "UnreachableIntermediateMasterWithLaggingReplicas"
+	UnreachableIntermediateMaster                                        = "UnreachableIntermediateMaster"
+	AllIntermediateMasterReplicasFailingToConnectOrDead                  = "AllIntermediateMasterReplicasFailingToConnectOrDead"
+	AllIntermediateMasterReplicasNotReplicating                          = "AllIntermediateMasterReplicasNotReplicating"
+	FirstTierReplicaFailingToConnectToMaster                             = "FirstTierReplicaFailingToConnectToMaster"
+	BinlogServerFailingToConnectToMaster                                 = "BinlogServerFailingToConnectToMaster"
 )
 
 const (
-	StatementAndMixedLoggingSlavesStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
-	StatementAndRowLoggingSlavesStructureWarning                             = "StatementAndRowLoggingSlavesStructureWarning"
-	MixedAndRowLoggingSlavesStructureWarning                                 = "MixedAndRowLoggingSlavesStructureWarning"
-	MultipleMajorVersionsLoggingSlavesStructureWarning                       = "MultipleMajorVersionsLoggingSlavesStructureWarning"
-	NoLoggingReplicasStructureWarning                                        = "NoLoggingReplicasStructureWarning"
-	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
-	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
-	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
-	NoValidSemiSyncReplicasStructureWarning                                  = "NoValidSemiSyncReplicasStructureWarning"
-	NotEnoughValidSemiSyncReplicasStructureWarning                           = "NotEnoughValidSemiSyncReplicasStructureWarning"
+	StatementAndMixedLoggingReplicasStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingReplicasStructureWarning"
+	StatementAndRowLoggingReplicasStructureWarning                             = "StatementAndRowLoggingReplicasStructureWarning"
+	MixedAndRowLoggingReplicasStructureWarning                                 = "MixedAndRowLoggingReplicasStructureWarning"
+	MultipleMajorVersionsLoggingReplicasStructureWarning                       = "MultipleMajorVersionsLoggingReplicasStructureWarning"
+	NoLoggingReplicasStructureWarning                                          = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                         = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                                 = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                          = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                          = "NoWriteableMasterStructureWarning"
+	NotEnoughValidSemiSyncReplicasStructureWarning                             = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -118,6 +119,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceDataCenter                string
 	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
+	AnalyzedInstanceBinlogCoordinates         BinlogCoordinates
 	IsMaster                                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool
@@ -134,7 +136,7 @@ type ReplicationAnalysis struct {
 	Description                               string
 	StructureAnalysis                         []StructureAnalysisCode
 	IsDowntimed                               bool
-	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterSlavesNotReplicating)
+	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterReplicasNotReplicating)
 	DowntimeEndTimestamp                      string
 	DowntimeRemainingSeconds                  int
 	IsBinlogServer                            bool
@@ -143,6 +145,9 @@ type ReplicationAnalysis struct {
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
 	SemiSyncMasterEnabled                     bool
+	SemiSyncMasterStatus                      bool
+	SemiSyncMasterWaitForReplicaCount         uint
+	SemiSyncMasterClients                     uint
 	CountSemiSyncReplicasEnabled              uint
 	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint

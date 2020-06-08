@@ -55,7 +55,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
+	args := sqlutils.Args(config.Config.ReasonableReplicationLagSeconds, ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
 
 	if config.Config.ReduceReplicationAnalysisCount {
@@ -97,7 +97,17 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
-		        MIN(master_instance.cluster_name) AS cluster_name,
+						MIN(master_instance.cluster_name) AS cluster_name,
+						MIN(master_instance.binary_log_file) AS binary_log_file,
+		        MIN(master_instance.binary_log_pos) AS binary_log_pos,
+						MIN(
+							IFNULL(
+								master_instance.binary_log_file = database_instance_stale_binlog_coordinates.binary_log_file
+								AND master_instance.binary_log_pos = database_instance_stale_binlog_coordinates.binary_log_pos
+								AND database_instance_stale_binlog_coordinates.first_seen < NOW() - interval ? second,
+								0
+							)
+						) AS is_stale_binlog_coordinates,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(IFNULL(cluster_domain_name.domain_name, master_instance.cluster_name)) AS cluster_domain,
 		        MIN(
@@ -157,6 +167,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 						MIN(
 				    		master_instance.semi_sync_master_wait_for_slave_count
 				    	) AS semi_sync_master_wait_for_slave_count,
+						MIN(
+							master_instance.semi_sync_master_clients
+						) AS semi_sync_master_clients,
+						MIN(
+							master_instance.semi_sync_master_status
+						) AS semi_sync_master_status,
 						SUM(
 								replica_instance.is_co_master
 							) AS count_co_master_replicas,
@@ -238,6 +254,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
 							AND master_instance.port = database_instance_maintenance.port
 							AND database_instance_maintenance.maintenance_active = 1)
+					LEFT JOIN
+						database_instance_stale_binlog_coordinates ON (
+							master_instance.hostname = database_instance_stale_binlog_coordinates.hostname
+							AND master_instance.port = database_instance_stale_binlog_coordinates.port
+						)
           LEFT JOIN
 		        database_instance_downtime as master_downtime ON (master_instance.hostname = master_downtime.hostname
 							AND master_instance.port = master_downtime.port
@@ -278,6 +299,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
 		a.AnalyzedInstanceRegion = m.GetString("region")
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
+		a.AnalyzedInstanceBinlogCoordinates = BinlogCoordinates{
+			LogFile: m.GetString("binary_log_file"),
+			LogPos:  m.GetInt64("binary_log_pos"),
+			Type:    BinaryLog,
+		}
+		isStaleBinlogCoordinates := m.GetBool("is_stale_binlog_coordinates")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.ClusterDetails.ClusterDomain = m.GetString("cluster_domain")
@@ -300,17 +327,19 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.SlaveHosts = *NewInstanceKeyMap()
 		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
-		countValidOracleGTIDSlaves := m.GetUint("count_valid_oracle_gtid_replicas")
-		a.OracleGTIDImmediateTopology = countValidOracleGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
-		countValidMariaDBGTIDSlaves := m.GetUint("count_valid_mariadb_gtid_replicas")
-		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
-		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_replicas")
-		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidOracleGTIDReplicas := m.GetUint("count_valid_oracle_gtid_replicas")
+		a.OracleGTIDImmediateTopology = countValidOracleGTIDReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidMariaDBGTIDReplicas := m.GetUint("count_valid_mariadb_gtid_replicas")
+		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
+		countValidBinlogServerReplicas := m.GetUint("count_valid_binlog_server_replicas")
+		a.BinlogServerImmediateTopology = countValidBinlogServerReplicas == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
 		a.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+		a.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
 		a.CountSemiSyncReplicasEnabled = m.GetUint("count_semi_sync_replicas")
-		countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
-		semiSyncMasterWaitForReplicaCount := m.GetUint("semi_sync_master_wait_for_slave_count")
+		// countValidSemiSyncReplicasEnabled := m.GetUint("count_valid_semi_sync_replicas")
+		a.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
+		a.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
@@ -336,7 +365,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			}
 		}
 		if a.IsMaster && !a.LastCheckValid && a.CountReplicas == 0 {
-			a.Analysis = DeadMasterWithoutSlaves
+			a.Analysis = DeadMasterWithoutReplicas
 			a.Description = "Master cannot be reached by orchestrator and has no slave"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -344,11 +373,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadMasterAndSlaves
+			a.Analysis = DeadMasterAndReplicas
 			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadMasterAndSomeSlaves
+			a.Analysis = DeadMasterAndSomeReplicas
 			a.Description = "Master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
@@ -359,20 +388,29 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
+		} else if a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount {
+			if isStaleBinlogCoordinates {
+				a.Analysis = LockedSemiSyncMaster
+				a.Description = "Semi sync master is locked since it doesn't get enough replica acknowledgements"
+			} else {
+				a.Analysis = LockedSemiSyncMasterHypothesis
+				a.Description = "Semi sync master seems to be locked, more samplings needed to validate"
+			}
+			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = MasterSingleSlaveNotReplicating
+			a.Analysis = MasterSingleReplicaNotReplicating
 			a.Description = "Master is reachable but its single slave is not replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == 0 {
-			a.Analysis = MasterSingleSlaveDead
+			a.Analysis = MasterSingleReplicaDead
 			a.Description = "Master is reachable but its single slave is dead"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllMasterSlavesNotReplicating
+			a.Analysis = AllMasterReplicasNotReplicating
 			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllMasterSlavesNotReplicatingOrDead
+			a.Analysis = AllMasterReplicasNotReplicatingOrDead
 			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -380,7 +418,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Co-master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadCoMasterAndSomeSlaves
+			a.Analysis = DeadCoMasterAndSomeReplicas
 			a.Description = "Co-master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
@@ -388,15 +426,15 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Co-master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
 		} else if a.IsCoMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllCoMasterSlavesNotReplicating
+			a.Analysis = AllCoMasterReplicasNotReplicating
 			a.Description = "Co-master is reachable but none of its replicas is replicating"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountReplicasFailingToConnectToMaster == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterWithSingleSlaveFailingToConnect
+			a.Analysis = DeadIntermediateMasterWithSingleReplicaFailingToConnect
 			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is failing to connect"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas == 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterWithSingleSlave
+			a.Analysis = DeadIntermediateMasterWithSingleReplica
 			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is not replicating"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
@@ -404,11 +442,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterAndSomeSlaves
+			a.Analysis = DeadIntermediateMasterAndSomeReplicas
 			a.Description = "Intermediate master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 {
-			a.Analysis = DeadIntermediateMasterAndSlaves
+			a.Analysis = DeadIntermediateMasterAndReplicas
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
@@ -425,11 +463,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			// or completely dead.
 			// Must have at least two replicas to reach such conclusion -- do note that the intermediate master is still
 			// reachable to orchestrator, so we base our conclusion on replicas only at this point.
-			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
+			a.Analysis = AllIntermediateMasterReplicasFailingToConnectOrDead
 			a.Description = "Intermediate master is reachable but all of its replicas are failing to connect"
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
-			a.Analysis = AllIntermediateMasterSlavesNotReplicating
+			a.Analysis = AllIntermediateMasterReplicasNotReplicating
 			a.Description = "Intermediate master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
@@ -437,12 +475,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Description = "Binlog server is unable to connect to its master"
 			//
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
-			a.Analysis = FirstTierSlaveFailingToConnectToMaster
+			a.Analysis = FirstTierReplicaFailingToConnectToMaster
 			a.Description = "1st tier slave (directly replicating from topology master) is unable to connect to the master"
 			//
 		}
 		//		 else if a.IsMaster && a.CountReplicas == 0 {
-		//			a.Analysis = MasterWithoutSlaves
+		//			a.Analysis = MasterWithoutReplicas
 		//			a.Description = "Master has no replicas"
 		//		}
 
@@ -460,16 +498,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			}
 			if a.CountReplicas == a.CountDowntimedReplicas {
 				switch a.Analysis {
-				case AllMasterSlavesNotReplicating,
-					AllMasterSlavesNotReplicatingOrDead,
-					MasterSingleSlaveDead,
-					AllCoMasterSlavesNotReplicating,
-					DeadIntermediateMasterWithSingleSlave,
-					DeadIntermediateMasterWithSingleSlaveFailingToConnect,
-					DeadIntermediateMasterAndSlaves,
-					DeadIntermediateMasterAndSomeSlaves,
-					AllIntermediateMasterSlavesFailingToConnectOrDead,
-					AllIntermediateMasterSlavesNotReplicating:
+				case AllMasterReplicasNotReplicating,
+					AllMasterReplicasNotReplicatingOrDead,
+					MasterSingleReplicaDead,
+					AllCoMasterReplicasNotReplicating,
+					DeadIntermediateMasterWithSingleReplica,
+					DeadIntermediateMasterWithSingleReplicaFailingToConnect,
+					DeadIntermediateMasterAndReplicas,
+					DeadIntermediateMasterAndSomeReplicas,
+					AllIntermediateMasterReplicasFailingToConnectOrDead,
+					AllIntermediateMasterReplicasNotReplicating:
 					a.IsReplicasDowntimed = true
 					a.SkippableDueToDowntime = true
 				}
@@ -494,16 +532,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, NoFailoverSupportStructureWarning)
 			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountMixedBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountMixedBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingReplicasStructureWarning)
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlavesStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingReplicasStructureWarning)
 			}
 
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
@@ -517,13 +555,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
 			}
 
-			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled == 0 {
-				a.StructureAnalysis = append(a.StructureAnalysis, NoValidSemiSyncReplicasStructureWarning)
-			}
-			if a.IsMaster && a.SemiSyncMasterEnabled && countValidSemiSyncReplicasEnabled > 0 && countValidSemiSyncReplicasEnabled < semiSyncMasterWaitForReplicaCount {
+			if a.IsMaster && a.SemiSyncMasterEnabled && !a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients < a.SemiSyncMasterWaitForReplicaCount {
 				a.StructureAnalysis = append(a.StructureAnalysis, NotEnoughValidSemiSyncReplicasStructureWarning)
 			}
-
 		}
 		appendAnalysis(&a)
 
