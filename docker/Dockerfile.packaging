@@ -21,14 +21,7 @@ RUN apt-get install -y ruby ruby-dev rubygems build-essential
 RUN gem install --no-ri --no-rdoc fpm
 ENV GOPATH=/tmp/go
 
-RUN apt-get install -y curl
-RUN apt-get install -y rsync
-RUN apt-get install -y gcc
-RUN apt-get install -y g++
-RUN apt-get install -y bash
-RUN apt-get install -y git
-RUN apt-get install -y tar
-RUN apt-get install -y rpm
+RUN apt-get install -y curl rsync gcc g++ bash git tar rpm
 
 RUN mkdir -p $GOPATH/src/github.com/openark/orchestrator
 WORKDIR $GOPATH/src/github.com/openark/orchestrator
