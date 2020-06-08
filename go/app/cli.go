@@ -26,14 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/agent"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/logic"
-	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
+	"github.com/openark/orchestrator/go/agent"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/logic"
+	"github.com/openark/orchestrator/go/process"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -1508,7 +1508,23 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey != nil {
 				validateInstanceIsFound(destinationKey)
 			}
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+			fmt.Println(*promotedMasterCoordinates)
+			log.Debugf("Promoted %+v as new master. Binlog coordinates at time of promotion: %+v", topologyRecovery.SuccessorKey, *promotedMasterCoordinates)
+		}
+	case registerCliCommand("graceful-master-takeover-auto", "Recovery", `Gracefully promote a new master. orchestrator will attempt to pick the promoted replica automatically`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			// destinationKey doesn't _have_ to be specified: if unspecified, orchestrator will auto-deduce a replica.
+			// but if specified, then that's the replica to promote, and it must be valid.
+			if destinationKey != nil {
+				validateInstanceIsFound(destinationKey)
+			}
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}

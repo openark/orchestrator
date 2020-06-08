@@ -1,0 +1,3 @@
+#!/bin/bash
+
+orchestrator-client -c api -path all-instances | jq -r '.[] | select(.GtidErrant != "") | .Key.Port'

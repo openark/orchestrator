@@ -1,0 +1,4 @@
+#!/bin/bash
+
+orchestrator-client -c gtid-errant-inject-empty -i 127.0.0.1:10113
+sleep 3

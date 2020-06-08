@@ -250,6 +250,7 @@ function api {
   local curl_auth_params="$(get_curl_auth_params)"
 
   path="$1"
+  raw_output="${2:-}"
 
   uri="$leader_api/$path"
   # echo $uri
@@ -281,8 +282,12 @@ function api {
   fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
-    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
-    [ "$api_details" != "null" ] && echo $api_details
+    if [ -n "$raw_output" ] ; then
+      echo $api_response
+    else
+      echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
+      [ "$api_details" != "null" ] && echo $api_details
+    fi
     exit 1
   fi
 }
@@ -329,7 +334,7 @@ function which_api {
 
 function api_call {
   assert_nonempty "path" "$api_path"
-  api "$api_path"
+  api "$api_path" "true"
   print_response
 }
 
@@ -781,6 +786,18 @@ function graceful_master_takeover {
   print_details | jq '.SuccessorKey' | print_key
 }
 
+function graceful_master_takeover_auto {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  if [ -z "$destination_hostport" ] ; then
+    # No destination given.
+    api "graceful-master-takeover-auto/${alias:-$instance}"
+  else
+    # Explicit destination (designated master) given
+    api "graceful-master-takeover-auto/${alias:-$instance}/${destination_hostport}"
+  fi
+  print_details | jq '.SuccessorKey' | print_key
+}
+
 function force_master_failover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "force-master-failover/${alias:-$instance}"
@@ -975,6 +992,7 @@ function run_command {
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
+    "graceful-master-takeover-auto") graceful_master_takeover_auto ;; # Gracefully promote a new master. orchestrator will attempt to pick the promoted replica automatically
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
     "force-master-takeover") force_master_takeover ;;         # Forcibly discard master and promote another (direct child) instance instead, even if everything is running well
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries

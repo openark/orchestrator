@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/math"
+	"github.com/openark/orchestrator/go/config"
 )
 
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
@@ -74,20 +74,26 @@ type Instance struct {
 
 	masterExecutedGtidSet string // Not exported
 
-	SlaveLagSeconds                 sql.NullInt64
-	SlaveHosts                      InstanceKeyMap
-	ClusterName                     string
-	SuggestedClusterAlias           string
-	DataCenter                      string
-	Region                          string
-	PhysicalEnvironment             string
-	ReplicationDepth                uint
-	IsCoMaster                      bool
-	HasReplicationCredentials       bool
-	ReplicationCredentialsAvailable bool
-	SemiSyncEnforced                bool
-	SemiSyncMasterEnabled           bool
-	SemiSyncReplicaEnabled          bool
+	SlaveLagSeconds                   sql.NullInt64
+	SlaveHosts                        InstanceKeyMap
+	ClusterName                       string
+	SuggestedClusterAlias             string
+	DataCenter                        string
+	Region                            string
+	PhysicalEnvironment               string
+	ReplicationDepth                  uint
+	IsCoMaster                        bool
+	HasReplicationCredentials         bool
+	ReplicationCredentialsAvailable   bool
+	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
+	SemiSyncEnforced                  bool
+	SemiSyncMasterEnabled             bool
+	SemiSyncReplicaEnabled            bool
+	SemiSyncMasterTimeout             uint
+	SemiSyncMasterWaitForReplicaCount uint
+	SemiSyncMasterStatus              bool
+	SemiSyncMasterClients             uint
+	SemiSyncReplicaStatus             bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool
@@ -512,10 +518,20 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 			extraTokens = append(extraTokens, ">>")
 		}
 		if this.UsingGTID() || this.SupportsOracleGTID {
-			extraTokens = append(extraTokens, "GTID")
+			token := "GTID"
+			if this.GtidErrant != "" {
+				token = fmt.Sprintf("%s:errant", token)
+			}
+			extraTokens = append(extraTokens, token)
 		}
 		if this.UsingPseudoGTID {
 			extraTokens = append(extraTokens, "P-GTID")
+		}
+		if this.SemiSyncMasterStatus {
+			extraTokens = append(extraTokens, "semi:master")
+		}
+		if this.SemiSyncReplicaStatus {
+			extraTokens = append(extraTokens, "semi:replica")
 		}
 		if this.IsDowntimed {
 			extraTokens = append(extraTokens, "downtimed")

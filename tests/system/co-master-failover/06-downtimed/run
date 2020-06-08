@@ -1,0 +1,1 @@
+orchestrator-client -c api -path downtimed | jq -r '.[] | select(.IsDowntimed==true and .DowntimeReason=="lost-in-recovery") | .Key.Port'

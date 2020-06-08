@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/process"
+	"github.com/openark/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/util"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -614,14 +614,6 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
-// ReadRecoveriesForClusterAlias reads open/closed recoveries by alias
-func ReadRecoveriesForClusterAlias(clusteAlias string) ([]TopologyRecovery, error) {
-	whereClause := `
-		where
-			cluster_alias=?`
-	return readRecoveries(whereClause, ``, sqlutils.Args(clusteAlias))
-}
-
 // ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
 // was promoted as result, still in active period (may be used to block further recoveries should this instance die)
 func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
@@ -673,7 +665,7 @@ func ReadRecoveryByUID(recoveryUID string) ([]TopologyRecovery, error) {
 }
 
 // ReadCRecoveries reads latest recovery entries from topology_recovery
-func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
+func ReadRecentRecoveries(clusterName string, clusterAlias string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
 	whereConditions := []string{}
 	whereClause := ""
 	args := sqlutils.Args()
@@ -683,6 +675,9 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 	if clusterName != "" {
 		whereConditions = append(whereConditions, `cluster_name=?`)
 		args = append(args, clusterName)
+	} else if clusterAlias != "" {
+		whereConditions = append(whereConditions, `cluster_alias=?`)
+		args = append(args, clusterAlias)
 	}
 	if len(whereConditions) > 0 {
 		whereClause = fmt.Sprintf("where %s", strings.Join(whereConditions, " and "))
@@ -750,23 +745,24 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 }
 
 // ReadRecentFailureDetections
-func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
+func ReadRecentFailureDetections(clusterAlias string, page int) ([]TopologyRecovery, error) {
+	whereClause := ""
+	args := sqlutils.Args()
+	if clusterAlias != "" {
+		whereClause = `where cluster_alias = ?`
+		args = append(args, clusterAlias)
+	}
 	limit := `
 		limit ?
 		offset ?`
-	return readFailureDetections(``, limit, sqlutils.Args(config.AuditPageSize, page*config.AuditPageSize))
+	args = append(args, config.AuditPageSize, page*config.AuditPageSize)
+	return readFailureDetections(whereClause, limit, args)
 }
 
 // ReadFailureDetection
 func ReadFailureDetection(detectionId int64) ([]TopologyRecovery, error) {
 	whereClause := `where detection_id = ?`
 	return readFailureDetections(whereClause, ``, sqlutils.Args(detectionId))
-}
-
-// ReadFailureDetectionsForClusterAlias
-func ReadFailureDetectionsForClusterAlias(clusterAlias string) ([]TopologyRecovery, error) {
-	whereClause := `where cluster_alias = ?`
-	return readFailureDetections(whereClause, ``, sqlutils.Args(clusterAlias))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)

@@ -32,15 +32,15 @@ import (
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
 
-	"github.com/github/orchestrator/go/agent"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/discovery"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/logic"
-	"github.com/github/orchestrator/go/metrics/query"
-	"github.com/github/orchestrator/go/process"
-	orcraft "github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/agent"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/discovery"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/logic"
+	"github.com/openark/orchestrator/go/metrics/query"
+	"github.com/openark/orchestrator/go/process"
+	orcraft "github.com/openark/orchestrator/go/raft"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -2428,7 +2428,7 @@ func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r rende
 	r.JSON(http.StatusOK, aggregated)
 }
 
-// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
+// Agents provides complete list of registered agents (See https://github.com/openark/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -2961,10 +2961,11 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	config.Reload()
+	extraConfigFile := req.URL.Query().Get("config")
+	config.Reload(extraConfigFile)
 	inst.AuditOperation("reload-configuration", nil, "Triggered via API")
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded")})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded"), Details: extraConfigFile})
 }
 
 // ReplicationAnalysis retuens list of issues
@@ -3063,7 +3064,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 }
 
 // GracefulMasterTakeover gracefully fails over a master onto its single replica.
-func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, auto bool) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -3075,17 +3076,28 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 	}
 	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
 	// designatedKey may be empty/invalid
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey, auto)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
 	}
-	if topologyRecovery.SuccessorKey == nil {
+	if topologyRecovery == nil || topologyRecovery.SuccessorKey == nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: "graceful-master-takeover: no successor promoted", Details: topologyRecovery})
 		return
 	}
-
 	Respond(r, &APIResponse{Code: OK, Message: "graceful-master-takeover: successor promoted", Details: topologyRecovery})
+}
+
+// GracefulMasterTakeover gracefully fails over a master, either:
+// - onto its single replica, or
+// - onto a replica indicated by the user
+func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.gracefulMasterTakeover(params, r, req, user, false)
+}
+
+// GracefulMasterTakeoverAuto gracefully fails over a master onto a replica of orchestrator's choosing
+func (this *HttpAPI) GracefulMasterTakeoverAuto(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.gracefulMasterTakeover(params, r, req, user, true)
 }
 
 // ForceMasterFailover fails over a master (even if there's no particular problem with the master)
@@ -3196,14 +3208,12 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 
 	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
 		audits, err = logic.ReadFailureDetection(detectionId)
-	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
-		audits, err = logic.ReadFailureDetectionsForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
 			page = 0
 		}
-		audits, err = logic.ReadRecentFailureDetections(page)
+		audits, err = logic.ReadRecentFailureDetections(params["clusterAlias"], page)
 	}
 
 	if err != nil {
@@ -3248,15 +3258,14 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 		audits, err = logic.ReadRecoveryByUID(recoveryUID)
 	} else if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
 		audits, err = logic.ReadRecovery(recoveryId)
-	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
-		audits, err = logic.ReadRecoveriesForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
 			page = 0
 		}
 		unacknowledgedOnly := (req.URL.Query().Get("unacknowledged") == "true")
-		audits, err = logic.ReadRecentRecoveries(params["clusterName"], unacknowledgedOnly, page)
+
+		audits, err = logic.ReadRecentRecoveries(params["clusterName"], params["clusterAlias"], unacknowledgedOnly, page)
 	}
 
 	if err != nil {
@@ -3736,6 +3745,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:host/:port", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:clusterHint", this.GracefulMasterTakeoverAuto)
+	this.registerAPIRequest(m, "graceful-master-takeover-auto/:clusterHint/:designatedHost/:designatedPort", this.GracefulMasterTakeoverAuto)
 	this.registerAPIRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-failover/:clusterHint", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-takeover/:clusterHint/:designatedHost/:designatedPort", this.ForceMasterTakeover)
@@ -3746,6 +3759,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
+	this.registerAPIRequest(m, "audit-failure-detection/alias/:clusterAlias/:page", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	this.registerAPIRequest(m, "audit-recovery", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/:page", this.AuditRecovery)
@@ -3754,6 +3768,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
+	this.registerAPIRequest(m, "audit-recovery/alias/:clusterAlias/:page", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery-steps/:uid", this.AuditRecoverySteps)
 	this.registerAPIRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerAPIRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)

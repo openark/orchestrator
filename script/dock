@@ -1,30 +1,44 @@
 #!/bin/bash
 
 # Usage:
-# dock <test|alpine|packages> [arg]
+# dock <test|alpine|pkg|hub|system> [arg]
 #   dock test:                build orchestrator & run unit and integration tests
-#   docker alpine:            build and run orchestrator on alpine linux
-#   docker pkg [target-path]: build orchestrator release packages and copy to target path (default path: /tmp/orchestrator-release)
+#   dock alpine:              build and run orchestrator on alpine linux
+#   dock hub:                 build hub.docker.com image with latest tag
+#   dock pkg [target-path]:   build orchestrator release packages and copy to target path (default path: /tmp/orchestrator-release)
+#   dock system:              create and run a system test environment
 
 command="$1"
 
 case "$command" in
   "test")
     docker_target="orchestrator-test"
-    docker build . -f Dockerfile.test -t "${docker_target}" && docker run --rm -it "${docker_target}:latest"
+    docker build . -f docker/Dockerfile.test -t "${docker_target}" && docker run --rm -it "${docker_target}:latest"
     ;;
   "alpine")
     docker_target="orchestrator-alpine"
-    docker build . -f Dockerfile -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
+    docker build . -f docker/Dockerfile -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
+    ;;
+  "hub")
+    tag="$(git describe --tags --abbrev=0)"
+    if [ -z "$tag" ] ; then
+      echo "Cannot find latest tag"
+      exit 1
+    fi
+    docker build . -f docker/Dockerfile -t "openarkcode/orchestrator:${tag}"
     ;;
   "pkg")
     packages_path="${2:-/tmp/orchestrator-release}"
     docker_target="orchestrator-packaging"
-    docker build . -f Dockerfile.packaging -t "${docker_target}" && docker run --rm -it -v "${packages_path}:/tmp/pkg" "${docker_target}:latest" bash -c 'find /tmp/orchestrator-release/ -maxdepth 1 -type f | xargs cp -t /tmp/pkg'
+    docker build . -f docker/Dockerfile.packaging -t "${docker_target}" && docker run --rm -it -v "${packages_path}:/tmp/pkg" "${docker_target}:latest" bash -c 'find /tmp/orchestrator-release/ -maxdepth 1 -type f | xargs cp -t /tmp/pkg'
     echo "packages generated on ${packages_path}:"
     ls -l "${packages_path}"
     ;;
+  "system")
+    docker_target="orchestrator-system"
+    docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
+    ;;
   *)
-    >&2 echo "Usage: dock dock <test|alpine|packages> [arg]"
+    >&2 echo "Usage: dock dock <test|alpine|packages|system> [arg]"
     exit 1
 esac

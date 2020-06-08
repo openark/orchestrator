@@ -45,7 +45,7 @@
 			<button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
 				<span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span> <span class="icon-bar"></span> <span class="icon-bar"></span>
 			</button>
-			<a class="navbar-brand orchestrator-brand" href="https://github.com/github/orchestrator">orchestrator</a>
+			<a class="navbar-brand orchestrator-brand" href="https://github.com/openark/orchestrator">orchestrator</a>
 
 		</div>
 		<div class="collapse navbar-collapse">
@@ -60,8 +60,8 @@
                         </a>
 					<ul class="dropdown-menu">
 						<li><a href="{{.prefix}}/web/about">About</a></li>
-						<li><a href="https://github.com/github/orchestrator/wiki/Orchestrator-Manual" target="_blank">Manual</a></li>
-						<li><a href="https://github.com/github/orchestrator/wiki/FAQ" target="_blank">FAQ</a></li>
+						<li><a href="https://github.com/openark/orchestrator/wiki/Orchestrator-Manual" target="_blank">Manual</a></li>
+						<li><a href="https://github.com/openark/orchestrator/wiki/FAQ" target="_blank">FAQ</a></li>
 						<li><a href="{{.prefix}}/web/keep-calm">Keep calm</a></li>
 						<li role="presentation" class="divider"></li>
 						<li><a href="{{.prefix}}/web/status">Status</a></li>
@@ -191,27 +191,18 @@
 					<div class="modal-footer">
 						<button type="button" class="btn btn-success" data-btn="recover" title="Recover from failure"><span class="glyphicon glyphicon-heart"></span> Recover</button>
 						<button type="button" class="btn alert-success" data-btn="refresh-instance" title="Refresh instance status now"><span class="glyphicon glyphicon-refresh"></span> Refresh</button>
-						<button type="button" class="btn btn-success" data-btn="start-slave"><span class="glyphicon glyphicon-play"></span> Start slave</button>
-						<button type="button" class="btn btn-warning" data-btn="restart-slave"><span class="glyphicon glyphicon-repeat"></span> Restart slave</button>
+						<button type="button" class="btn btn-danger" data-btn="stop-replica"><span class="glyphicon glyphicon-stop"></span> Stop replication</button>
+						<button type="button" class="btn btn-success" data-btn="start-replica"><span class="glyphicon glyphicon-play"></span> Start replication</button>
+						<button type="button" class="btn btn-warning" data-btn="restart-replica"><span class="glyphicon glyphicon-repeat"></span> Restart replication</button>
 						<button type="button" class="btn btn-danger" data-btn="detach-replica" title="Corrupt replica coordinates such that it fails to replicate. Reversible via reattach-replica"><span class="glyphicon glyphicon-remove-sign"></span> Detach replica</button>
 						<button type="button" class="btn btn-success" data-btn="reattach-replica" title="Restore replica coordinates corrupted by detach-replica"><span class="glyphicon glyphicon-ok-sign"></span> Reattach replica</button>
 
-						<div class="btn-group" data-btn-group="stop-slave">
-							<button type="button" class="btn btn-danger" data-btn="stop-slave" data-grouped="true">Stop slave</button>
-							<button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown">
-								<span class="caret"></span> <span class="sr-only">Toggle Dropdown</span>
-							</button>
-							<ul class="dropdown-menu" role="menu">
-								<li><a href="#" data-btn="stop-slave">Normal</a></li>
-								<li><a href="#" data-btn="stop-slave-nice">Nicely</a></li>
-							</ul>
-						</div>
 						<button type="button" class="btn btn-danger" data-btn="skip-query" title="Skip a single query and resume replication">Skip query</button>
 						<button type="button" class="btn btn-warning" data-btn="set-read-only"><span class="glyphicon glyphicon-eye-open"></span> Set read-only</button>
 						<button type="button" class="btn btn-warning" data-btn="set-writeable"><span class="glyphicon glyphicon-pencil"></span> Set writeable</button>
 						<button type="button" class="btn btn-warning" data-btn="reattach-replica-master-host" title="Reattach woth detached master">
 							</span> Reattach</button>
-						<button type="button" class="btn btn-danger" data-btn="reset-slave" title="Make this replica forget its master and stop replicating">Reset slave</button>
+						<button type="button" class="btn btn-danger" data-btn="reset-replica" title="Make this replica forget its master and stop replicating">Reset replica</button>
 						<button type="button" class="btn btn-info" data-btn="take-siblings" title="Take siblings of this replica">Take siblings</button>
 						<button type="button" class="btn btn-success" data-btn="enable-gtid"><span class="glyphicon glyphicon-globe"></span> Enable</button>
 						<button type="button" class="btn btn-danger" data-btn="disable-gtid"><span class="glyphicon glyphicon-remove"></span> Disable</button>

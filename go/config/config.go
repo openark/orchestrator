@@ -47,7 +47,6 @@ const (
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 7
 	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
@@ -57,6 +56,7 @@ const (
 	PseudoGTIDSchema                             = "_pseudo_gtid_"
 	PseudoGTIDIntervalSeconds                    = 5
 	PseudoGTIDExpireMinutes                      = 60
+	StaleInstanceCoordinatesExpireSeconds        = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
 )
@@ -70,7 +70,6 @@ var deprecatedConfigurationVariables = []string{
 	"DiscoveryPollSeconds",
 	"ActiveNodeExpireSeconds",
 	"AuditPageSize",
-	"AuditPurgeDays",
 	"SlaveStartPostWaitMilliseconds",
 	"MySQLTopologyMaxPoolConnections",
 	"MaintenancePurgeDays",
@@ -163,6 +162,7 @@ type Configuration struct {
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                              bool     // If true, audit messages are written to syslog
 	AuditToBackendDB                           bool     // If true, audit messages are written to the backend DB's `audit` table (default: true)
+	AuditPurgeDays                             uint     // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
@@ -246,6 +246,7 @@ type Configuration struct {
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	FailMasterPromotionOnLagMinutes            uint              // when > 0, fail a master promotion if the candidate replica is lagging >= configured number of minutes.
 	FailMasterPromotionIfSQLThreadNotUpToDate  bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
 	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
@@ -266,6 +267,7 @@ type Configuration struct {
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
+	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -315,7 +317,7 @@ func newConfiguration() *Configuration {
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
 		InstanceFlushIntervalMilliseconds:          100,
-		SkipMaxScaleCheck:                          false,
+		SkipMaxScaleCheck:                          true,
 		UnseenInstanceForgetHours:                  240,
 		SnapshotTopologiesIntervalHours:            0,
 		DiscoverByShowSlaveHosts:                   false,
@@ -339,6 +341,7 @@ func newConfiguration() *Configuration {
 		AuditLogFile:                               "",
 		AuditToSyslog:                              false,
 		AuditToBackendDB:                           false,
+		AuditPurgeDays:                             7,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "",
@@ -413,6 +416,7 @@ func newConfiguration() *Configuration {
 		PreventCrossRegionMasterFailover:           false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
+		FailMasterPromotionOnLagMinutes:            0,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
 		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
@@ -430,6 +434,7 @@ func newConfiguration() *Configuration {
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",
+		MaxConcurrentReplicaOperations:             5,
 	}
 }
 
@@ -494,12 +499,14 @@ func (this *Configuration) postReadAdjustments() error {
 		if this.ReplicationLagQuery != "" && this.SlaveLagQuery != "" && this.ReplicationLagQuery != this.SlaveLagQuery {
 			return fmt.Errorf("config's ReplicationLagQuery and SlaveLagQuery are synonyms and cannot both be defined")
 		}
-		// Make sure both are turned identical:
-		if this.SlaveLagQuery != "" {
+		// ReplicationLagQuery is the replacement param to SlaveLagQuery
+		if this.ReplicationLagQuery == "" {
 			this.ReplicationLagQuery = this.SlaveLagQuery
-		} else {
-			this.SlaveLagQuery = this.ReplicationLagQuery
 		}
+		// We reset SlaveLagQuery because we want to support multiple config file loading;
+		// One of the next config files may indicate a new value for ReplicationLagQuery.
+		// If we do not reset SlaveLagQuery, then the two will have a conflict.
+		this.SlaveLagQuery = ""
 	}
 
 	{
@@ -515,6 +522,9 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.FailMasterPromotionIfSQLThreadNotUpToDate && this.DelayMasterPromotionIfSQLThreadNotUpToDate {
 		return fmt.Errorf("Cannot have both FailMasterPromotionIfSQLThreadNotUpToDate and DelayMasterPromotionIfSQLThreadNotUpToDate enabled")
+	}
+	if this.FailMasterPromotionOnLagMinutes > 0 && this.ReplicationLagQuery == "" {
+		return fmt.Errorf("nonzero FailMasterPromotionOnLagMinutes requires ReplicationLagQuery to be set")
 	}
 	{
 		if this.PostponeReplicaRecoveryOnLagMinutes != 0 && this.PostponeSlaveRecoveryOnLagMinutes != 0 &&
@@ -596,18 +606,22 @@ func (this *Configuration) IsMySQL() bool {
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
 func read(fileName string) (*Configuration, error) {
+	if fileName == "" {
+		return Config, fmt.Errorf("Empty file name")
+	}
 	file, err := os.Open(fileName)
+	if err != nil {
+		return Config, err
+	}
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(Config)
 	if err == nil {
-		decoder := json.NewDecoder(file)
-		err := decoder.Decode(Config)
-		if err == nil {
-			log.Infof("Read config: %s", fileName)
-		} else {
-			log.Fatal("Cannot read config file:", fileName, err)
-		}
-		if err := Config.postReadAdjustments(); err != nil {
-			log.Fatale(err)
-		}
+		log.Infof("Read config: %s", fileName)
+	} else {
+		log.Fatal("Cannot read config file:", fileName, err)
+	}
+	if err := Config.postReadAdjustments(); err != nil {
+		log.Fatale(err)
 	}
 	return Config, err
 }
@@ -633,8 +647,11 @@ func ForceRead(fileName string) *Configuration {
 }
 
 // Reload re-reads configuration from last used files
-func Reload() *Configuration {
+func Reload(extraFileNames ...string) *Configuration {
 	for _, fileName := range readFileNames {
+		read(fileName)
+	}
+	for _, fileName := range extraFileNames {
 		read(fileName)
 	}
 	return Config

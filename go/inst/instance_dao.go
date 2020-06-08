@@ -36,13 +36,13 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/sjmudd/stopwatch"
 
-	"github.com/github/orchestrator/go/attributes"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/metrics/query"
-	"github.com/github/orchestrator/go/util"
+	"github.com/openark/orchestrator/go/attributes"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/metrics/query"
+	"github.com/openark/orchestrator/go/util"
 )
 
 const (
@@ -145,7 +145,7 @@ func ExecDBWriteFunc(f func() error) error {
 func ExpireTableData(tableName string, timestampColumn string) error {
 	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		_, err := db.ExecOrchestrator(query, config.Config.AuditPurgeDays)
 		return err
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -422,12 +422,39 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
-					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+				semiSyncMasterPluginLoaded := false
+				semiSyncReplicaPluginLoaded := false
+				err := sqlutils.QueryRowsMap(db, "show global variables like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "rpl_semi_sync_master_enabled" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
-					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+						semiSyncMasterPluginLoaded = true
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
+						instance.SemiSyncMasterTimeout = m.GetUint("Value")
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
+						instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
+					} else if m.GetString("Variable_name") == "rpl_semi_sync_slave_enabled" {
 						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
+						semiSyncReplicaPluginLoaded = true
 					}
+					return nil
+				})
+				instance.SemiSyncAvailable = (semiSyncMasterPluginLoaded && semiSyncReplicaPluginLoaded)
+				errorChan <- err
+			}()
+		}
+		{
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+						instance.SemiSyncMasterStatus = (m.GetString("Value") == "ON")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_master_clients" {
+						instance.SemiSyncMasterClients = m.GetUint("Value")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+						instance.SemiSyncReplicaStatus = (m.GetString("Value") == "ON")
+					}
+
 					return nil
 				})
 				errorChan <- err
@@ -604,7 +631,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 				replicaKey, err := NewResolveInstanceKey(host, port)
 				if err == nil && replicaKey.IsValid() {
-					instance.AddReplicaKey(replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(replicaKey)
+					}
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -632,7 +661,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
 					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-					instance.AddReplicaKey(&replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(&replicaKey)
+					}
 					return err
 				})
 
@@ -1106,8 +1137,14 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
+	instance.SemiSyncAvailable = m.GetBool("semi_sync_available")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+	instance.SemiSyncMasterTimeout = m.GetUint("semi_sync_master_timeout")
+	instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
+	instance.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
+	instance.SemiSyncMasterClients = m.GetUint("semi_sync_master_clients")
+	instance.SemiSyncReplicaStatus = m.GetBool("semi_sync_replica_status")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -2393,8 +2430,14 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"has_replication_credentials",
 		"allow_tls",
 		"semi_sync_enforced",
+		"semi_sync_available",
 		"semi_sync_master_enabled",
+		"semi_sync_master_timeout",
+		"semi_sync_master_wait_for_slave_count",
 		"semi_sync_replica_enabled",
+		"semi_sync_master_status",
+		"semi_sync_master_clients",
+		"semi_sync_replica_status",
 		"instance_alias",
 		"last_discovery_latency",
 	}
@@ -2473,8 +2516,14 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.HasReplicationCredentials)
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.SemiSyncAvailable)
 		args = append(args, instance.SemiSyncMasterEnabled)
+		args = append(args, instance.SemiSyncMasterTimeout)
+		args = append(args, instance.SemiSyncMasterWaitForReplicaCount)
 		args = append(args, instance.SemiSyncReplicaEnabled)
+		args = append(args, instance.SemiSyncMasterStatus)
+		args = append(args, instance.SemiSyncMasterClients)
+		args = append(args, instance.SemiSyncReplicaStatus)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
@@ -2812,19 +2861,21 @@ func RecordInstanceCoordinatesHistory() error {
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-    	insert into
-    		database_instance_coordinates_history (
+			insert into
+				database_instance_coordinates_history (
 					hostname, port,	last_seen, recorded_timestamp,
 					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 				)
-    	select
-    		hostname, port, last_seen, NOW(),
+			select
+				hostname, port, last_seen, NOW(),
 				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 			from
 				database_instance
 			where
-				binary_log_file != ''
-				OR relay_log_file != ''
+				(
+					binary_log_file != ''
+					or relay_log_file != ''
+				)
 				`,
 		)
 		return log.Errore(err)
@@ -2854,6 +2905,55 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 		return nil
 	})
 	return selfCoordinates, relayLogCoordinates, err
+}
+
+// RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances
+func RecordStaleInstanceBinlogCoordinates(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinates) error {
+	args := sqlutils.Args(
+		instanceKey.Hostname, instanceKey.Port,
+		binlogCoordinates.LogFile, binlogCoordinates.LogPos,
+	)
+	_, err := db.ExecOrchestrator(`
+			delete from
+				database_instance_stale_binlog_coordinates
+			where
+				hostname=? and port=?
+				and (
+					binary_log_file != ?
+					or binary_log_pos != ?
+				)
+				`,
+		args...,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	_, err = db.ExecOrchestrator(`
+			insert ignore into
+				database_instance_stale_binlog_coordinates (
+					hostname, port,	binary_log_file, binary_log_pos, first_seen
+				)
+				values (
+					?, ?, ?, ?, NOW()
+				)`,
+		args...)
+	return log.Errore(err)
+}
+
+func ExpireStaleInstanceBinlogCoordinates() error {
+	expireSeconds := config.Config.ReasonableReplicationLagSeconds * 2
+	if expireSeconds < config.StaleInstanceCoordinatesExpireSeconds {
+		expireSeconds = config.StaleInstanceCoordinatesExpireSeconds
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+					delete from database_instance_stale_binlog_coordinates
+					where first_seen < NOW() - INTERVAL ? SECOND
+					`, expireSeconds,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the

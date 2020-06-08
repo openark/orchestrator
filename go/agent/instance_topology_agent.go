@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/inst"
 )
 
 func SyncReplicaRelayLogs(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
