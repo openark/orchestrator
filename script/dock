@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage:
-# dock <test|alpine|packages|hub|system> [arg]
+# dock <test|alpine|pkg|hub|system> [arg]
 #   dock test:                build orchestrator & run unit and integration tests
 #   dock alpine:              build and run orchestrator on alpine linux
 #   dock hub:                 build hub.docker.com image with latest tag
