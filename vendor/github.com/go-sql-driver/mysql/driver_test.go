@@ -14,6 +14,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -550,6 +551,29 @@ func TestRawBytes(t *testing.T) {
 			// https://github.com/go-sql-driver/mysql/issues/765
 			// Appending to RawBytes shouldn't overwrite next RawBytes.
 			o1 = append(o1, "xyzzy"...)
+			if !bytes.Equal(v2, o2) {
+				dbt.Errorf("expected %v, got %v", v2, o2)
+			}
+		} else {
+			dbt.Errorf("no data")
+		}
+	})
+}
+
+func TestRawMessage(t *testing.T) {
+	runTests(t, dsn, func(dbt *DBTest) {
+		v1 := json.RawMessage("{}")
+		v2 := json.RawMessage("[]")
+		rows := dbt.mustQuery("SELECT ?, ?", v1, v2)
+		defer rows.Close()
+		if rows.Next() {
+			var o1, o2 json.RawMessage
+			if err := rows.Scan(&o1, &o2); err != nil {
+				dbt.Errorf("Got error: %v", err)
+			}
+			if !bytes.Equal(v1, o1) {
+				dbt.Errorf("expected %v, got %v", v1, o1)
+			}
 			if !bytes.Equal(v2, o2) {
 				dbt.Errorf("expected %v, got %v", v2, o2)
 			}
@@ -1448,7 +1472,7 @@ func TestCollation(t *testing.T) {
 		t.Skipf("MySQL server not running on %s", netAddr)
 	}
 
-	defaultCollation := "utf8_general_ci"
+	defaultCollation := "utf8mb4_general_ci"
 	testCollations := []string{
 		"",               // do not set
 		defaultCollation, // driver default
@@ -1846,7 +1870,7 @@ func TestConcurrent(t *testing.T) {
 }
 
 func testDialError(t *testing.T, dialErr error, expectErr error) {
-	RegisterDial("mydial", func(addr string) (net.Conn, error) {
+	RegisterDialContext("mydial", func(ctx context.Context, addr string) (net.Conn, error) {
 		return nil, dialErr
 	})
 
@@ -1874,7 +1898,7 @@ func TestDialNonRetryableNetErr(t *testing.T) {
 
 func TestDialTemporaryNetErr(t *testing.T) {
 	testErr := netErrorMock{temporary: true}
-	testDialError(t, testErr, driver.ErrBadConn)
+	testDialError(t, testErr, testErr)
 }
 
 // Tests custom dial functions
@@ -1884,8 +1908,9 @@ func TestCustomDial(t *testing.T) {
 	}
 
 	// our custom dial function which justs wraps net.Dial here
-	RegisterDial("mydial", func(addr string) (net.Conn, error) {
-		return net.Dial(prot, addr)
+	RegisterDialContext("mydial", func(ctx context.Context, addr string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, prot, addr)
 	})
 
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@mydial(%s)/%s?timeout=30s", user, pass, addr, dbname))
@@ -2583,7 +2608,12 @@ func TestContextCancelBegin(t *testing.T) {
 	runTests(t, dsn, func(dbt *DBTest) {
 		dbt.mustExec("CREATE TABLE test (v INTEGER)")
 		ctx, cancel := context.WithCancel(context.Background())
-		tx, err := dbt.db.BeginTx(ctx, nil)
+		conn, err := dbt.db.Conn(ctx)
+		if err != nil {
+			dbt.Fatal(err)
+		}
+		defer conn.Close()
+		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			dbt.Fatal(err)
 		}
@@ -2613,7 +2643,17 @@ func TestContextCancelBegin(t *testing.T) {
 			dbt.Errorf("expected sql.ErrTxDone or context.Canceled, got %v", err)
 		}
 
-		// Context is canceled, so cannot begin a transaction.
+		// The connection is now in an inoperable state - so performing other
+		// operations should fail with ErrBadConn
+		// Important to exercise isolation level too - it runs SET TRANSACTION ISOLATION
+		// LEVEL XXX first, which needs to return ErrBadConn if the connection's context
+		// is cancelled
+		_, err = conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+		if err != driver.ErrBadConn {
+			dbt.Errorf("expected driver.ErrBadConn, got %v", err)
+		}
+
+		// cannot begin a transaction (on a different conn) with a canceled context
 		if _, err := dbt.db.BeginTx(ctx, nil); err != context.Canceled {
 			dbt.Errorf("expected context.Canceled, got %v", err)
 		}
@@ -2937,4 +2977,228 @@ func TestValuerWithValueReceiverGivenNilValue(t *testing.T) {
 		dbt.db.Exec("INSERT INTO test VALUES (?)", (*testValuer)(nil))
 		// This test will panic on the INSERT if ConvertValue() does not check for typed nil before calling Value()
 	})
+}
+
+// TestRawBytesAreNotModified checks for a race condition that arises when a query context
+// is canceled while a user is calling rows.Scan. This is a more stringent test than the one
+// proposed in https://github.com/golang/go/issues/23519. Here we're explicitly using
+// `sql.RawBytes` to check the contents of our internal buffers are not modified after an implicit
+// call to `Rows.Close`, so Context cancellation should **not** invalidate the backing buffers.
+func TestRawBytesAreNotModified(t *testing.T) {
+	const blob = "abcdefghijklmnop"
+	const contextRaceIterations = 20
+	const blobSize = defaultBufSize * 3 / 4 // Second row overwrites first row.
+	const insertRows = 4
+
+	var sqlBlobs = [2]string{
+		strings.Repeat(blob, blobSize/len(blob)),
+		strings.Repeat(strings.ToUpper(blob), blobSize/len(blob)),
+	}
+
+	runTests(t, dsn, func(dbt *DBTest) {
+		dbt.mustExec("CREATE TABLE test (id int, value BLOB) CHARACTER SET utf8")
+		for i := 0; i < insertRows; i++ {
+			dbt.mustExec("INSERT INTO test VALUES (?, ?)", i+1, sqlBlobs[i&1])
+		}
+
+		for i := 0; i < contextRaceIterations; i++ {
+			func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				rows, err := dbt.db.QueryContext(ctx, `SELECT id, value FROM test`)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var b int
+				var raw sql.RawBytes
+				for rows.Next() {
+					if err := rows.Scan(&b, &raw); err != nil {
+						t.Fatal(err)
+					}
+
+					before := string(raw)
+					// Ensure cancelling the query does not corrupt the contents of `raw`
+					cancel()
+					time.Sleep(time.Microsecond * 100)
+					after := string(raw)
+
+					if before != after {
+						t.Fatalf("the backing storage for sql.RawBytes has been modified (i=%v)", i)
+					}
+				}
+				rows.Close()
+			}()
+		}
+	})
+}
+
+var _ driver.DriverContext = &MySQLDriver{}
+
+type dialCtxKey struct{}
+
+func TestConnectorObeysDialTimeouts(t *testing.T) {
+	if !available {
+		t.Skipf("MySQL server not running on %s", netAddr)
+	}
+
+	RegisterDialContext("dialctxtest", func(ctx context.Context, addr string) (net.Conn, error) {
+		var d net.Dialer
+		if !ctx.Value(dialCtxKey{}).(bool) {
+			return nil, fmt.Errorf("test error: query context is not propagated to our dialer")
+		}
+		return d.DialContext(ctx, prot, addr)
+	})
+
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@dialctxtest(%s)/%s?timeout=30s", user, pass, addr, dbname))
+	if err != nil {
+		t.Fatalf("error connecting: %s", err.Error())
+	}
+	defer db.Close()
+
+	ctx := context.WithValue(context.Background(), dialCtxKey{}, true)
+
+	_, err = db.ExecContext(ctx, "DO 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func configForTests(t *testing.T) *Config {
+	if !available {
+		t.Skipf("MySQL server not running on %s", netAddr)
+	}
+
+	mycnf := NewConfig()
+	mycnf.User = user
+	mycnf.Passwd = pass
+	mycnf.Addr = addr
+	mycnf.Net = prot
+	mycnf.DBName = dbname
+	return mycnf
+}
+
+func TestNewConnector(t *testing.T) {
+	mycnf := configForTests(t)
+	conn, err := NewConnector(mycnf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := sql.OpenDB(conn)
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type slowConnection struct {
+	net.Conn
+	slowdown time.Duration
+}
+
+func (sc *slowConnection) Read(b []byte) (int, error) {
+	time.Sleep(sc.slowdown)
+	return sc.Conn.Read(b)
+}
+
+type connectorHijack struct {
+	driver.Connector
+	connErr error
+}
+
+func (cw *connectorHijack) Connect(ctx context.Context) (driver.Conn, error) {
+	var conn driver.Conn
+	conn, cw.connErr = cw.Connector.Connect(ctx)
+	return conn, cw.connErr
+}
+
+func TestConnectorTimeoutsDuringOpen(t *testing.T) {
+	RegisterDialContext("slowconn", func(ctx context.Context, addr string) (net.Conn, error) {
+		var d net.Dialer
+		conn, err := d.DialContext(ctx, prot, addr)
+		if err != nil {
+			return nil, err
+		}
+		return &slowConnection{Conn: conn, slowdown: 100 * time.Millisecond}, nil
+	})
+
+	mycnf := configForTests(t)
+	mycnf.Net = "slowconn"
+
+	conn, err := NewConnector(mycnf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hijack := &connectorHijack{Connector: conn}
+
+	db := sql.OpenDB(hijack)
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err = db.ExecContext(ctx, "DO 1")
+	if err != context.DeadlineExceeded {
+		t.Fatalf("ExecContext should have timed out")
+	}
+	if hijack.connErr != context.DeadlineExceeded {
+		t.Fatalf("(*Connector).Connect should have timed out")
+	}
+}
+
+// A connection which can only be closed.
+type dummyConnection struct {
+	net.Conn
+	closed bool
+}
+
+func (d *dummyConnection) Close() error {
+	d.closed = true
+	return nil
+}
+
+func TestConnectorTimeoutsWatchCancel(t *testing.T) {
+	var (
+		cancel  func()           // Used to cancel the context just after connecting.
+		created *dummyConnection // The created connection.
+	)
+
+	RegisterDialContext("TestConnectorTimeoutsWatchCancel", func(ctx context.Context, addr string) (net.Conn, error) {
+		// Canceling at this time triggers the watchCancel error branch in Connect().
+		cancel()
+		created = &dummyConnection{}
+		return created, nil
+	})
+
+	mycnf := NewConfig()
+	mycnf.User = "root"
+	mycnf.Addr = "foo"
+	mycnf.Net = "TestConnectorTimeoutsWatchCancel"
+
+	conn, err := NewConnector(mycnf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db := sql.OpenDB(conn)
+	defer db.Close()
+
+	var ctx context.Context
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	if _, err := db.Conn(ctx); err != context.Canceled {
+		t.Errorf("got %v, want context.Canceled", err)
+	}
+
+	if created == nil {
+		t.Fatal("no connection created")
+	}
+	if !created.closed {
+		t.Errorf("connection not closed")
+	}
 }
