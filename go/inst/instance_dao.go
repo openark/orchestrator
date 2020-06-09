@@ -570,7 +570,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			instance.SecondsBehindMaster.Int64 = 0
 		}
 		// And until told otherwise:
-		instance.SlaveLagSeconds = instance.SecondsBehindMaster
+		instance.ReplicationLagSeconds = instance.SecondsBehindMaster
 
 		instance.AllowTLS = (m.GetString("Master_SSL_Allowed") == "Yes")
 		// Not breaking the flow even on error
@@ -589,13 +589,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
-				if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
-					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
-					instance.SlaveLagSeconds.Int64 = 0
+			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.ReplicationLagSeconds); err == nil {
+				if instance.ReplicationLagSeconds.Valid && instance.ReplicationLagSeconds.Int64 < 0 {
+					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.ReplicationLagSeconds.Int64)
+					instance.ReplicationLagSeconds.Int64 = 0
 				}
 			} else {
-				instance.SlaveLagSeconds = instance.SecondsBehindMaster
+				instance.ReplicationLagSeconds = instance.SecondsBehindMaster
 				logReadTopologyInstanceError(instanceKey, "ReplicationLagQuery", err)
 			}
 		}()
@@ -1128,7 +1128,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.LastSQLError = m.GetString("last_sql_error")
 	instance.LastIOError = m.GetString("last_io_error")
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
-	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
+	instance.ReplicationLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	instance.SQLDelay = m.GetUint("sql_delay")
 	replicasJSON := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
@@ -1176,7 +1176,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 		instance.Problems = append(instance.Problems, "not_recently_checked")
 	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
 		instance.Problems = append(instance.Problems, "not_replicating")
-	} else if instance.SlaveLagSeconds.Valid && math.AbsInt64(instance.SlaveLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
+	} else if instance.ReplicationLagSeconds.Valid && math.AbsInt64(instance.ReplicationLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
 		instance.Problems = append(instance.Problems, "replication_lag")
 	}
 	if instance.GtidErrant != "" {
@@ -1693,8 +1693,8 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 		return 0, log.Errorf("No instances found in GetInstancesMaxLag")
 	}
 	for _, clusterInstance := range instances {
-		if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
-			maxLag = clusterInstance.SlaveLagSeconds.Int64
+		if clusterInstance.ReplicationLagSeconds.Valid && clusterInstance.ReplicationLagSeconds.Int64 > maxLag {
+			maxLag = clusterInstance.ReplicationLagSeconds.Int64
 		}
 	}
 	return maxLag, nil
@@ -2501,7 +2501,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.LastSQLError)
 		args = append(args, instance.LastIOError)
 		args = append(args, instance.SecondsBehindMaster)
-		args = append(args, instance.SlaveLagSeconds)
+		args = append(args, instance.ReplicationLagSeconds)
 		args = append(args, instance.SQLDelay)
 		args = append(args, len(instance.Replicas))
 		args = append(args, instance.Replicas.ToJSONString())

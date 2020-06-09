@@ -145,12 +145,12 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	}{}
 	i.Instance = *this
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
-	i.ReplicationLagSeconds = this.SlaveLagSeconds
 	i.ReplicationSQLThreadRuning = this.Slave_SQL_Running
 	i.ReplicationIOThreadRuning = this.Slave_IO_Running
 	i.LogReplicationUpdatesEnabled = this.LogSlaveUpdatesEnabled
 	// flip
 	i.SlaveHosts = i.Replicas
+	i.SlaveLagSeconds = this.ReplicationLagSeconds
 
 	return json.Marshal(i)
 }
@@ -516,10 +516,10 @@ func (this *Instance) LagStatusString() string {
 	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
 		return "null"
 	}
-	if this.IsReplica() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
+	if this.IsReplica() && this.ReplicationLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return fmt.Sprintf("%+vs", this.ReplicationLagSeconds.Int64)
 	}
-	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
+	return fmt.Sprintf("%+vs", this.ReplicationLagSeconds.Int64)
 }
 
 func (this *Instance) descriptionTokens() (tokens []string) {
