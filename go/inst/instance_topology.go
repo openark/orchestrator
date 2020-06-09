@@ -37,7 +37,7 @@ type StopReplicationMethod string
 const (
 	NoStopReplication     StopReplicationMethod = "NoStopReplication"
 	StopReplicationNormal                       = "StopReplicationNormal"
-	StopReplicationNicely                       = "StopReplicationNicely"
+	StopReplicationNice                         = "StopReplicationNice"
 )
 
 var ReplicationNotRunningError = fmt.Errorf("Replication not running")
@@ -2227,7 +2227,7 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	}
 	stopReplicationMethod := NoStopReplication
 	if forRematchPurposes {
-		stopReplicationMethod = StopReplicationNicely
+		stopReplicationMethod = StopReplicationNice
 	}
 	replicas = sortedReplicasDataCenterHint(replicas, stopReplicationMethod, dataCenterHint)
 	if err != nil {

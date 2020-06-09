@@ -364,7 +364,7 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				if stopReplicationMethod == StopReplicationNicely {
+				if stopReplicationMethod == StopReplicationNice {
 					StopSlaveNicely(&replica.Key, timeout)
 				}
 				replica, _ = StopReplication(&replica.Key)
@@ -380,7 +380,7 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 
 // StopReplicasNicely will attemt to stop all given replicas nicely, up to timeout
 func StopReplicasNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
-	return StopReplicas(replicas, StopReplicationNicely, timeout)
+	return StopReplicas(replicas, StopReplicationNice, timeout)
 }
 
 // StopReplication stops replication on a given instance
