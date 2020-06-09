@@ -141,7 +141,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
   "Binlog_format": "ROW",
   "BinlogRowImage": "FULL",
   "LogBinEnabled": true,
-  "LogSlaveUpdatesEnabled": true,
+  "LogReplicationUpdatesEnabled": true,
   "SelfBinlogCoordinates": {
     "LogFile": "mysql-bin.000002",
     "LogPos": 333006336,

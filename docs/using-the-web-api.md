@@ -46,7 +46,7 @@ This sample is followed by a field breakdown:
     "ReadOnly": false,
     "Binlog_format": "ROW",
     "LogBinEnabled": true,
-    "LogSlaveUpdatesEnabled": true,
+    "LogReplicationUpdatesEnabled": true,
     "SelfBinlogCoordinates": {
         "LogFile": "mysql-bin.015656",
         "LogPos": 15082,
@@ -117,7 +117,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `ReadOnly`: the global `read_only` boolean value
 * `Binlog_format`: the global `binlog_format` MySQL param
 * `LogBinEnabled`: whether binary logs are enabled
-* `LogSlaveUpdatesEnabled`:  whether `log_slave_updates` MySQL param is enabled
+* `LogReplicationUpdatesEnabled`:  whether `log_slave_updates` MySQL param is enabled
 * `SelfBinlogCoordinates`: binary log file & position this instance write to (as in `SHOW MASTER STATUS`)
 * `MasterKey`: hostname & port of master, if any
 * `Slave_SQL_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`

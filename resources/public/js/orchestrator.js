@@ -333,7 +333,7 @@ function openNodeModal(node) {
       format = format + "/" + node.BinlogRowImage;
     }
     addNodeModalDataAttribute("Binlog format", format);
-    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
+    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogReplicationUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
@@ -551,7 +551,7 @@ function openNodeModal(node) {
   });
 
   $('#node_modal button[data-btn=take-siblings]').hide();
-  if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
+  if (node.LogBinEnabled && node.LogReplicationUpdatesEnabled) {
     $('#node_modal button[data-btn=take-siblings]').show();
   }
   $('#node_modal button[data-btn=take-siblings]').click(function() {
@@ -905,7 +905,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.SemiSyncReplicaStatus) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-saved" title="Semi sync enabled (replica side)"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
+    if (instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
     }
     if (instance.IsCandidate) {

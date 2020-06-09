@@ -441,7 +441,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -518,7 +518,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -624,7 +624,7 @@ function Cluster() {
         };
       }
       if (instancesAreSiblings(node, droppableNode)) {
-        if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
+        if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogReplicationUpdatesEnabled) {
           return {
             accept: false
           };
@@ -787,7 +787,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -842,7 +842,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -1553,7 +1553,7 @@ function Cluster() {
         if (replica.SQLDelay > 0) {
           return
         }
-        if (!replica.LogSlaveUpdatesEnabled) {
+        if (!replica.LogReplicationUpdatesEnabled) {
           return
         }
         if (replica.lastCheckInvalidProblem()) {
@@ -1580,7 +1580,7 @@ function Cluster() {
         if (!sibling.LogBinEnabled) {
           return
         }
-        if (!sibling.LogSlaveUpdatesEnabled) {
+        if (!sibling.LogReplicationUpdatesEnabled) {
           return
         }
         if (sibling.lastCheckInvalidProblem()) {
