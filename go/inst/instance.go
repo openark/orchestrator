@@ -202,7 +202,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	return IsSmallerMajorVersion(this.Version, other.Version)
 }
 
-// IsSmallerMajorVersionByString cehcks if this instance has a smaller major version number than given one
+// IsSmallerMajorVersionByString checks if this instance has a smaller major version number than given one
 func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
 	return IsSmallerMajorVersion(this.Version, otherVersion)
 }
