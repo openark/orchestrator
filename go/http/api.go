@@ -1319,8 +1319,8 @@ func (this *HttpAPI) StopReplication(params martini.Params, r render.Render, req
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica stopped: %+v", instance.Key), Details: instance})
 }
 
-// StopSlaveNicely stops replication on given instance, such that sql thead is aligned with IO thread
-func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// StopReplicationNicely stops replication on given instance, such that sql thead is aligned with IO thread
+func (this *HttpAPI) StopReplicationNicely(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -3637,7 +3637,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "start-slave/:host/:port", this.StartReplication)
 	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartReplication)
 	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopReplication)
-	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
+	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopReplicationNicely)
 	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetSlave)
 	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplicaMasterHost)
 	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplicaMasterHost)
