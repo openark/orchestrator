@@ -18,6 +18,7 @@ package inst
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,50 +33,57 @@ const ReasonableDiscoveryLatency = 500 * time.Millisecond
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
-	Key                       InstanceKey
-	InstanceAlias             string
-	Uptime                    uint
-	ServerID                  uint
-	ServerUUID                string
-	Version                   string
-	VersionComment            string
-	FlavorName                string
-	ReadOnly                  bool
-	Binlog_format             string
-	BinlogRowImage            string
-	LogBinEnabled             bool
-	LogSlaveUpdatesEnabled    bool
-	SelfBinlogCoordinates     BinlogCoordinates
-	MasterKey                 InstanceKey
-	MasterUUID                string
-	AncestryUUID              string
-	IsDetachedMaster          bool
-	Slave_SQL_Running         bool
-	Slave_IO_Running          bool
-	ReplicationSQLThreadState ReplicationThreadState
-	ReplicationIOThreadState  ReplicationThreadState
-	HasReplicationFilters     bool
-	GTIDMode                  string
-	SupportsOracleGTID        bool
-	UsingOracleGTID           bool
-	UsingMariaDBGTID          bool
-	UsingPseudoGTID           bool
-	ReadBinlogCoordinates     BinlogCoordinates
-	ExecBinlogCoordinates     BinlogCoordinates
-	IsDetached                bool
-	RelaylogCoordinates       BinlogCoordinates
-	LastSQLError              string
-	LastIOError               string
-	SecondsBehindMaster       sql.NullInt64
-	SQLDelay                  uint
-	ExecutedGtidSet           string
-	GtidPurged                string
-	GtidErrant                string
+	Key                          InstanceKey
+	InstanceAlias                string
+	Uptime                       uint
+	ServerID                     uint
+	ServerUUID                   string
+	Version                      string
+	VersionComment               string
+	FlavorName                   string
+	ReadOnly                     bool
+	Binlog_format                string
+	BinlogRowImage               string
+	LogBinEnabled                bool
+	LogSlaveUpdatesEnabled       bool
+	LogReplicationUpdatesEnabled bool
+	SelfBinlogCoordinates        BinlogCoordinates
+	MasterKey                    InstanceKey
+	MasterUUID                   string
+	AncestryUUID                 string
+	IsDetachedMaster             bool
+
+	Slave_SQL_Running          bool
+	ReplicationSQLThreadRuning bool
+	Slave_IO_Running           bool
+	ReplicationIOThreadRuning  bool
+	ReplicationSQLThreadState  ReplicationThreadState
+	ReplicationIOThreadState   ReplicationThreadState
+
+	HasReplicationFilters bool
+	GTIDMode              string
+	SupportsOracleGTID    bool
+	UsingOracleGTID       bool
+	UsingMariaDBGTID      bool
+	UsingPseudoGTID       bool
+	ReadBinlogCoordinates BinlogCoordinates
+	ExecBinlogCoordinates BinlogCoordinates
+	IsDetached            bool
+	RelaylogCoordinates   BinlogCoordinates
+	LastSQLError          string
+	LastIOError           string
+	SecondsBehindMaster   sql.NullInt64
+	SQLDelay              uint
+	ExecutedGtidSet       string
+	GtidPurged            string
+	GtidErrant            string
 
 	masterExecutedGtidSet string // Not exported
 
 	SlaveLagSeconds                   sql.NullInt64
+	ReplicationLagSeconds             sql.NullInt64
 	SlaveHosts                        InstanceKeyMap
+	Replicas                          InstanceKeyMap
 	ClusterName                       string
 	SuggestedClusterAlias             string
 	DataCenter                        string
@@ -129,6 +137,21 @@ func NewInstance() *Instance {
 		SlaveHosts: make(map[InstanceKey]bool),
 		Problems:   []string{},
 	}
+}
+
+func (this *Instance) MarshalJSON() ([]byte, error) {
+	i := struct {
+		Instance
+	}{}
+	i.Instance = *this
+	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
+	i.Replicas = i.SlaveHosts
+	i.ReplicationLagSeconds = this.SlaveLagSeconds
+	i.ReplicationSQLThreadRuning = this.Slave_SQL_Running
+	i.ReplicationIOThreadRuning = this.Slave_IO_Running
+	i.LogReplicationUpdatesEnabled = this.LogSlaveUpdatesEnabled
+	//
+	return json.Marshal(i)
 }
 
 // Equals tests that this instance is the same instance as other. The function does not test
