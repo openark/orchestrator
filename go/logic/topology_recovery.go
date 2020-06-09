@@ -1849,7 +1849,7 @@ func getGracefulMasterTakeoverDesignatedInstance(clusterMasterKey *inst.Instance
 			return nil, fmt.Errorf("GracefulMasterTakeover: no target instance indicated, failed to auto-detect candidate replica for master %+v. Aborting", *clusterMasterKey)
 		}
 		log.Debugf("GracefulMasterTakeover: candidateReplica=%+v", designatedInstance.Key)
-		if _, err := inst.StartSlave(&designatedInstance.Key); err != nil {
+		if _, err := inst.StartReplication(&designatedInstance.Key); err != nil {
 			return nil, fmt.Errorf("GracefulMasterTakeover:cannot start replication on designated replica %+v. Aborting", designatedKey)
 		}
 		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
@@ -2003,7 +2003,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 		}
 	}
 	if auto {
-		_, startReplicationErr := inst.StartSlave(&clusterMaster.Key)
+		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
 		if err == nil {
 			err = startReplicationErr
 		}

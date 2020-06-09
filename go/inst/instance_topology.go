@@ -248,7 +248,7 @@ func MoveEquivalent(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	instance, err = ChangeMasterTo(instanceKey, otherKey, binlogCoordinates, false, GTIDHintNeutral)
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 
 	if err == nil {
 		message := fmt.Sprintf("moved %+v via equivalence coordinates below %+v", *instanceKey, *otherKey)
@@ -331,9 +331,9 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if !instance.UsingMariaDBGTID {
-		master, _ = StartSlave(&master.Key)
+		master, _ = StartReplication(&master.Key)
 	}
 	if err != nil {
 		return instance, log.Errore(err)
@@ -407,7 +407,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 		go func() {
 			defer func() {
 				defer func() { barrier <- &replica.Key }()
-				StartSlave(&replica.Key)
+				StartReplication(&replica.Key)
 			}()
 
 			var replicaErr error
@@ -460,7 +460,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return res, instance, log.Errore(err), errs
 	}
@@ -551,8 +551,8 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
-	sibling, _ = StartSlave(siblingKey)
+	instance, _ = StartReplication(instanceKey)
+	sibling, _ = StartReplication(siblingKey)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -636,7 +636,7 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 		goto Cleanup
 	}
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -819,7 +819,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1012,7 +1012,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	master, _ = StartSlave(&master.Key)
+	master, _ = StartReplication(&master.Key)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1051,7 +1051,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1097,7 +1097,7 @@ func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1144,7 +1144,7 @@ func ReattachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	ReplaceAliasClusterName(instanceKey.StringCode(), reattachedMasterKey.StringCode())
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1351,7 +1351,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 
 Cleanup:
 	var startSlaveErr error
-	instance, startSlaveErr = StartSlave(instanceKey)
+	instance, startSlaveErr = StartReplication(instanceKey)
 	log.Errore(startSlaveErr)
 
 	if err != nil {
@@ -1592,7 +1592,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	instance, _ = StartReplication(instanceKey)
 	if err != nil {
 		return instance, nextBinlogCoordinatesToMatch, log.Errore(err)
 	}
@@ -1775,10 +1775,10 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 
 Cleanup:
 	if instance != nil {
-		instance, _ = StartSlave(&instance.Key)
+		instance, _ = StartReplication(&instance.Key)
 	}
 	if masterInstance != nil {
-		masterInstance, _ = StartSlave(&masterInstance.Key)
+		masterInstance, _ = StartReplication(&masterInstance.Key)
 	}
 	if err != nil {
 		return instance, err
@@ -2340,7 +2340,7 @@ func RegroupReplicasPseudoGTID(
 			go func() {
 				defer func() { barrier <- &candidateReplica.Key }()
 				ExecuteOnTopology(func() {
-					StartSlave(&replica.Key)
+					StartReplication(&replica.Key)
 				})
 			}()
 		}
@@ -2500,7 +2500,7 @@ func RegroupReplicasGTID(
 		err = moveGTIDFunc()
 	}
 
-	StartSlave(&candidateReplica.Key)
+	StartReplication(&candidateReplica.Key)
 
 	log.Debugf("RegroupReplicasGTID: done")
 	AuditOperation("regroup-replicas-gtid", masterKey, fmt.Sprintf("regrouped replicas of %+v via GTID; promoted %+v", *masterKey, candidateReplica.Key))

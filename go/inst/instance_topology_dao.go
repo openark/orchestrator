@@ -432,8 +432,8 @@ func waitForReplicationState(instanceKey *InstanceKey, expectedState Replication
 	return false, nil
 }
 
-// StartSlave starts replication on a given instance.
-func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
+// StartReplication starts replication on a given instance.
+func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -481,7 +481,7 @@ func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	instance, err = StartSlave(instanceKey)
+	instance, err = StartReplication(instanceKey)
 	return instance, log.Errore(err)
 }
 
@@ -496,7 +496,7 @@ func StartSlaves(replicas [](*Instance)) {
 			// Signal compelted replica
 			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a replica
-			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
+			ExecuteOnTopology(func() { StartReplication(&instance.Key) })
 		}()
 	}
 	for range replicas {
@@ -796,7 +796,7 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	AuditOperation("skip-binlog", instanceKey, fmt.Sprintf("Skipped replication to next binary log: %+v", nextFileCoordinates.LogFile))
-	return StartSlave(instanceKey)
+	return StartReplication(instanceKey)
 }
 
 // ResetSlave resets a replica, breaking the replication
@@ -961,7 +961,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	AuditOperation("skip-query", instanceKey, "Skipped one query")
-	return StartSlave(instanceKey)
+	return StartReplication(instanceKey)
 }
 
 // MasterPosWait issues a MASTER_POS_WAIT() an given instance according to given coordinates.

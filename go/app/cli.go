@@ -618,7 +618,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("start-slave", "Replication, general", `Issue a START SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.StartSlave(instanceKey)
+			_, err := inst.StartReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
