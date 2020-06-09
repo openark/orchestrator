@@ -58,12 +58,12 @@ const (
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
-// InstancesByCountSlaveHosts is a sortable type for Instance
-type InstancesByCountSlaveHosts [](*Instance)
+// InstancesByCountReplicas is a sortable type for Instance
+type InstancesByCountReplicas [](*Instance)
 
-func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
-func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
+func (this InstancesByCountReplicas) Len() int      { return len(this) }
+func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountReplicas) Less(i, j int) bool {
 	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
@@ -1583,7 +1583,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		if err != nil {
 			return result, err
 		}
-		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(intermediateMasters)))
+		sort.Sort(sort.Reverse(InstancesByCountReplicas(intermediateMasters)))
 		intermediateMasters = filterOSCInstances(intermediateMasters)
 		intermediateMasters = intermediateMasters[0:math.MinInt(2, len(intermediateMasters))]
 		result = append(result, intermediateMasters...)
@@ -1596,7 +1596,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 			if err != nil {
 				return result, err
 			}
-			sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+			sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 			replicas = filterOSCInstances(replicas)
 			replicas = replicas[0:math.MinInt(2, len(replicas))]
 			result = append(result, replicas...)
@@ -1609,7 +1609,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 				if err != nil {
 					return result, err
 				}
-				sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+				sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 				replicas = filterOSCInstances(replicas)
 				if len(replicas) > 0 {
 					result = append(result, replicas[0])
@@ -1627,7 +1627,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		if err != nil {
 			return result, err
 		}
-		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+		sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 		replicas = filterOSCInstances(replicas)
 		replicas = replicas[0:math.MinInt(2, len(replicas))]
 		result = append(result, replicas...)
