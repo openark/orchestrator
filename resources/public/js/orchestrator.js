@@ -603,8 +603,8 @@ function normalizeInstance(instance) {
   instance.masterId = getInstanceId(instance.MasterKey.Hostname,
     instance.MasterKey.Port);
 
-  instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.Slave_IO_Running;
-  instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.Slave_IO_Running;
+  instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.ReplicationIOThreadRuning;
+  instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.ReplicationIOThreadRuning;
   instance.replicationLagReasonable = Math.abs(instance.ReplicationLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
   instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;

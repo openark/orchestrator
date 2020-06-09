@@ -153,7 +153,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
   },
   "IsDetachedMaster": false,
   "ReplicationSQLThreadRuning": false,
-  "Slave_IO_Running": false,
+  "ReplicationIOThreadRuning": false,
   "HasReplicationFilters": false,
   "GTIDMode": "OFF",
   "SupportsOracleGTID": false,

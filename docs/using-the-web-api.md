@@ -57,7 +57,7 @@ This sample is followed by a field breakdown:
         "Port": 3306
     },
     "ReplicationSQLThreadRuning": true,
-    "Slave_IO_Running": true,
+    "ReplicationIOThreadRuning": true,
     "HasReplicationFilters": false,
     "SupportsOracleGTID": true,
     "UsingOracleGTID": true,
@@ -121,7 +121,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `SelfBinlogCoordinates`: binary log file & position this instance write to (as in `SHOW MASTER STATUS`)
 * `MasterKey`: hostname & port of master, if any
 * `ReplicationSQLThreadRuning`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`
-* `Slave_IO_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
+* `ReplicationIOThreadRuning`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
 * `HasReplicationFilters`: true if there's any replication filter
 * `SupportsOracleGTID`: true if cnfigured with `gtid_mode` (Oracle MySQL >= 5.6)
 * `UsingOracleGTID`: true if replica replicates via Oracle GTID
