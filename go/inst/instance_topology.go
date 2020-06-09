@@ -318,7 +318,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.UsingMariaDBGTID {
-		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
+		instance, err = StartReplicationUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
@@ -430,7 +430,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 						replicaErr = err
 						return
 					}
-					replica, err = StartSlaveUntilMasterCoordinates(&replica.Key, &instance.SelfBinlogCoordinates)
+					replica, err = StartReplicationUntilMasterCoordinates(&replica.Key, &instance.SelfBinlogCoordinates)
 					if err != nil {
 						replicaErr = err
 						return
@@ -533,12 +533,12 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 	if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
+		instance, err = StartReplicationUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
 	} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
-		sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
+		sibling, err = StartReplicationUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
@@ -1753,7 +1753,7 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 		goto Cleanup
 	}
 
-	instance, err = StartSlaveUntilMasterCoordinates(&instance.Key, &masterInstance.SelfBinlogCoordinates)
+	instance, err = StartReplicationUntilMasterCoordinates(&instance.Key, &masterInstance.SelfBinlogCoordinates)
 	if err != nil {
 		goto Cleanup
 	}
@@ -2429,7 +2429,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 				return log.Errore(err)
 			}
 			log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: repointed candidate replica %+v under binlog server %+v", candidateReplica.Key, mostUpToDateBinlogServer.Key)
-			candidateReplica, err = StartSlaveUntilMasterCoordinates(&candidateReplica.Key, &mostUpToDateBinlogServer.ExecBinlogCoordinates)
+			candidateReplica, err = StartReplicationUntilMasterCoordinates(&candidateReplica.Key, &mostUpToDateBinlogServer.ExecBinlogCoordinates)
 			if err != nil {
 				return log.Errore(err)
 			}

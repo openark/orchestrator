@@ -527,8 +527,8 @@ func WaitForExecBinlogCoordinatesToReach(instanceKey *InstanceKey, coordinates *
 	return instance, exactMatch, err
 }
 
-// StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
-func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
+// StartReplicationUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
+func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)

@@ -407,7 +407,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.StartSlaveUntilMasterCoordinates(&promotedReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+	promotedReplica, err = inst.StartReplicationUntilMasterCoordinates(&promotedReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -464,7 +464,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 				// Make sure the BLS has the "next binlog" -- the one the master flushed & purged to. Otherwise the BLS
 				// will request a binlog the master does not have
 				if binlogServerReplica.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
-					binlogServerReplica, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+					binlogServerReplica, err = inst.StartReplicationUntilMasterCoordinates(&binlogServerReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 					if err != nil {
 						return err
 					}
