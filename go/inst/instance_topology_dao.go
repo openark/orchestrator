@@ -485,8 +485,8 @@ func RestartReplication(instanceKey *InstanceKey) (instance *Instance, err error
 	return instance, log.Errore(err)
 }
 
-// StartSlaves will do concurrent start-slave
-func StartSlaves(replicas [](*Instance)) {
+// StartReplicas will do concurrent start-slave
+func StartReplicas(replicas [](*Instance)) {
 	// use concurrency but wait for all to complete
 	log.Debugf("Starting %d replicas", len(replicas))
 	barrier := make(chan InstanceKey)
