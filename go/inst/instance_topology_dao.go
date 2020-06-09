@@ -367,7 +367,7 @@ func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMet
 				if stopReplicationMethod == StopReplicationNicely {
 					StopSlaveNicely(&replica.Key, timeout)
 				}
-				replica, _ = StopSlave(&replica.Key)
+				replica, _ = StopReplication(&replica.Key)
 				updatedReplica = &replica
 			})
 		}()
@@ -383,8 +383,8 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 	return StopSlaves(replicas, StopReplicationNicely, timeout)
 }
 
-// StopSlave stops replication on a given instance
-func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
+// StopReplication stops replication on a given instance
+func StopReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -475,9 +475,9 @@ func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, nil
 }
 
-// RestartSlave stops & starts replication on a given instance
-func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
-	instance, err = StopSlave(instanceKey)
+// RestartReplication stops & starts replication on a given instance
+func RestartReplication(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -569,7 +569,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}

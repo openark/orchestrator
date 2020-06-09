@@ -1277,8 +1277,8 @@ func (this *HttpAPI) StartReplication(params martini.Params, r render.Render, re
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica started: %+v", instance.Key), Details: instance})
 }
 
-// RestartSlave stops & starts replication on given instance
-func (this *HttpAPI) RestartSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// RestartReplication stops & starts replication on given instance
+func (this *HttpAPI) RestartReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -1289,7 +1289,7 @@ func (this *HttpAPI) RestartSlave(params martini.Params, r render.Render, req *h
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.RestartSlave(&instanceKey)
+	instance, err := inst.RestartReplication(&instanceKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1298,8 +1298,8 @@ func (this *HttpAPI) RestartSlave(params martini.Params, r render.Render, req *h
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica restarted: %+v", instance.Key), Details: instance})
 }
 
-// StopSlave stops replication on given instance
-func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// StopReplication stops replication on given instance
+func (this *HttpAPI) StopReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -1310,7 +1310,7 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.StopSlave(&instanceKey)
+	instance, err := inst.StopReplication(&instanceKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -3635,8 +3635,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "gtid-errant-inject-empty/:host/:port", this.ErrantGTIDInjectEmpty)
 	this.registerAPIRequest(m, "skip-query/:host/:port", this.SkipQuery)
 	this.registerAPIRequest(m, "start-slave/:host/:port", this.StartReplication)
-	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartSlave)
-	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopSlave)
+	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartReplication)
+	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopReplication)
 	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetSlave)
 	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplicaMasterHost)

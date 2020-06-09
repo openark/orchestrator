@@ -236,7 +236,7 @@ func MoveEquivalent(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	// Now if we DO get to happen on equivalent coordinates, we need to double check. For CHANGE MASTER to happen we must
 	// stop the replica anyhow. But then let's verify the position hasn't changed.
 	knownExecBinlogCoordinates := instance.ExecBinlogCoordinates
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -306,13 +306,13 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.UsingMariaDBGTID {
-		master, err = StopSlave(&master.Key)
+		master, err = StopReplication(&master.Key)
 		if err != nil {
 			goto Cleanup
 		}
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -396,7 +396,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 		}
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -425,7 +425,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 					}
 				} else {
 					// Normal case. Do the math.
-					replica, err = StopSlave(&replica.Key)
+					replica, err = StopReplication(&replica.Key)
 					if err != nil {
 						replicaErr = err
 						return
@@ -523,12 +523,12 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
 
-	sibling, err = StopSlave(siblingKey)
+	sibling, err = StopReplication(siblingKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -626,7 +626,7 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -802,7 +802,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -977,9 +977,9 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	// the coMaster used to be merely a replica. Just point master into *some* position
 	// within coMaster...
 	if master.IsReplica() {
-		// this is the case of a co-master. For masters, the StopSlave operation throws an error, and
+		// this is the case of a co-master. For masters, the StopReplication operation throws an error, and
 		// there's really no point in doing it.
-		master, err = StopSlave(&master.Key)
+		master, err = StopReplication(&master.Key)
 		if err != nil {
 			goto Cleanup
 		}
@@ -1039,7 +1039,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
+		instance, err = StopReplication(instanceKey)
 		if err != nil {
 			goto Cleanup
 		}
@@ -1086,7 +1086,7 @@ func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1131,7 +1131,7 @@ func ReattachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1288,7 +1288,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	}
 
 	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
+		instance, err = StopReplication(instanceKey)
 		if err != nil {
 			goto Cleanup
 		}
@@ -1572,7 +1572,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	}
 
 	log.Debugf("Stopping replica on %+v", *instanceKey)
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1744,11 +1744,11 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 		return instance, err
 	}
 	// We begin
-	masterInstance, err = StopSlave(&masterInstance.Key)
+	masterInstance, err = StopReplication(&masterInstance.Key)
 	if err != nil {
 		goto Cleanup
 	}
-	instance, err = StopSlave(&instance.Key)
+	instance, err = StopReplication(&instance.Key)
 	if err != nil {
 		goto Cleanup
 	}

@@ -609,7 +609,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("stop-slave", "Replication, general", `Issue a STOP SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.StopSlave(instanceKey)
+			_, err := inst.StopReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -627,7 +627,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("restart-slave", "Replication, general", `STOP and START SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.RestartSlave(instanceKey)
+			_, err := inst.RestartReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

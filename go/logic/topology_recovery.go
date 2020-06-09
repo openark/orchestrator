@@ -393,7 +393,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return nil, log.Errore(err)
 	}
-	promotedBinlogServer, err = inst.StopSlave(&promotedBinlogServer.Key)
+	promotedBinlogServer, err = inst.StopReplication(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -403,7 +403,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 		return promotedReplica, log.Errore(err)
 	}
 	// Align it with binlog server coordinates
-	promotedReplica, err = inst.StopSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.StopReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -411,7 +411,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.StopSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.StopReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -457,7 +457,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 				return
 			}
 			postponedFunction := func() error {
-				binlogServerReplica, err := inst.StopSlave(&binlogServerReplica.Key)
+				binlogServerReplica, err := inst.StopReplication(&binlogServerReplica.Key)
 				if err != nil {
 					return err
 				}
