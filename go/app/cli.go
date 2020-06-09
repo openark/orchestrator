@@ -732,7 +732,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			statements, err := inst.GetSlaveRestartPreserveStatements(instanceKey, *config.RuntimeCLIFlags.Statement)
+			statements, err := inst.GetReplicationRestartPreserveStatements(instanceKey, *config.RuntimeCLIFlags.Statement)
 			if err != nil {
 				log.Fatale(err)
 			}

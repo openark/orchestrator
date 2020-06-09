@@ -1409,7 +1409,7 @@ func (this *HttpAPI) RestartReplicationStatements(params martini.Params, r rende
 	}
 
 	query := req.URL.Query().Get("q")
-	statements, err := inst.GetSlaveRestartPreserveStatements(&instanceKey, query)
+	statements, err := inst.GetReplicationRestartPreserveStatements(&instanceKey, query)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})

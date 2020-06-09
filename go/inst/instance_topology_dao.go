@@ -129,14 +129,14 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	}
 }
 
-// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
+// GetReplicationRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
 // and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
 // The caller may provide an injected statememt, to be executed while the replica is stopped.
 // This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the replica
 // is completely stopped.
-func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
+func GetReplicationRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return statements, err
