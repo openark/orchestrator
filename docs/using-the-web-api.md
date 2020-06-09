@@ -90,7 +90,7 @@ This sample is followed by a field breakdown:
         "Int64": 0,
         "Valid": true
     },
-    "SlaveHosts": [ ],
+    "Replicas": [ ],
     "ClusterName": "mysql.01.instance.com:3306",
     "DataCenter": "",
     "PhysicalEnvironment": "",
@@ -137,7 +137,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
 * `ReplicationLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
-* `SlaveHosts`: list of MySQL replicas _hostname & port_)
+* `Replicas`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable
 * `PhysicalEnvironment`: (metadata) name of environment, infered by `PhysicalEnvironmentPattern` config variable
@@ -191,5 +191,5 @@ curl -s "http://my.orchestrator.service.com/api/instance-replicas/${master}" | j
 - Find all intermediate masters in `my_cluster`:
 
 ```
-curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.MasterKey.Hostname!="") | select(.SlaveHosts!=[]) .Key.Hostname'
+curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.MasterKey.Hostname!="") | select(.Replicas!=[]) .Key.Hostname'
 ```

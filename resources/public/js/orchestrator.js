@@ -315,7 +315,7 @@ function openNodeModal(node) {
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
   }
-  var td = addNodeModalDataAttribute("Num replicas", node.SlaveHosts.length);
+  var td = addNodeModalDataAttribute("Num replicas", node.Replicas.length);
   $('#node_modal button[data-btn=regroup-replicas]').appendTo(td.find("div"))
   addNodeModalDataAttribute("Server ID", node.ServerID);
   if (node.ServerUUID) {
@@ -536,7 +536,7 @@ function openNodeModal(node) {
   }
 
   $('#node_modal button[data-btn=regroup-replicas]').hide();
-  if (node.SlaveHosts.length > 1) {
+  if (node.Replicas.length > 1) {
     $('#node_modal button[data-btn=regroup-replicas]').show();
   }
   $('#node_modal button[data-btn=regroup-replicas]').click(function() {

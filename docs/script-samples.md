@@ -189,7 +189,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
     "Int64": 0,
     "Valid": true
   },
-  "SlaveHosts": [
+  "Replicas": [
     {
       "Hostname": "mysql-2222.dc1.domain.net",
       "Port": 3306
@@ -286,14 +286,14 @@ mysql-00ff.dc1.domain.net
 #### How many replicas to a specific instance?
 
 ```shell
-$ orchestrator-client -c api -path instance/$master_host/3306 | jq '.SlaveHosts | length'
+$ orchestrator-client -c api -path instance/$master_host/3306 | jq '.Replicas | length'
 3
 ```
 
 #### How many replicas to each of a cluster's members?
 
 ```shell
-$ orchestrator-client -c api -path cluster/alias/mycluster | jq '.[].SlaveHosts | length'
+$ orchestrator-client -c api -path cluster/alias/mycluster | jq '.[].Replicas | length'
 3
 0
 2
