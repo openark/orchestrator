@@ -185,7 +185,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
   "SQLDelay": 0,
   "ExecutedGtidSet": "",
   "GtidPurged": "",
-  "SlaveLagSeconds": {
+  "ReplicationLagSeconds": {
     "Int64": 0,
     "Valid": true
   },

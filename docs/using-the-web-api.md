@@ -86,7 +86,7 @@ This sample is followed by a field breakdown:
     },
     "SQLDelay": 0,
     "ExecutedGtidSet": "230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-49",
-    "SlaveLagSeconds": {
+    "ReplicationLagSeconds": {
         "Int64": 0,
         "Valid": true
     },
@@ -136,7 +136,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
     `"Valid": false` indicates a `NULL`
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
-* `SlaveLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
+* `ReplicationLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `SlaveHosts`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable

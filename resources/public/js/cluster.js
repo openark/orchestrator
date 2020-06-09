@@ -1204,7 +1204,7 @@ function Cluster() {
         if (isAnonymized()) {
           instanceDescription = anonymizeInstanceId(instance.id);
         }
-        instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
+        instanceDescription += ", " + instance.ReplicationLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
         instance.Problems.forEach(function(problem) {

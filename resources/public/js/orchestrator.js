@@ -276,7 +276,7 @@ function openNodeModal(node) {
       }
     }
     addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
-    addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
+    addNodeModalDataAttribute("Replication lag", node.ReplicationLagSeconds.Valid ? node.ReplicationLagSeconds.Int64 : "null");
     addNodeModalDataAttribute("SQL delay", node.SQLDelay);
 
     var masterCoordinatesEl = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile + ":" + node.ExecBinlogCoordinates.LogPos);
@@ -605,7 +605,7 @@ function normalizeInstance(instance) {
 
   instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
   instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
-  instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
+  instance.replicationLagReasonable = Math.abs(instance.ReplicationLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
   instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
   instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
@@ -709,7 +709,7 @@ function createVirtualInstance() {
     isMaster: false,
     isCoMaster: false,
     isVirtual: true,
-    SlaveLagSeconds: 0,
+    ReplicationLagSeconds: 0,
     SecondsSinceLastSeen: 0
   }
   normalizeInstanceProblem(virtualInstance);
@@ -944,7 +944,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
     }
-    var statusMessage = formattedInterval(instance.SlaveLagSeconds.Int64) + ' lag';
+    var statusMessage = formattedInterval(instance.ReplicationLagSeconds.Int64) + ' lag';
     if (indicateLastSeenInStatus) {
       statusMessage = 'seen ' + formattedInterval(instance.SecondsSinceLastSeen.Int64) + ' ago';
     }

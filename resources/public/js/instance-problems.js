@@ -25,7 +25,7 @@ $(document).ready(function() {
     function SortByProblemOrder(instance0, instance1) {
       var orderDiff = instance0.problemOrder - instance1.problemOrder;
       if (orderDiff != 0) return orderDiff;
-      var orderDiff = instance1.SlaveLagSeconds.Int64 - instance0.SlaveLagSeconds.Int64;
+      var orderDiff = instance1.ReplicationLagSeconds.Int64 - instance0.ReplicationLagSeconds.Int64;
       if (orderDiff != 0) return orderDiff;
       orderDiff = instance0.title.localeCompare(instance1.title);
       if (orderDiff != 0) return orderDiff;
