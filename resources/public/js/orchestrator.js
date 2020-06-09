@@ -514,7 +514,7 @@ function openNodeModal(node) {
     } else if (!node.replicationRunning) {
       $('#node_modal button[data-btn=start-replica]').show();
     }
-    if (!node.Slave_SQL_Running && node.LastSQLError) {
+    if (!node.ReplicationSQLThreadRuning && node.LastSQLError) {
       $('#node_modal button[data-btn=skip-query]').show();
     }
   }
@@ -603,8 +603,8 @@ function normalizeInstance(instance) {
   instance.masterId = getInstanceId(instance.MasterKey.Hostname,
     instance.MasterKey.Port);
 
-  instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
-  instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
+  instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.Slave_IO_Running;
+  instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.Slave_IO_Running;
   instance.replicationLagReasonable = Math.abs(instance.ReplicationLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
   instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;

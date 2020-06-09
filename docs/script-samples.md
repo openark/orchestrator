@@ -152,7 +152,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
     "Port": 0
   },
   "IsDetachedMaster": false,
-  "Slave_SQL_Running": false,
+  "ReplicationSQLThreadRuning": false,
   "Slave_IO_Running": false,
   "HasReplicationFilters": false,
   "GTIDMode": "OFF",

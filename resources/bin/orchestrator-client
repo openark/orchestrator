@@ -313,11 +313,11 @@ function filter_keys {
 }
 
 function filter_broken_replicas {
-  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
+  cat - | jq '.[] | select((.ReplicationSQLThreadRuning == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
 }
 
 function filter_running_replicas {
-  cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
+  cat - | jq '.[] | select(.ReplicationSQLThreadRuning == true and .Slave_IO_Running == true) | [.]'
 }
 
 function print_key {

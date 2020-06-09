@@ -56,7 +56,7 @@ This sample is followed by a field breakdown:
         "Hostname": "mysql.01.instance.com",
         "Port": 3306
     },
-    "Slave_SQL_Running": true,
+    "ReplicationSQLThreadRuning": true,
     "Slave_IO_Running": true,
     "HasReplicationFilters": false,
     "SupportsOracleGTID": true,
@@ -120,7 +120,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `LogReplicationUpdatesEnabled`:  whether `log_slave_updates` MySQL param is enabled
 * `SelfBinlogCoordinates`: binary log file & position this instance write to (as in `SHOW MASTER STATUS`)
 * `MasterKey`: hostname & port of master, if any
-* `Slave_SQL_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`
+* `ReplicationSQLThreadRuning`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`
 * `Slave_IO_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
 * `HasReplicationFilters`: true if there's any replication filter
 * `SupportsOracleGTID`: true if cnfigured with `gtid_mode` (Oracle MySQL >= 5.6)
