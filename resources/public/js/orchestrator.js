@@ -333,7 +333,7 @@ function openNodeModal(node) {
       format = format + "/" + node.BinlogRowImage;
     }
     addNodeModalDataAttribute("Binlog format", format);
-    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogReplicationUpdatesEnabled));
+    var td = addNodeModalDataAttribute("Logs replication updates", booleanString(node.LogReplicationUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
@@ -906,7 +906,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-saved" title="Semi sync enabled (replica side)"></span> ');
     }
     if (instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs replication updates"></span> ');
     }
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
