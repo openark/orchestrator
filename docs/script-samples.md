@@ -337,7 +337,7 @@ start slave io_thread;
 Compare with:
 
 ```shell
-$ orchestrator-client -c stop-slave -i mysql-bb00.dc1.domain.net
+$ orchestrator-client -c stop-replica -i mysql-bb00.dc1.domain.net
 mysql-bb00.dc1.domain.net:3306
 
 $ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r

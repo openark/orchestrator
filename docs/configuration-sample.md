@@ -121,19 +121,19 @@ The following is a production configuration file, with some details redacted.
     "*"
   ],
   "OnFailureDetectionProcesses": [
-    "/redacted/our-orchestrator-recovery-handler -t 'detection' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countSlaves}'"
+    "/redacted/our-orchestrator-recovery-handler -t 'detection' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countReplicas}'"
   ],
   "PreGracefulTakeoverProcesses": [
     "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
   ],
   "PreFailoverProcesses": [
-    "/redacted/our-orchestrator-recovery-handler -t 'pre-failover' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countSlaves}'"
+    "/redacted/our-orchestrator-recovery-handler -t 'pre-failover' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countReplicas}'"
   ],
   "PostFailoverProcesses": [
-    "/redacted/our-orchestrator-recovery-handler -t 'post-failover' -f '{failureType}' -h '{failedHost}' -H '{successorHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countSlaves}' -u '{recoveryUID}'"
+    "/redacted/our-orchestrator-recovery-handler -t 'post-failover' -f '{failureType}' -h '{failedHost}' -H '{successorHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countReplicas}' -u '{recoveryUID}'"
   ],
   "PostUnsuccessfulFailoverProcesses": [
-    "/redacted/our-orchestrator-recovery-handler -t 'post-unsuccessful-failover' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countSlaves}' -u '{recoveryUID}'"
+    "/redacted/our-orchestrator-recovery-handler -t 'post-unsuccessful-failover' -f '{failureType}' -h '{failedHost}' -C '{failureCluster}' -A '{failureClusterAlias}' -n '{countReplicas}' -u '{recoveryUID}'"
   ],
   "PostMasterFailoverProcesses": [
     "/redacted/do-something # e.g. kick pt-heartbeat on promoted master"
