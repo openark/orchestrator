@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -130,6 +131,7 @@ type ReplicationAnalysis struct {
 	CountReplicasFailingToConnectToMaster     uint
 	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
+	Replicas                                  InstanceKeyMap
 	SlaveHosts                                InstanceKeyMap
 	IsFailingToConnectToMaster                bool
 	Analysis                                  AnalysisCode
@@ -177,10 +179,21 @@ type ReplicationAnalysisChangelog struct {
 	Changelog           []string
 }
 
+func (this *ReplicationAnalysis) MarshalJSON() ([]byte, error) {
+	i := struct {
+		ReplicationAnalysis
+	}{}
+	i.ReplicationAnalysis = *this
+	// backwards compatibility
+	i.SlaveHosts = i.Replicas
+
+	return json.Marshal(i)
+}
+
 // ReadReplicaHostsFromString parses and reads replica keys from comma delimited string
 func (this *ReplicationAnalysis) ReadReplicaHostsFromString(replicaHostsString string) error {
-	this.SlaveHosts = *NewInstanceKeyMap()
-	return this.SlaveHosts.ReadCommaDelimitedList(replicaHostsString)
+	this.Replicas = *NewInstanceKeyMap()
+	return this.Replicas.ReadCommaDelimitedList(replicaHostsString)
 }
 
 // AnalysisString returns a human friendly description of all analysis issues

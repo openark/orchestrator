@@ -434,8 +434,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.IsBinlogServer = m.GetBool("is_binlog_server")
 		a.ClusterDetails.ReadRecoveryInfo()
 
-		a.SlaveHosts = *NewInstanceKeyMap()
-		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
+		a.Replicas = *NewInstanceKeyMap()
+		a.Replicas.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
 		countValidOracleGTIDReplicas := m.GetUint("count_valid_oracle_gtid_replicas")
 		a.OracleGTIDImmediateTopology = countValidOracleGTIDReplicas == a.CountValidReplicas && a.CountValidReplicas > 0

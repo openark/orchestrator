@@ -41,7 +41,7 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,
 		analysisEntry.CountReplicas,
-		analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.Replicas.ToCommaDelimitedList(),
 		analysisEntry.IsActionableRecovery,
 	)
 	startActivePeriodHint := "now()"
@@ -182,7 +182,7 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 		string(analysisEntry.Analysis),
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,
-		analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.CountReplicas, analysisEntry.Replicas.ToCommaDelimitedList(),
 		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
 	)
 	if err != nil {
