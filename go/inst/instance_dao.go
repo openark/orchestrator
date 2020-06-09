@@ -58,13 +58,13 @@ const (
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
-// InstancesByCountSlaveHosts is a sortable type for Instance
-type InstancesByCountSlaveHosts [](*Instance)
+// InstancesByCountReplicas is a sortable type for Instance
+type InstancesByCountReplicas [](*Instance)
 
-func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
-func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
-	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+func (this InstancesByCountReplicas) Len() int      { return len(this) }
+func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountReplicas) Less(i, j int) bool {
+	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
@@ -229,7 +229,7 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 			instance.Binlog_format = "INHERIT"
 			instance.ReadOnly = true
 			instance.LogBinEnabled = true
-			instance.LogSlaveUpdatesEnabled = true
+			instance.LogReplicationUpdatesEnabled = true
 			resolvedHostname = instance.Key.Hostname
 			latency.Start("backend")
 			UpdateResolvedHostname(resolvedHostname, resolvedHostname)
@@ -384,7 +384,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogReplicationUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
 		}
@@ -526,12 +526,12 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
 		instance.ReplicationIOThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_IO_Running"))
 		instance.ReplicationSQLThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_SQL_Running"))
-		instance.Slave_IO_Running = instance.ReplicationIOThreadState.IsRunning()
+		instance.ReplicationIOThreadRuning = instance.ReplicationIOThreadState.IsRunning()
 		if isMaxScale110 {
 			// Covering buggy MaxScale 1.1.0
-			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
+			instance.ReplicationIOThreadRuning = instance.ReplicationIOThreadRuning && (m.GetString("Slave_IO_State") == "Binlog Dump")
 		}
-		instance.Slave_SQL_Running = instance.ReplicationSQLThreadState.IsRunning()
+		instance.ReplicationSQLThreadRuning = instance.ReplicationSQLThreadState.IsRunning()
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
@@ -570,7 +570,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			instance.SecondsBehindMaster.Int64 = 0
 		}
 		// And until told otherwise:
-		instance.SlaveLagSeconds = instance.SecondsBehindMaster
+		instance.ReplicationLagSeconds = instance.SecondsBehindMaster
 
 		instance.AllowTLS = (m.GetString("Master_SSL_Allowed") == "Yes")
 		// Not breaking the flow even on error
@@ -589,13 +589,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
-				if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
-					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
-					instance.SlaveLagSeconds.Int64 = 0
+			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.ReplicationLagSeconds); err == nil {
+				if instance.ReplicationLagSeconds.Valid && instance.ReplicationLagSeconds.Int64 < 0 {
+					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.ReplicationLagSeconds.Int64)
+					instance.ReplicationLagSeconds.Int64 = 0
 				}
 			} else {
-				instance.SlaveLagSeconds = instance.SecondsBehindMaster
+				instance.ReplicationLagSeconds = instance.SecondsBehindMaster
 				logReadTopologyInstanceError(instanceKey, "ReplicationLagQuery", err)
 			}
 		}()
@@ -1096,12 +1096,12 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Binlog_format = m.GetString("binlog_format")
 	instance.BinlogRowImage = m.GetString("binlog_row_image")
 	instance.LogBinEnabled = m.GetBool("log_bin")
-	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
+	instance.LogReplicationUpdatesEnabled = m.GetBool("log_slave_updates")
 	instance.MasterKey.Hostname = m.GetString("master_host")
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
-	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
-	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.ReplicationSQLThreadRuning = m.GetBool("slave_sql_running")
+	instance.ReplicationIOThreadRuning = m.GetBool("slave_io_running")
 	instance.ReplicationSQLThreadState = ReplicationThreadState(m.GetInt("replication_sql_thread_state"))
 	instance.ReplicationIOThreadState = ReplicationThreadState(m.GetInt("replication_io_thread_state"))
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
@@ -1128,9 +1128,9 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.LastSQLError = m.GetString("last_sql_error")
 	instance.LastIOError = m.GetString("last_io_error")
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
-	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
+	instance.ReplicationLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	instance.SQLDelay = m.GetUint("sql_delay")
-	slaveHostsJSON := m.GetString("slave_hosts")
+	replicasJSON := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
@@ -1166,7 +1166,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.InstanceAlias = m.GetString("instance_alias")
 	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
 
-	instance.SlaveHosts.ReadJson(slaveHostsJSON)
+	instance.Replicas.ReadJson(replicasJSON)
 	instance.applyFlavorName()
 
 	// problems
@@ -1176,7 +1176,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 		instance.Problems = append(instance.Problems, "not_recently_checked")
 	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
 		instance.Problems = append(instance.Problems, "not_replicating")
-	} else if instance.SlaveLagSeconds.Valid && math.AbsInt64(instance.SlaveLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
+	} else if instance.ReplicationLagSeconds.Valid && math.AbsInt64(instance.ReplicationLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
 		instance.Problems = append(instance.Problems, "replication_lag")
 	}
 	if instance.GtidErrant != "" {
@@ -1583,7 +1583,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		if err != nil {
 			return result, err
 		}
-		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(intermediateMasters)))
+		sort.Sort(sort.Reverse(InstancesByCountReplicas(intermediateMasters)))
 		intermediateMasters = filterOSCInstances(intermediateMasters)
 		intermediateMasters = intermediateMasters[0:math.MinInt(2, len(intermediateMasters))]
 		result = append(result, intermediateMasters...)
@@ -1596,7 +1596,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 			if err != nil {
 				return result, err
 			}
-			sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+			sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 			replicas = filterOSCInstances(replicas)
 			replicas = replicas[0:math.MinInt(2, len(replicas))]
 			result = append(result, replicas...)
@@ -1609,7 +1609,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 				if err != nil {
 					return result, err
 				}
-				sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+				sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 				replicas = filterOSCInstances(replicas)
 				if len(replicas) > 0 {
 					result = append(result, replicas[0])
@@ -1627,7 +1627,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		if err != nil {
 			return result, err
 		}
-		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+		sort.Sort(sort.Reverse(InstancesByCountReplicas(replicas)))
 		replicas = filterOSCInstances(replicas)
 		replicas = replicas[0:math.MinInt(2, len(replicas))]
 		result = append(result, replicas...)
@@ -1676,7 +1676,7 @@ func GetClusterGhostReplicas(clusterName string) (result [](*Instance), err erro
 		if !instance.LogBinEnabled {
 			skipThisHost = true
 		}
-		if !instance.LogSlaveUpdatesEnabled {
+		if !instance.LogReplicationUpdatesEnabled {
 			skipThisHost = true
 		}
 		if !skipThisHost {
@@ -1693,8 +1693,8 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 		return 0, log.Errorf("No instances found in GetInstancesMaxLag")
 	}
 	for _, clusterInstance := range instances {
-		if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
-			maxLag = clusterInstance.SlaveLagSeconds.Int64
+		if clusterInstance.ReplicationLagSeconds.Valid && clusterInstance.ReplicationLagSeconds.Int64 > maxLag {
+			maxLag = clusterInstance.ReplicationLagSeconds.Int64
 		}
 	}
 	return maxLag, nil
@@ -2472,13 +2472,13 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.Binlog_format)
 		args = append(args, instance.BinlogRowImage)
 		args = append(args, instance.LogBinEnabled)
-		args = append(args, instance.LogSlaveUpdatesEnabled)
+		args = append(args, instance.LogReplicationUpdatesEnabled)
 		args = append(args, instance.SelfBinlogCoordinates.LogFile)
 		args = append(args, instance.SelfBinlogCoordinates.LogPos)
 		args = append(args, instance.MasterKey.Hostname)
 		args = append(args, instance.MasterKey.Port)
-		args = append(args, instance.Slave_SQL_Running)
-		args = append(args, instance.Slave_IO_Running)
+		args = append(args, instance.ReplicationSQLThreadRuning)
+		args = append(args, instance.ReplicationIOThreadRuning)
 		args = append(args, instance.ReplicationSQLThreadState)
 		args = append(args, instance.ReplicationIOThreadState)
 		args = append(args, instance.HasReplicationFilters)
@@ -2501,10 +2501,10 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.LastSQLError)
 		args = append(args, instance.LastIOError)
 		args = append(args, instance.SecondsBehindMaster)
-		args = append(args, instance.SlaveLagSeconds)
+		args = append(args, instance.ReplicationLagSeconds)
 		args = append(args, instance.SQLDelay)
-		args = append(args, len(instance.SlaveHosts))
-		args = append(args, instance.SlaveHosts.ToJSONString())
+		args = append(args, len(instance.Replicas))
+		args = append(args, instance.Replicas.ToJSONString())
 		args = append(args, instance.ClusterName)
 		args = append(args, instance.SuggestedClusterAlias)
 		args = append(args, instance.DataCenter)
