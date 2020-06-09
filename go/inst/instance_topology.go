@@ -1350,9 +1350,9 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	}
 
 Cleanup:
-	var startSlaveErr error
-	instance, startSlaveErr = StartReplication(instanceKey)
-	log.Errore(startSlaveErr)
+	var startReplicationErr error
+	instance, startReplicationErr = StartReplication(instanceKey)
+	log.Errore(startReplicationErr)
 
 	if err != nil {
 		return instance, log.Errore(err)
