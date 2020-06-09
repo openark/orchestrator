@@ -1002,7 +1002,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	return true
 }
 
-func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpdates bool) bool {
+func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogReplicationUpdates bool) bool {
 	if !replica.IsLastCheckValid {
 		// something wrong with this replica right now. We shouldn't hope to be able to promote it
 		return false
@@ -1010,7 +1010,7 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpda
 	if !replica.LogBinEnabled {
 		return false
 	}
-	if requireLogSlaveUpdates && !replica.LogReplicationUpdatesEnabled {
+	if requireLogReplicationUpdates && !replica.LogReplicationUpdatesEnabled {
 		return false
 	}
 	if replica.IsBinlogServer() {
@@ -1553,7 +1553,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
-	// case inst.AllMasterSlavesStale:
+	// case inst.AllMasterReplicasStale:
 	//   return checkAndRecoverGenericProblem, false
 
 	return nil, false
