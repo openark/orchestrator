@@ -134,8 +134,8 @@ type Instance struct {
 // NewInstance creates a new, empty instance
 func NewInstance() *Instance {
 	return &Instance{
-		SlaveHosts: make(map[InstanceKey]bool),
-		Problems:   []string{},
+		Replicas: make(map[InstanceKey]bool),
+		Problems: []string{},
 	}
 }
 
@@ -145,12 +145,13 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	}{}
 	i.Instance = *this
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
-	i.Replicas = i.SlaveHosts
 	i.ReplicationLagSeconds = this.SlaveLagSeconds
 	i.ReplicationSQLThreadRuning = this.Slave_SQL_Running
 	i.ReplicationIOThreadRuning = this.Slave_IO_Running
 	i.LogReplicationUpdatesEnabled = this.LogSlaveUpdatesEnabled
-	//
+	// flip
+	i.SlaveHosts = i.Replicas
+
 	return json.Marshal(i)
 }
 
@@ -354,7 +355,7 @@ func (this *Instance) NextGTID() (string, error) {
 
 // AddReplicaKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
-	this.SlaveHosts.AddKey(*replicaKey)
+	this.Replicas.AddKey(*replicaKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given

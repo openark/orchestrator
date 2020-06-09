@@ -280,7 +280,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 
 	// Investigate replicas:
-	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
+	for _, replicaKey := range instance.Replicas.GetInstanceKeys() {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover

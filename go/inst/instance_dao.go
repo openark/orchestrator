@@ -64,7 +64,7 @@ type InstancesByCountSlaveHosts [](*Instance)
 func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
 func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
-	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
@@ -1130,7 +1130,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	instance.SQLDelay = m.GetUint("sql_delay")
-	slaveHostsJSON := m.GetString("slave_hosts")
+	replicasJSON := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
@@ -1166,7 +1166,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.InstanceAlias = m.GetString("instance_alias")
 	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
 
-	instance.SlaveHosts.ReadJson(slaveHostsJSON)
+	instance.Replicas.ReadJson(replicasJSON)
 	instance.applyFlavorName()
 
 	// problems
@@ -2503,8 +2503,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SecondsBehindMaster)
 		args = append(args, instance.SlaveLagSeconds)
 		args = append(args, instance.SQLDelay)
-		args = append(args, len(instance.SlaveHosts))
-		args = append(args, instance.SlaveHosts.ToJSONString())
+		args = append(args, len(instance.Replicas))
+		args = append(args, instance.Replicas.ToJSONString())
 		args = append(args, instance.ClusterName)
 		args = append(args, instance.SuggestedClusterAlias)
 		args = append(args, instance.DataCenter)

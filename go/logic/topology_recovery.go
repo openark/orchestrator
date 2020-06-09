@@ -173,11 +173,11 @@ type InstancesByCountReplicas [](*inst.Instance)
 func (this InstancesByCountReplicas) Len() int      { return len(this) }
 func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountReplicas) Less(i, j int) bool {
-	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
+	if len(this[i].Replicas) == len(this[j].Replicas) {
 		// Secondary sorting: prefer more advanced replicas
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 	}
-	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
 var recoverDeadMasterCounter = metrics.NewCounter()
