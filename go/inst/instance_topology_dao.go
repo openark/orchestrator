@@ -291,7 +291,7 @@ func StopReplicationNicely(instanceKey *InstanceKey, timeout time.Duration) (*In
 	}
 
 	instance, err = ReadTopologyInstance(instanceKey)
-	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
+	log.Infof("Stopped replication nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
 
@@ -485,7 +485,7 @@ func RestartReplication(instanceKey *InstanceKey) (instance *Instance, err error
 	return instance, log.Errore(err)
 }
 
-// StartReplicas will do concurrent start-slave
+// StartReplicas will do concurrent start-replica
 func StartReplicas(replicas [](*Instance)) {
 	// use concurrency but wait for all to complete
 	log.Debugf("Starting %d replicas", len(replicas))
@@ -577,13 +577,13 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 	return instance, err
 }
 
-// EnableSemiSync sets the rpl_semi_sync_(master|slave)_enabled variables
+// EnableSemiSync sets the rpl_semi_sync_(master|replica)_enabled variables
 // on a given instance.
-func EnableSemiSync(instanceKey *InstanceKey, master, slave bool) error {
-	log.Infof("instance %+v rpl_semi_sync_master_enabled: %t, rpl_semi_sync_slave_enabled: %t", instanceKey, master, slave)
+func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
+	log.Infof("instance %+v rpl_semi_sync_master_enabled: %t, rpl_semi_sync_slave_enabled: %t", instanceKey, master, replica)
 	_, err := ExecInstance(instanceKey,
 		`set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`,
-		master, slave)
+		master, replica)
 	return err
 }
 
@@ -807,11 +807,11 @@ func ResetReplication(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
-		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication threads are not stopped", instanceKey)
+		return instance, fmt.Errorf("Cannot reset replication on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
-		return instance, fmt.Errorf("noop: aborting reset-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+		return instance, fmt.Errorf("noop: aborting reset-replication operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
@@ -831,7 +831,7 @@ func ResetReplication(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Reset slave %+v", instanceKey)
+	log.Infof("Reset replication %+v", instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -939,7 +939,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	if instance.ReplicationSQLThreadRuning {
-		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
+		return instance, fmt.Errorf("Replication SQL thread is running on %+v", instanceKey)
 	}
 	if instance.LastSQLError == "" {
 		return instance, fmt.Errorf("No SQL error on %+v", instanceKey)
