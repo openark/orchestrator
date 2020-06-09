@@ -1823,7 +1823,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance, err = StopSlaveNicely(instanceKey, 0)
+	instance, err = StopReplicationNicely(instanceKey, 0)
 	if err != nil {
 		goto Cleanup
 	}

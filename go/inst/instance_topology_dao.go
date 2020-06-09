@@ -252,10 +252,10 @@ func RestartReplicationQuick(instanceKey *InstanceKey) error {
 	return nil
 }
 
-// StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
+// StopReplicationNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the replica is completely stopped.
-func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
+func StopReplicationNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -365,7 +365,7 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				if stopReplicationMethod == StopReplicationNice {
-					StopSlaveNicely(&replica.Key, timeout)
+					StopReplicationNicely(&replica.Key, timeout)
 				}
 				replica, _ = StopReplication(&replica.Key)
 				updatedReplica = &replica

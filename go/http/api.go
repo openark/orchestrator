@@ -1331,7 +1331,7 @@ func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.StopSlaveNicely(&instanceKey, 0)
+	instance, err := inst.StopReplicationNicely(&instanceKey, 0)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
