@@ -378,8 +378,8 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 	return refreshedReplicas
 }
 
-// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
-func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
+// StopReplicasNicely will attemt to stop all given replicas nicely, up to timeout
+func StopReplicasNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
 	return StopReplicas(replicas, StopReplicationNicely, timeout)
 }
 
