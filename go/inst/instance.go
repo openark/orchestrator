@@ -145,12 +145,12 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	}{}
 	i.Instance = *this
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
-	i.ReplicationSQLThreadRuning = this.Slave_SQL_Running
 	i.ReplicationIOThreadRuning = this.Slave_IO_Running
 	// flip
 	i.SlaveHosts = i.Replicas
 	i.SlaveLagSeconds = this.ReplicationLagSeconds
 	i.LogSlaveUpdatesEnabled = this.LogReplicationUpdatesEnabled
+	i.Slave_SQL_Running = this.ReplicationSQLThreadRuning
 
 	return json.Marshal(i)
 }
@@ -452,7 +452,7 @@ func (this *Instance) CanMove() (bool, error) {
 		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
 	if !this.SecondsBehindMaster.Valid {
-		return false, fmt.Errorf("%+v: cannot determine slave lag", this.Key)
+		return false, fmt.Errorf("%+v: cannot determine replication lag", this.Key)
 	}
 	if !this.HasReasonableMaintenanceReplicationLag() {
 		return false, fmt.Errorf("%+v: lags too much", this.Key)

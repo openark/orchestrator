@@ -144,13 +144,13 @@ func GetReplicationRestartPreserveStatements(instanceKey *InstanceKey, injectedS
 	if instance.Slave_IO_Running {
 		statements = append(statements, SemicolonTerminated(`stop slave io_thread`))
 	}
-	if instance.Slave_SQL_Running {
+	if instance.ReplicationSQLThreadRuning {
 		statements = append(statements, SemicolonTerminated(`stop slave sql_thread`))
 	}
 	if injectedStatement != "" {
 		statements = append(statements, SemicolonTerminated(injectedStatement))
 	}
-	if instance.Slave_SQL_Running {
+	if instance.ReplicationSQLThreadRuning {
 		statements = append(statements, SemicolonTerminated(`start slave sql_thread`))
 	}
 	if instance.Slave_IO_Running {
@@ -938,7 +938,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
-	if instance.Slave_SQL_Running {
+	if instance.ReplicationSQLThreadRuning {
 		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
 	}
 	if instance.LastSQLError == "" {

@@ -531,7 +531,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// Covering buggy MaxScale 1.1.0
 			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
 		}
-		instance.Slave_SQL_Running = instance.ReplicationSQLThreadState.IsRunning()
+		instance.ReplicationSQLThreadRuning = instance.ReplicationSQLThreadState.IsRunning()
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
@@ -1100,7 +1100,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.MasterKey.Hostname = m.GetString("master_host")
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
-	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
+	instance.ReplicationSQLThreadRuning = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
 	instance.ReplicationSQLThreadState = ReplicationThreadState(m.GetInt("replication_sql_thread_state"))
 	instance.ReplicationIOThreadState = ReplicationThreadState(m.GetInt("replication_io_thread_state"))
@@ -2477,7 +2477,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SelfBinlogCoordinates.LogPos)
 		args = append(args, instance.MasterKey.Hostname)
 		args = append(args, instance.MasterKey.Port)
-		args = append(args, instance.Slave_SQL_Running)
+		args = append(args, instance.ReplicationSQLThreadRuning)
 		args = append(args, instance.Slave_IO_Running)
 		args = append(args, instance.ReplicationSQLThreadState)
 		args = append(args, instance.ReplicationIOThreadState)
