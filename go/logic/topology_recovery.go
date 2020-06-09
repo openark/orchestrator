@@ -416,7 +416,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 		return promotedReplica, log.Errore(err)
 	}
 	// Detach, flush binary logs forward
-	promotedReplica, err = inst.ResetSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.ResetReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -883,10 +883,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// on GracefulMasterTakeoverCommandHint it makes utter sense to RESET SLAVE ALL and read_only=0, and there is no sense in not doing so.
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
 			{
-				_, err := inst.ResetSlaveOperation(&promotedReplica.Key)
+				_, err := inst.ResetReplicationOperation(&promotedReplica.Key)
 				if err != nil {
 					// Ugly, but this is important. Let's give it another try
-					_, err = inst.ResetSlaveOperation(&promotedReplica.Key)
+					_, err = inst.ResetReplicationOperation(&promotedReplica.Key)
 				}
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying RESET SLAVE ALL on promoted master: success=%t", (err == nil)))
 				if err != nil {

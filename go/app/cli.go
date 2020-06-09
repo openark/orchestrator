@@ -636,7 +636,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("reset-slave", "Replication, general", `Issues a RESET SLAVE command; use with care`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.ResetSlaveOperation(instanceKey)
+			_, err := inst.ResetReplicationOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

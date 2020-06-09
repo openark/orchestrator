@@ -799,8 +799,8 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 	return StartReplication(instanceKey)
 }
 
-// ResetSlave resets a replica, breaking the replication
-func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
+// ResetReplication resets a replica, breaking the replication
+func ResetReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -824,7 +824,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	if err != nil && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
-		log.Debugf("ResetSlave: got %+v", err)
+		log.Debugf("ResetReplication: got %+v", err)
 		workaroundBug83713(instanceKey)
 		_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	}

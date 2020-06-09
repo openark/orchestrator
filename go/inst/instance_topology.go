@@ -1022,8 +1022,8 @@ Cleanup:
 	return instance, err
 }
 
-// ResetSlaveOperation will reset a replica
-func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
+// ResetReplicationOperation will reset a replica
+func ResetReplicationOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1045,7 +1045,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance, err = ResetSlave(instanceKey)
+	instance, err = ResetReplication(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}

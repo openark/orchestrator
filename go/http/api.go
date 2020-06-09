@@ -603,8 +603,8 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance made co-master: %+v", instance.Key), Details: instance})
 }
 
-// ResetSlave makes a replica forget about its master, effectively breaking the replication
-func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// ResetReplication makes a replica forget about its master, effectively breaking the replication
+func (this *HttpAPI) ResetReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -615,7 +615,7 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.ResetSlaveOperation(&instanceKey)
+	instance, err := inst.ResetReplicationOperation(&instanceKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -3638,7 +3638,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartReplication)
 	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopReplication)
 	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopReplicationNicely)
-	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetSlave)
+	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetReplication)
 	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplicaMasterHost)
 	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "detach-slave-master-host/:host/:port", this.DetachReplicaMasterHost)
