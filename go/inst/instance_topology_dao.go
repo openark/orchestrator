@@ -345,9 +345,9 @@ func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Dura
 	}
 }
 
-// StopSlaves will stop replication concurrently on given set of replicas.
+// StopReplicas will stop replication concurrently on given set of replicas.
 // It will potentially do nothing, or attempt to stop _nicely_ or just stop normally, all according to stopReplicationMethod
-func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
+func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
 	if stopReplicationMethod == NoStopReplication {
 		return replicas
 	}
@@ -380,7 +380,7 @@ func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMet
 
 // StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
 func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
-	return StopSlaves(replicas, StopReplicationNicely, timeout)
+	return StopReplicas(replicas, StopReplicationNicely, timeout)
 }
 
 // StopReplication stops replication on a given instance

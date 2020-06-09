@@ -1880,7 +1880,7 @@ func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod 
 	if len(replicas) <= 1 {
 		return replicas
 	}
-	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+	replicas = StopReplicas(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
 	sortInstancesDataCenterHint(replicas, dataCenterHint)
