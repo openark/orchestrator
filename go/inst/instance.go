@@ -45,7 +45,7 @@ type Instance struct {
 	Binlog_format                string
 	BinlogRowImage               string
 	LogBinEnabled                bool
-	LogSlaveUpdatesEnabled       bool
+	LogSlaveUpdatesEnabled       bool // for API backwards compatibility. Equals `LogReplicationUpdatesEnabled`
 	LogReplicationUpdatesEnabled bool
 	SelfBinlogCoordinates        BinlogCoordinates
 	MasterKey                    InstanceKey
@@ -53,9 +53,9 @@ type Instance struct {
 	AncestryUUID                 string
 	IsDetachedMaster             bool
 
-	Slave_SQL_Running          bool
+	Slave_SQL_Running          bool // for API backwards compatibility. Equals `ReplicationSQLThreadRuning`
 	ReplicationSQLThreadRuning bool
-	Slave_IO_Running           bool
+	Slave_IO_Running           bool // for API backwards compatibility. Equals `ReplicationIOThreadRuning`
 	ReplicationIOThreadRuning  bool
 	ReplicationSQLThreadState  ReplicationThreadState
 	ReplicationIOThreadState   ReplicationThreadState
@@ -80,9 +80,9 @@ type Instance struct {
 
 	masterExecutedGtidSet string // Not exported
 
-	SlaveLagSeconds                   sql.NullInt64
+	SlaveLagSeconds                   sql.NullInt64 // for API backwards compatibility. Equals `ReplicationLagSeconds`
 	ReplicationLagSeconds             sql.NullInt64
-	SlaveHosts                        InstanceKeyMap
+	SlaveHosts                        InstanceKeyMap // for API backwards compatibility. Equals `Replicas`
 	Replicas                          InstanceKeyMap
 	ClusterName                       string
 	SuggestedClusterAlias             string

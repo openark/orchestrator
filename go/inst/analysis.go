@@ -132,7 +132,7 @@ type ReplicationAnalysis struct {
 	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	Replicas                                  InstanceKeyMap
-	SlaveHosts                                InstanceKeyMap
+	SlaveHosts                                InstanceKeyMap // for backwards compatibility. Equals `Replicas`
 	IsFailingToConnectToMaster                bool
 	Analysis                                  AnalysisCode
 	Description                               string
