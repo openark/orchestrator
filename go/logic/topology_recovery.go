@@ -1436,7 +1436,7 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 	}
 }
 
-// emergentlyRestartReplicationOnTopologyInstance forces a RestartSlave on a given instance.
+// emergentlyRestartReplicationOnTopologyInstance forces a RestartReplication on a given instance.
 func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted on this specific replica
@@ -1464,7 +1464,7 @@ func isInEmergencyOperationGracefulPeriod(instanceKey *inst.InstanceKey) bool {
 // that's where we hope they realize the master is bad.
 func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
-		// While each replica's RestartSlave() is throttled on its own, it's also wasteful to
+		// While each replica's RestartReplication() is throttled on its own, it's also wasteful to
 		// iterate all replicas all the time. This is the reason why we do grand-throttle check.
 		return
 	}
