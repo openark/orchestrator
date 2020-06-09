@@ -147,10 +147,10 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
 	i.ReplicationSQLThreadRuning = this.Slave_SQL_Running
 	i.ReplicationIOThreadRuning = this.Slave_IO_Running
-	i.LogReplicationUpdatesEnabled = this.LogSlaveUpdatesEnabled
 	// flip
 	i.SlaveHosts = i.Replicas
 	i.SlaveLagSeconds = this.ReplicationLagSeconds
+	i.LogSlaveUpdatesEnabled = this.LogReplicationUpdatesEnabled
 
 	return json.Marshal(i)
 }
@@ -396,7 +396,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 		return false, fmt.Errorf("instance does not have binary logs enabled: %+v", other.Key)
 	}
 	if other.IsReplica() {
-		if !other.LogSlaveUpdatesEnabled {
+		if !other.LogReplicationUpdatesEnabled {
 			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 		}
 		// OK for a master to not have log_slave_updates
@@ -405,7 +405,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
-	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+	if this.LogBinEnabled && this.LogReplicationUpdatesEnabled {
 		if this.IsSmallerBinlogFormat(other) {
 			return false, fmt.Errorf("Cannot replicate from %+v binlog format on %+v to %+v on %+v", other.Binlog_format, other.Key, this.Binlog_format, this.Key)
 		}
@@ -538,7 +538,7 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 	}
 	{
 		extraTokens := []string{}
-		if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+		if this.LogBinEnabled && this.LogReplicationUpdatesEnabled {
 			extraTokens = append(extraTokens, ">>")
 		}
 		if this.UsingGTID() || this.SupportsOracleGTID {

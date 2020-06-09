@@ -229,7 +229,7 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 			instance.Binlog_format = "INHERIT"
 			instance.ReadOnly = true
 			instance.LogBinEnabled = true
-			instance.LogSlaveUpdatesEnabled = true
+			instance.LogReplicationUpdatesEnabled = true
 			resolvedHostname = instance.Key.Hostname
 			latency.Start("backend")
 			UpdateResolvedHostname(resolvedHostname, resolvedHostname)
@@ -384,7 +384,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogReplicationUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
 		}
@@ -1096,7 +1096,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Binlog_format = m.GetString("binlog_format")
 	instance.BinlogRowImage = m.GetString("binlog_row_image")
 	instance.LogBinEnabled = m.GetBool("log_bin")
-	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
+	instance.LogReplicationUpdatesEnabled = m.GetBool("log_slave_updates")
 	instance.MasterKey.Hostname = m.GetString("master_host")
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
@@ -1676,7 +1676,7 @@ func GetClusterGhostReplicas(clusterName string) (result [](*Instance), err erro
 		if !instance.LogBinEnabled {
 			skipThisHost = true
 		}
-		if !instance.LogSlaveUpdatesEnabled {
+		if !instance.LogReplicationUpdatesEnabled {
 			skipThisHost = true
 		}
 		if !skipThisHost {
@@ -2472,7 +2472,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.Binlog_format)
 		args = append(args, instance.BinlogRowImage)
 		args = append(args, instance.LogBinEnabled)
-		args = append(args, instance.LogSlaveUpdatesEnabled)
+		args = append(args, instance.LogReplicationUpdatesEnabled)
 		args = append(args, instance.SelfBinlogCoordinates.LogFile)
 		args = append(args, instance.SelfBinlogCoordinates.LogPos)
 		args = append(args, instance.MasterKey.Hostname)

@@ -1418,7 +1418,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		return instancePseudoGtidCoordinates, instancePseudoGtidText, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 
-	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !*config.RuntimeCLIFlags.SkipBinlogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
+	if instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled && !*config.RuntimeCLIFlags.SkipBinlogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
 		minBinlogCoordinates, _, _ := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
 		// Well no need to search this instance's binary logs if it doesn't have any...
 		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
@@ -2061,7 +2061,7 @@ func isGenerallyValidAsBinlogSource(replica *Instance) bool {
 	if !replica.LogBinEnabled {
 		return false
 	}
-	if !replica.LogSlaveUpdatesEnabled {
+	if !replica.LogReplicationUpdatesEnabled {
 		return false
 	}
 
@@ -2091,7 +2091,7 @@ func isValidAsCandidateMasterInBinlogServerTopology(replica *Instance) bool {
 	if !replica.LogBinEnabled {
 		return false
 	}
-	if replica.LogSlaveUpdatesEnabled {
+	if replica.LogReplicationUpdatesEnabled {
 		// That's right: we *disallow* log-replica-updates
 		return false
 	}

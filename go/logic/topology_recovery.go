@@ -964,7 +964,7 @@ func isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instan
 	if !sibling.LogBinEnabled {
 		return false
 	}
-	if !sibling.LogSlaveUpdatesEnabled {
+	if !sibling.LogReplicationUpdatesEnabled {
 		return false
 	}
 	if !sibling.ReplicaRunning() {
@@ -1010,7 +1010,7 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpda
 	if !replica.LogBinEnabled {
 		return false
 	}
-	if requireLogSlaveUpdates && !replica.LogSlaveUpdatesEnabled {
+	if requireLogSlaveUpdates && !replica.LogReplicationUpdatesEnabled {
 		return false
 	}
 	if replica.IsBinlogServer() {
