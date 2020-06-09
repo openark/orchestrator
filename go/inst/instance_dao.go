@@ -526,10 +526,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
 		instance.ReplicationIOThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_IO_Running"))
 		instance.ReplicationSQLThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_SQL_Running"))
-		instance.Slave_IO_Running = instance.ReplicationIOThreadState.IsRunning()
+		instance.ReplicationIOThreadRuning = instance.ReplicationIOThreadState.IsRunning()
 		if isMaxScale110 {
 			// Covering buggy MaxScale 1.1.0
-			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
+			instance.ReplicationIOThreadRuning = instance.ReplicationIOThreadRuning && (m.GetString("Slave_IO_State") == "Binlog Dump")
 		}
 		instance.ReplicationSQLThreadRuning = instance.ReplicationSQLThreadState.IsRunning()
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
@@ -1101,7 +1101,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 	instance.ReplicationSQLThreadRuning = m.GetBool("slave_sql_running")
-	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.ReplicationIOThreadRuning = m.GetBool("slave_io_running")
 	instance.ReplicationSQLThreadState = ReplicationThreadState(m.GetInt("replication_sql_thread_state"))
 	instance.ReplicationIOThreadState = ReplicationThreadState(m.GetInt("replication_io_thread_state"))
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
@@ -2478,7 +2478,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.MasterKey.Hostname)
 		args = append(args, instance.MasterKey.Port)
 		args = append(args, instance.ReplicationSQLThreadRuning)
-		args = append(args, instance.Slave_IO_Running)
+		args = append(args, instance.ReplicationIOThreadRuning)
 		args = append(args, instance.ReplicationSQLThreadState)
 		args = append(args, instance.ReplicationIOThreadState)
 		args = append(args, instance.HasReplicationFilters)

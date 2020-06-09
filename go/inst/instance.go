@@ -145,12 +145,12 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	}{}
 	i.Instance = *this
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
-	i.ReplicationIOThreadRuning = this.Slave_IO_Running
 	// flip
 	i.SlaveHosts = i.Replicas
 	i.SlaveLagSeconds = this.ReplicationLagSeconds
 	i.LogSlaveUpdatesEnabled = this.LogReplicationUpdatesEnabled
 	i.Slave_SQL_Running = this.ReplicationSQLThreadRuning
+	i.Slave_IO_Running = this.ReplicationIOThreadRuning
 
 	return json.Marshal(i)
 }

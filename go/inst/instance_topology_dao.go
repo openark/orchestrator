@@ -141,7 +141,7 @@ func GetReplicationRestartPreserveStatements(instanceKey *InstanceKey, injectedS
 	if err != nil {
 		return statements, err
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		statements = append(statements, SemicolonTerminated(`stop slave io_thread`))
 	}
 	if instance.ReplicationSQLThreadRuning {
@@ -153,7 +153,7 @@ func GetReplicationRestartPreserveStatements(instanceKey *InstanceKey, injectedS
 	if instance.ReplicationSQLThreadRuning {
 		statements = append(statements, SemicolonTerminated(`start slave sql_thread`))
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		statements = append(statements, SemicolonTerminated(`start slave io_thread`))
 	}
 	return statements, err
@@ -231,7 +231,7 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_slave_enabled=?", enableReplica); err != nil {
 		return instance, log.Errore(err)
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		// Need to apply change by stopping starting IO thread
 		ExecInstance(instanceKey, "stop slave io_thread")
 		if _, err := ExecInstance(instanceKey, "start slave io_thread"); err != nil {
