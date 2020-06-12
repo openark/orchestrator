@@ -71,14 +71,14 @@ func (this InstancesByCountReplicas) Less(i, j int) bool {
 // Constant strings for Group Replication information
 // See https://dev.mysql.com/doc/refman/8.0/en/replication-group-members-table.html for additional information.
 const (
+	// Group member roles
+	GroupReplicationMemberRolePrimary   = "PRIMARY"
+	GroupReplicationMemberRoleSecondary = "SECONDARY"
 	// Group member states
 	GroupReplicationMemberStateOnline     = "ONLINE"
 	GroupReplicationMemberStateRecovering = "RECOVERING"
 	GroupReplicationMemberStateOffline    = "OFFLINE"
 	GroupReplicationMemberStateError      = "ERROR"
-	// Group member roles
-	GroupReplicationMemberRolePrimary   = "PRIMARY"
-	GroupReplicationMemberRoleSecondary = "SECONDARY"
 )
 
 // We use this map to identify whether the query failed because the server does not support group replication or due
