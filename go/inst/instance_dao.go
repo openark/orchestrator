@@ -784,10 +784,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	{
-		// wait for routines to finish before reading cluster attributes. This seems to be needed, as,
-		// otherwise, detecting whether a host is a replication group secondary to set up cluster attributes from its primary
-		// does not work. ToDo: Is there a better way to sync this?
-		waitGroup.Wait()
 		latency.Start("backend")
 		err = ReadInstanceClusterAttributes(instance)
 		latency.Stop("backend")
