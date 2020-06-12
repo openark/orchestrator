@@ -606,11 +606,10 @@ function normalizeInstance(instance) {
   // Setting the masterId to the group primary is what allows us to visualize group secondary members as replicating
   // from the group primary.
   if (instance.ReplicationGroupName != "" && (instance.ReplicationGroupMemberRole == "SECONDARY" || instance.ReplicationGroupMemberRole == ""))
-    masterKey = instance.ReplicationGroupPrimaryKey
+    masterKey = instance.ReplicationGroupPrimaryInstanceKey;
   else
-    masterKey = instance.MasterKey
-  instance.masterId = getInstanceId(masterKey.Hostname,
-    masterKey.Port);
+    masterKey = instance.MasterKey;
+  instance.masterId = getInstanceId(masterKey.Hostname, masterKey.Port);
 
   instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.ReplicationIOThreadRuning;
   instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.ReplicationIOThreadRuning;

@@ -145,7 +145,7 @@ type Instance struct {
 	ReplicationGroupMembers InstanceKeyMap
 
 	// Primary of the replication group
-	ReplicationGroupPrimaryKey InstanceKey
+	ReplicationGroupPrimaryInstanceKey InstanceKey
 }
 
 // NewInstance creates a new, empty instance
@@ -255,11 +255,11 @@ func (this *Instance) IsReplicationGroupMember() bool {
 }
 
 func (this *Instance) IsReplicationGroupPrimary() bool {
-	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryKey == this.Key
+	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryInstanceKey.Equals(&this.Key)
 }
 
 func (this *Instance) IsReplicationGroupSecondary() bool {
-	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryKey != this.Key
+	return this.IsReplicationGroupMember() && !this.ReplicationGroupPrimaryInstanceKey.Equals(&this.Key)
 }
 
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
@@ -327,12 +327,27 @@ func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
+// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server),
+// either via traditional async/semisync replication or group replication
 func (this *Instance) IsMaster() bool {
-	return !this.IsReplica() &&
-		((this.IsReplicationGroupMember() &&
-			this.ReplicationGroupMemberRole != GroupReplicationMemberRoleSecondary) ||
-			!this.IsReplicationGroupMember())
+	// If traditional replication is configured, it is for sure not a master
+	if this.IsReplica() {
+		return false
+	} else {
+		// If traditional replication is not configured, and it is also not part of a replication group, this host is
+		// a master
+		if !this.IsReplicationGroupMember() {
+			return true
+		} else {
+			// If traditional replication is not configured, and this host is part of a group, it is only considered a
+			// master if it has the role of group Primary. Otherwise it is not a master.
+			if this.ReplicationGroupMemberRole == GroupReplicationMemberRolePrimary {
+				return true
+			} else {
+				return false
+			}
+		}
+	}
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.

@@ -485,6 +485,12 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("MoveBelow: %+v is a secondary replication group member, hence, it cannot"+
+			" be relocated", instance.Key)
+	}
 
 	if sibling.IsBinlogServer() {
 		// Binlog server has same coordinates as master
@@ -656,6 +662,12 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("MoveBelowGTID: %+v is a secondary replication group member, hence, it "+
+			"cannot be relocated", instance.Key)
+	}
 	return moveInstanceBelowViaGTID(instance, other)
 }
 
@@ -766,7 +778,11 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
-
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("repoint: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	if masterKey == nil {
 		masterKey = &instance.MasterKey
 	}
@@ -925,6 +941,12 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	master, err := GetInstanceMaster(instance)
 	if err != nil {
 		return instance, err
+	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("MakeCoMaster: %+v is a secondary replication group member, hence, it "+
+			"cannot be relocated", instance.Key)
 	}
 	log.Debugf("Will check whether %+v's master (%+v) can become its co-master", instance.Key, master.Key)
 	if canMove, merr := master.CanMoveAsCoMaster(); !canMove {
@@ -1522,6 +1544,12 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		return instance, nil, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, nil, fmt.Errorf("MatchBelow: %+v is a secondary replication group member, hence, it "+
+			"cannot be relocated", *instanceKey)
+	}
 	if config.Config.PseudoGTIDPattern == "" {
 		return instance, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
@@ -1730,6 +1758,12 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
+	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("takeMaster: %+v is a secondary replication group member, hence, it "+
+			"cannot be relocated", instance.Key)
 	}
 	masterInstance, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
@@ -2025,6 +2059,11 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	}
 	if !instance.IsReplica() {
 		return instance, nil, fmt.Errorf("instance is not a replica: %+v", instanceKey)
+	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, nil, fmt.Errorf("MatchUp: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
 	}
 	master, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
