@@ -151,10 +151,9 @@ type Instance struct {
 // NewInstance creates a new, empty instance
 func NewInstance() *Instance {
 	return &Instance{
-		Replicas: make(map[InstanceKey]bool),
+		Replicas:                make(map[InstanceKey]bool),
 		ReplicationGroupMembers: make(map[InstanceKey]bool),
-		Problems: []string{},
-
+		Problems:                []string{},
 	}
 }
 

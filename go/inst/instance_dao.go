@@ -62,14 +62,13 @@ var instanceWriteChan = make(chan bool, backendDBConcurrency)
 // InstancesByCountReplicas is a sortable type for Instance
 type InstancesByCountReplicas [](*Instance)
 
-
 func (this InstancesByCountReplicas) Len() int      { return len(this) }
 func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountReplicas) Less(i, j int) bool {
 	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
-	// Constant strings for Group Replication information
+// Constant strings for Group Replication information
 // See https://dev.mysql.com/doc/refman/8.0/en/replication-group-members-table.html for additional information.
 const (
 	// Group member states
@@ -91,7 +90,6 @@ var GroupReplicationNotSupportedErrors = map[uint16]bool{
 	1193: true, // ERROR: 1193 (HY000): Unknown system variable 'group_replication_group_name'
 	1146: true, // ERROR: 1146 (42S02): Table 'performance_schema.replication_group_members' doesn't exist
 }
-
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
