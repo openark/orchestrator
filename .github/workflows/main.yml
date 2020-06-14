@@ -30,7 +30,7 @@ jobs:
       run:  script/test-unit
 
     - name: Set up SQLite
-      run:  cat /etc/*release && uname -a && sudo apt-get install sqlite3
+      run:  sudo apt-get update && sudo apt-get install sqlite3
 
     - name: Start local MySQL
       run: sudo /etc/init.d/mysql start
