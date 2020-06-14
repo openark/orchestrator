@@ -29,11 +29,14 @@ jobs:
     - name: Test unit
       run:  script/test-unit
 
+    - name: Update packages
+      run:  sudo apt-get update
+
     - name: Set up SQLite
-      run:  sudo apt-get update && sudo apt-get install sqlite3
+      run:  sudo apt-get install sqlite3
 
     - name: Start local MySQL
-      run: sudo /etc/init.d/mysql start
+      run:  sudo /etc/init.d/mysql start
 
     - name: Test integration
       run:  script/test-integration
