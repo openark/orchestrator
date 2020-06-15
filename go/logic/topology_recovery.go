@@ -173,11 +173,11 @@ type InstancesByCountReplicas [](*inst.Instance)
 func (this InstancesByCountReplicas) Len() int      { return len(this) }
 func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountReplicas) Less(i, j int) bool {
-	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
+	if len(this[i].Replicas) == len(this[j].Replicas) {
 		// Secondary sorting: prefer more advanced replicas
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 	}
-	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+	return len(this[i].Replicas) < len(this[j].Replicas)
 }
 
 var recoverDeadMasterCounter = metrics.NewCounter()
@@ -291,8 +291,8 @@ func prepareCommand(command string, topologyRecovery *TopologyRecovery) (result 
 	command = strings.Replace(command, "{lostSlaves}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{lostReplicas}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{countLostReplicas}", fmt.Sprintf("%d", len(topologyRecovery.LostReplicas)), -1)
-	command = strings.Replace(command, "{slaveHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
-	command = strings.Replace(command, "{replicaHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{slaveHosts}", analysisEntry.Replicas.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{replicaHosts}", analysisEntry.Replicas.ToCommaDelimitedList(), -1)
 
 	return command, async
 }
@@ -319,7 +319,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env = append(env, fmt.Sprintf("ORC_ORCHESTRATOR_HOST=%s", process.ThisHostname))
 	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%v", (topologyRecovery.SuccessorKey != nil)))
 	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostReplicas.ToCommaDelimitedList()))
-	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.SlaveHosts.ToCommaDelimitedList()))
+	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.Replicas.ToCommaDelimitedList()))
 	env = append(env, fmt.Sprintf("ORC_RECOVERY_UID=%s", topologyRecovery.UID))
 
 	if topologyRecovery.SuccessorKey != nil {
@@ -393,7 +393,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return nil, log.Errore(err)
 	}
-	promotedBinlogServer, err = inst.StopSlave(&promotedBinlogServer.Key)
+	promotedBinlogServer, err = inst.StopReplication(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -403,20 +403,20 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 		return promotedReplica, log.Errore(err)
 	}
 	// Align it with binlog server coordinates
-	promotedReplica, err = inst.StopSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.StopReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.StartSlaveUntilMasterCoordinates(&promotedReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+	promotedReplica, err = inst.StartReplicationUntilMasterCoordinates(&promotedReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.StopSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.StopReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
 	// Detach, flush binary logs forward
-	promotedReplica, err = inst.ResetSlave(&promotedReplica.Key)
+	promotedReplica, err = inst.ResetReplication(&promotedReplica.Key)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -457,14 +457,14 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 				return
 			}
 			postponedFunction := func() error {
-				binlogServerReplica, err := inst.StopSlave(&binlogServerReplica.Key)
+				binlogServerReplica, err := inst.StopReplication(&binlogServerReplica.Key)
 				if err != nil {
 					return err
 				}
 				// Make sure the BLS has the "next binlog" -- the one the master flushed & purged to. Otherwise the BLS
 				// will request a binlog the master does not have
 				if binlogServerReplica.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
-					binlogServerReplica, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+					binlogServerReplica, err = inst.StartReplicationUntilMasterCoordinates(&binlogServerReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 					if err != nil {
 						return err
 					}
@@ -850,9 +850,9 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			return nil, fmt.Errorf("RecoverDeadMaster: failed %+v promotion; %s", promotedReplica.Key, reason)
 		}
 		if config.Config.FailMasterPromotionOnLagMinutes > 0 &&
-			time.Duration(promotedReplica.SlaveLagSeconds.Int64)*time.Second >= time.Duration(config.Config.FailMasterPromotionOnLagMinutes)*time.Minute {
+			time.Duration(promotedReplica.ReplicationLagSeconds.Int64)*time.Second >= time.Duration(config.Config.FailMasterPromotionOnLagMinutes)*time.Minute {
 			// candidate replica lags too much
-			return nil, fmt.Errorf("RecoverDeadMaster: failed promotion. FailMasterPromotionOnLagMinutes is set to %d (minutes) and promoted replica %+v 's lag is %d (seconds)", config.Config.FailMasterPromotionOnLagMinutes, promotedReplica.Key, promotedReplica.SlaveLagSeconds.Int64)
+			return nil, fmt.Errorf("RecoverDeadMaster: failed promotion. FailMasterPromotionOnLagMinutes is set to %d (minutes) and promoted replica %+v 's lag is %d (seconds)", config.Config.FailMasterPromotionOnLagMinutes, promotedReplica.Key, promotedReplica.ReplicationLagSeconds.Int64)
 		}
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			return nil, fmt.Errorf("RecoverDeadMaster: failed promotion. FailMasterPromotionIfSQLThreadNotUpToDate is set and promoted replica %+v 's sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
@@ -883,10 +883,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// on GracefulMasterTakeoverCommandHint it makes utter sense to RESET SLAVE ALL and read_only=0, and there is no sense in not doing so.
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
 			{
-				_, err := inst.ResetSlaveOperation(&promotedReplica.Key)
+				_, err := inst.ResetReplicationOperation(&promotedReplica.Key)
 				if err != nil {
 					// Ugly, but this is important. Let's give it another try
-					_, err = inst.ResetSlaveOperation(&promotedReplica.Key)
+					_, err = inst.ResetReplicationOperation(&promotedReplica.Key)
 				}
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying RESET SLAVE ALL on promoted master: success=%t", (err == nil)))
 				if err != nil {
@@ -964,7 +964,7 @@ func isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instan
 	if !sibling.LogBinEnabled {
 		return false
 	}
-	if !sibling.LogSlaveUpdatesEnabled {
+	if !sibling.LogReplicationUpdatesEnabled {
 		return false
 	}
 	if !sibling.ReplicaRunning() {
@@ -1002,7 +1002,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	return true
 }
 
-func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpdates bool) bool {
+func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogReplicationUpdates bool) bool {
 	if !replica.IsLastCheckValid {
 		// something wrong with this replica right now. We shouldn't hope to be able to promote it
 		return false
@@ -1010,7 +1010,7 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpda
 	if !replica.LogBinEnabled {
 		return false
 	}
-	if requireLogSlaveUpdates && !replica.LogSlaveUpdatesEnabled {
+	if requireLogReplicationUpdates && !replica.LogReplicationUpdatesEnabled {
 		return false
 	}
 	if replica.IsBinlogServer() {
@@ -1396,21 +1396,32 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 }
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
+func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	return false, nil, nil
+}
+
+// checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil
 }
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
-func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) (instance *inst.Instance, err error) {
 	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
-		return
+		return nil, nil
 	}
-	go inst.ExecuteOnTopology(func() {
-		inst.ReadTopologyInstance(instanceKey)
-		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
-	})
+	instance, err = inst.ReadTopologyInstance(instanceKey)
+	inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
+	return instance, err
 }
 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
@@ -1425,7 +1436,7 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 	}
 }
 
-// emergentlyRestartReplicationOnTopologyInstance forces a RestartSlave on a given instance.
+// emergentlyRestartReplicationOnTopologyInstance forces a RestartReplication on a given instance.
 func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted on this specific replica
@@ -1453,7 +1464,7 @@ func isInEmergencyOperationGracefulPeriod(instanceKey *inst.InstanceKey) bool {
 // that's where we hope they realize the master is bad.
 func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
-		// While each replica's RestartSlave() is throttled on its own, it's also wasteful to
+		// While each replica's RestartReplication() is throttled on its own, it's also wasteful to
 		// iterate all replicas all the time. This is the reason why we do grand-throttle check.
 		return
 	}
@@ -1467,6 +1478,11 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 		replicaKey := &replica.Key
 		go emergentlyRestartReplicationOnTopologyInstance(replicaKey, analysisCode)
 	}
+}
+
+func emergentlyRecordStaleBinlogCoordinates(instanceKey *inst.InstanceKey, binlogCoordinates *inst.BinlogCoordinates) {
+	err := inst.RecordStaleInstanceBinlogCoordinates(instanceKey, binlogCoordinates)
+	log.Errore(err)
 }
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
@@ -1493,45 +1509,51 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 ) {
 	switch analysisCode {
 	// master
-	case inst.DeadMaster, inst.DeadMasterAndSomeSlaves:
+	case inst.DeadMaster, inst.DeadMasterAndSomeReplicas:
 		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
 			return checkAndRecoverGenericProblem, false
 		} else {
 			return checkAndRecoverDeadMaster, true
 		}
+	case inst.LockedSemiSyncMaster:
+		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
+			return checkAndRecoverGenericProblem, false
+		} else {
+			return checkAndRecoverLockedSemiSyncMaster, true
+		}
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSomeSlaves:
+	case inst.DeadIntermediateMasterAndSomeReplicas:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
+	case inst.DeadIntermediateMasterWithSingleReplicaFailingToConnect:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
+	case inst.AllIntermediateMasterReplicasFailingToConnectOrDead:
 		return checkAndRecoverDeadIntermediateMaster, true
-	case inst.DeadIntermediateMasterAndSlaves:
+	case inst.DeadIntermediateMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	// co-master
 	case inst.DeadCoMaster:
 		return checkAndRecoverDeadCoMaster, true
-	case inst.DeadCoMasterAndSomeSlaves:
+	case inst.DeadCoMasterAndSomeReplicas:
 		return checkAndRecoverDeadCoMaster, true
 	// master, non actionable
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMaster:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		return checkAndRecoverGenericProblem, false
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
-	// case inst.AllMasterSlavesStale:
+	// case inst.AllMasterReplicasStale:
 	//   return checkAndRecoverGenericProblem, false
 
 	return nil, false
@@ -1539,20 +1561,23 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 
 func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	switch analysisEntry.Analysis {
-	case inst.DeadMasterAndSlaves:
+	case inst.DeadMasterAndReplicas:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.LockedSemiSyncMasterHypothesis:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+		go emergentlyRecordStaleBinlogCoordinates(&analysisEntry.AnalyzedInstanceKey, &analysisEntry.AnalyzedInstanceBinlogCoordinates)
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicating:
+	case inst.AllMasterReplicasNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicatingOrDead:
+	case inst.AllMasterReplicasNotReplicatingOrDead:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.FirstTierSlaveFailingToConnectToMaster:
+	case inst.FirstTierReplicaFailingToConnectToMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	}
 }
@@ -1824,7 +1849,7 @@ func getGracefulMasterTakeoverDesignatedInstance(clusterMasterKey *inst.Instance
 			return nil, fmt.Errorf("GracefulMasterTakeover: no target instance indicated, failed to auto-detect candidate replica for master %+v. Aborting", *clusterMasterKey)
 		}
 		log.Debugf("GracefulMasterTakeover: candidateReplica=%+v", designatedInstance.Key)
-		if _, err := inst.StartSlave(&designatedInstance.Key); err != nil {
+		if _, err := inst.StartReplication(&designatedInstance.Key); err != nil {
 			return nil, fmt.Errorf("GracefulMasterTakeover:cannot start replication on designated replica %+v. Aborting", designatedKey)
 		}
 		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
@@ -1978,7 +2003,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 		}
 	}
 	if auto {
-		_, startReplicationErr := inst.StartSlave(&clusterMaster.Key)
+		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
 		if err == nil {
 			err = startReplicationErr
 		}

@@ -46,7 +46,7 @@ This sample is followed by a field breakdown:
     "ReadOnly": false,
     "Binlog_format": "ROW",
     "LogBinEnabled": true,
-    "LogSlaveUpdatesEnabled": true,
+    "LogReplicationUpdatesEnabled": true,
     "SelfBinlogCoordinates": {
         "LogFile": "mysql-bin.015656",
         "LogPos": 15082,
@@ -56,8 +56,8 @@ This sample is followed by a field breakdown:
         "Hostname": "mysql.01.instance.com",
         "Port": 3306
     },
-    "Slave_SQL_Running": true,
-    "Slave_IO_Running": true,
+    "ReplicationSQLThreadRuning": true,
+    "ReplicationIOThreadRuning": true,
     "HasReplicationFilters": false,
     "SupportsOracleGTID": true,
     "UsingOracleGTID": true,
@@ -86,11 +86,11 @@ This sample is followed by a field breakdown:
     },
     "SQLDelay": 0,
     "ExecutedGtidSet": "230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-49",
-    "SlaveLagSeconds": {
+    "ReplicationLagSeconds": {
         "Int64": 0,
         "Valid": true
     },
-    "SlaveHosts": [ ],
+    "Replicas": [ ],
     "ClusterName": "mysql.01.instance.com:3306",
     "DataCenter": "",
     "Region": "",
@@ -118,11 +118,11 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `ReadOnly`: the global `read_only` boolean value
 * `Binlog_format`: the global `binlog_format` MySQL param
 * `LogBinEnabled`: whether binary logs are enabled
-* `LogSlaveUpdatesEnabled`:  whether `log_slave_updates` MySQL param is enabled
+* `LogReplicationUpdatesEnabled`:  whether `log_slave_updates` MySQL param is enabled
 * `SelfBinlogCoordinates`: binary log file & position this instance write to (as in `SHOW MASTER STATUS`)
 * `MasterKey`: hostname & port of master, if any
-* `Slave_SQL_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`
-* `Slave_IO_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
+* `ReplicationSQLThreadRuning`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_SQL_Running`
+* `ReplicationIOThreadRuning`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
 * `HasReplicationFilters`: true if there's any replication filter
 * `SupportsOracleGTID`: true if cnfigured with `gtid_mode` (Oracle MySQL >= 5.6)
 * `UsingOracleGTID`: true if replica replicates via Oracle GTID
@@ -137,8 +137,8 @@ The structure of an Instance evolves and documentation will always fall behind. 
     `"Valid": false` indicates a `NULL`
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
-* `SlaveLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
-* `SlaveHosts`: list of MySQL replicas _hostname & port_)
+* `ReplicationLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
+* `Replicas`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, determined by `DataCenterPattern`, `DataCenterMap`, and `DetectDataCenterQuery`config variables
 * `Region`: (metadata) name of region, determined by `RegionPattern`, `RegionMap`, and `DetectRegionQuery`config variables
@@ -193,5 +193,5 @@ curl -s "http://my.orchestrator.service.com/api/instance-replicas/${master}" | j
 - Find all intermediate masters in `my_cluster`:
 
 ```
-curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.MasterKey.Hostname!="") | select(.SlaveHosts!=[]) .Key.Hostname'
+curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.MasterKey.Hostname!="") | select(.Replicas!=[]) .Key.Hostname'
 ```
