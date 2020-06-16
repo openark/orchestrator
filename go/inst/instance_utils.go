@@ -24,6 +24,7 @@ import (
 
 var (
 	DowntimeLostInRecoveryMessage = "lost-in-recovery"
+	DowntimeSeedInProcessMessage  = "seed-in-process"
 )
 
 // majorVersionsSortedByCount sorts (major) versions:

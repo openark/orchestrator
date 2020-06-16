@@ -562,6 +562,14 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		if err != nil {
 			return
 		}
+		targetInstanceKey := &inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.MySQLPort}
+		downtimeDuration := time.Duration(config.SeedDowntimeHours) * time.Hour
+		downtime := inst.NewDowntime(targetInstanceKey, "orchestrator-agent", "seed-in-process", downtimeDuration)
+		if err = inst.BeginDowntime(downtime); err != nil {
+			s.Status = Error
+			s.updateSeed(targetAgent, fmt.Sprintf("Error starting downtime on targetAgent: %+v", err))
+			return
+		}
 		agents := make(map[*Agent]SeedSide)
 		agents[targetAgent] = Target
 		agents[sourceAgent] = Source
@@ -690,6 +698,12 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 						s.Status = Completed
 						s.updateSeedState(agent.Info.Hostname, "Executed post-seed command")
 					}
+				}
+				targetInstanceKey := &inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.MySQLPort}
+				if _, err = inst.EndDowntime(targetInstanceKey); err != nil {
+					s.Status = Error
+					s.updateSeed(targetAgent, fmt.Sprintf("Error ending downtime on targetAgent: %+v", err))
+					return
 				}
 				s.Status = Completed
 				s.EndTimestamp = time.Now()

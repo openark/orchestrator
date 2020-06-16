@@ -58,6 +58,7 @@ const (
 	PseudoGTIDExpireMinutes                      = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
+	SeedDowntimeHours                            = 96
 )
 
 var deprecatedConfigurationVariables = []string{

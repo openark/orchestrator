@@ -125,17 +125,20 @@ func UpdateClusterAliases() error {
 				    left join database_instance_downtime using (hostname, port)
 				  where
 				    suggested_cluster_alias!=''
-						/* exclude newly demoted, downtimed masters */
+						/* exclude newly demoted, downtimed masters and hosts which are seeding */
 						and ifnull(
 								database_instance_downtime.downtime_active = 1
 								and database_instance_downtime.end_timestamp > now()
-								and database_instance_downtime.reason = ?
+								and (
+									database_instance_downtime.reason = ?
+									or database_instance_downtime.reason = ?
+								)
 							, 0) = 0
 					order by
 						ifnull(last_checked <= last_seen, 0) asc,
 						read_only desc,
 						num_slave_hosts asc
-			`, DowntimeLostInRecoveryMessage)
+			`, DowntimeLostInRecoveryMessage, DowntimeSeedInProcessMessage)
 		return log.Errore(err)
 	}
 	if err := ExecDBWriteFunc(writeFunc); err != nil {
