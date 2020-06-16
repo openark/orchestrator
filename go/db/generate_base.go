@@ -407,7 +407,7 @@ var generateSQLBase = []string{
 			port smallint(5) unsigned NOT NULL,
 			downtime_active tinyint(4) DEFAULT NULL,
 			begin_timestamp timestamp DEFAULT CURRENT_TIMESTAMP,
-			end_timestamp timestamp,
+			end_timestamp timestamp NULL,
 			owner varchar(128) CHARACTER SET utf8 NOT NULL,
 			reason text CHARACTER SET utf8 NOT NULL,
 			PRIMARY KEY (hostname, port)
