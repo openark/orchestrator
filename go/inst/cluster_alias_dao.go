@@ -147,7 +147,7 @@ func UpdateClusterAliases() error {
 			replace into
 					cluster_alias (alias, cluster_name, last_registered)
 				select
-						cluster_name, cluster_name, now()
+						cluster_name as alias, cluster_name, now()
 				  from
 				    database_instance
 				  group by
