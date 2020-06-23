@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"runtime"
 	"sort"
@@ -499,6 +500,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				instance.DataCenter = match[1]
 			}
 		}
+		// This can be overriden by DataCenterMap or later invocation of DetectDataCenterQuery
+	}
+	if dc, ok := mapHostIpNetwork(config.Config.DataCenterMap, instance); ok {
+		instance.DataCenter = dc
 		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
 	if config.Config.RegionPattern != "" {
@@ -508,6 +513,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				instance.Region = match[1]
 			}
 		}
+		// This can be overriden by RegionMap or later invocation of DetectRegionQuery
+	}
+	if region, ok := mapHostIpNetwork(config.Config.RegionMap, instance); ok {
+		instance.Region = region
 		// This can be overriden by later invocation of DetectRegionQuery
 	}
 	if config.Config.PhysicalEnvironmentPattern != "" {
@@ -517,6 +526,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				instance.PhysicalEnvironment = match[1]
 			}
 		}
+		// This can be overriden by PhysicalEnvironmentMap or later invocation of DetectPhysicalEnvironmentQuery
+	}
+	if env, ok := mapHostIpNetwork(config.Config.PhysicalEnvironmentMap, instance); ok {
+		instance.PhysicalEnvironment = env
 		// This can be overriden by later invocation of DetectPhysicalEnvironmentQuery
 	}
 
@@ -648,13 +661,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		go func() {
 			defer waitGroup.Done()
 			err := sqlutils.QueryRowsMap(db, `
-      	select
-      		substring_index(host, ':', 1) as slave_hostname
-      	from
-      		information_schema.processlist
-      	where
-          command IN ('Binlog Dump', 'Binlog Dump GTID')
-  		`,
+	select
+		substring_index(host, ':', 1) as slave_hostname
+	from
+		information_schema.processlist
+	where
+	  command IN ('Binlog Dump', 'Binlog Dump GTID')
+		`,
 				func(m sqlutils.RowMap) error {
 					cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
 					if resolveErr != nil {
@@ -677,13 +690,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		go func() {
 			defer waitGroup.Done()
 			err := sqlutils.QueryRowsMap(db, `
-      	select
-      		substring(service_URI,9) mysql_host
-      	from
-      		ndbinfo.processes
-      	where
-          process_name='mysqld'
-  		`,
+	select
+		substring(service_URI,9) mysql_host
+	from
+		ndbinfo.processes
+	where
+	  process_name='mysqld'
+		`,
 				func(m sqlutils.RowMap) error {
 					cname, resolveErr := ResolveHostname(m.GetString("mysql_host"))
 					if resolveErr != nil {
@@ -919,6 +932,58 @@ Cleanup:
 	_ = UpdateInstanceLastChecked(&instance.Key, partialSuccess)
 	latency.Stop("backend")
 	return nil, err
+}
+
+// mapHostIpNetwork attempts to match an instance to a key in the provided mapping and returns the
+// associated value when a match is found. Key matching is attempted in the following order:
+//    1. direct key lookup of "<hostname>:<port>"
+//    2. direct key lookup of "<hostname>"
+//    3. loop over each IP of <hostname>, performing a direct key lookup of "<ip>:<port>"
+//    4. loop over each IP of <hostname>, performing a direct key lookup of "<ip>"
+//    5. loop over each key in the mapping, and if the key is a CIDR, loop over each IP of
+//       <hostname> to test if the CIDR contains <ip>
+// Note: Because map order and DNS response record order can both be indeterminate, this function is
+// not necessarily idempotent in steps 3-5 above. That is, if two keys associated to different
+// values at the same "matching level" (3-5) match an instance, the result may be different on
+// subsequent calls to this function. This could specifically occur for instances with multiple IPs
+// (or IP + port combinations) that are mapped to different values or if multiple CIDR keys happen
+// to overlap. In practice, this issue should be rare if the mapping is carefully built.
+func mapHostIpNetwork(mapping map[string]string, instance *Instance) (string, bool) {
+	if len(mapping) == 0 {
+		return "", false
+	}
+	host := instance.Key.Hostname
+	port := instance.Key.Port
+	if res, ok := mapping[fmt.Sprintf("%s:%d", host, port)]; ok {
+		return res, true
+	}
+	if res, ok := mapping[host]; ok {
+		return res, true
+	}
+	ips, _, err := getHostnameIPs(host)
+	if err != nil {
+		return "", false
+	}
+	for _, ip := range ips {
+		if res, ok := mapping[fmt.Sprintf("%s:%d", ip, port)]; ok {
+			return res, true
+		}
+	}
+	for _, ip := range ips {
+		if res, ok := mapping[ip.String()]; ok {
+			return res, true
+		}
+	}
+	for k, v := range mapping {
+		if _, n, err := net.ParseCIDR(k); err == nil {
+			for _, ip := range ips {
+				if n.Contains(ip) {
+					return v, true
+				}
+			}
+		}
+	}
+	return "", false
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
@@ -1205,10 +1270,10 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(database_instance_downtime.downtime_active is not null and ifnull(database_instance_downtime.end_timestamp, now()) > now()) as is_downtimed,
-    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
+	ifnull(database_instance_downtime.reason, '') as downtime_reason,
 			ifnull(database_instance_downtime.owner, '') as downtime_owner,
 			ifnull(unix_timestamp() - unix_timestamp(begin_timestamp), 0) as elapsed_downtime_seconds,
-    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
+	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
 		from
 			database_instance
 			left join candidate_database_instance using (hostname, port)
@@ -1766,7 +1831,7 @@ func updateInstanceClusterName(instance *Instance) error {
 				cluster_name=?
 			where
 				hostname=? and port=?
-        	`, instance.ClusterName, instance.Key.Hostname, instance.Key.Port,
+		`, instance.ClusterName, instance.Key.Hostname, instance.Key.Port,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -1845,12 +1910,12 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 			    slave_instance.master_host, slave_instance.master_port
 			FROM
 			    database_instance slave_instance
-			        LEFT JOIN
+				LEFT JOIN
 			    hostname_resolve ON (slave_instance.master_host = hostname_resolve.hostname)
-			        LEFT JOIN
+				LEFT JOIN
 			    database_instance master_instance ON (
-			    	COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname
-			    	and slave_instance.master_port = master_instance.port)
+				COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname
+				and slave_instance.master_port = master_instance.port)
 			WHERE
 			    master_instance.last_checked IS NULL
 			    and slave_instance.master_host != ''
@@ -2349,12 +2414,12 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	}
 
 	q.WriteString(fmt.Sprintf(`INSERT %s INTO %s
-                (%s)
-        VALUES
-                %s
-        ON DUPLICATE KEY UPDATE
-                %s
-        `,
+		(%s)
+	VALUES
+		%s
+	ON DUPLICATE KEY UPDATE
+		%s
+	`,
 		ignore, table, col, val.String(), odku.String()))
 
 	return q.String(), nil
@@ -2668,9 +2733,9 @@ func WriteInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 func UpdateInstanceLastChecked(instanceKey *InstanceKey, partialSuccess bool) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update
-        		database_instance
-        	set
+		update
+			database_instance
+		set
 						last_checked = NOW(),
 						last_check_partial_success = ?
 			where
@@ -2696,10 +2761,10 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey, partialSuccess bool) er
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-    	update
-    		database_instance
-    	set
-    		last_attempted_check = NOW()
+	update
+		database_instance
+	set
+		last_attempted_check = NOW()
 			where
 				hostname = ?
 				and port = ?`,
@@ -2793,12 +2858,12 @@ func ForgetLongUnseenInstances() error {
 func SnapshotTopologies() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert ignore into
-        		database_instance_topology_history (snapshot_unix_timestamp,
-        			hostname, port, master_host, master_port, cluster_name, version)
-        	select
-        		UNIX_TIMESTAMP(NOW()),
-        		hostname, port, master_host, master_port, cluster_name, version
+		insert ignore into
+			database_instance_topology_history (snapshot_unix_timestamp,
+				hostname, port, master_host, master_port, cluster_name, version)
+		select
+			UNIX_TIMESTAMP(NOW()),
+			hostname, port, master_host, master_port, cluster_name, version
 			from
 				database_instance
 				`,
@@ -2850,7 +2915,7 @@ func RecordInstanceCoordinatesHistory() error {
 	{
 		writeFunc := func() error {
 			_, err := db.ExecOrchestrator(`
-        	delete from database_instance_coordinates_history
+		delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
 				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 2),

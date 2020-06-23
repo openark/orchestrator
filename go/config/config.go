@@ -181,8 +181,11 @@ type Configuration struct {
 	DetectInstanceAliasQuery                   string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
 	DetectPromotionRuleQuery                   string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
+	DataCenterMap                              map[string]string // map between hostnames(+port), IPs(+port), or CIDRs to a data center
 	RegionPattern                              string            // Regexp pattern with one group, extracting the region name from the hostname
+	RegionMap                                  map[string]string // map between hostnames(+port), IPs, or CIDRs to a region
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
+	PhysicalEnvironmentMap                     map[string]string // map between hostnames(+port), IPs(+port), or CIDRs to a physical environment
 	DetectDataCenterQuery                      string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
 	DetectRegionQuery                          string            // Optional query (executed on topology instance) that returns the region of an instance. If provided, must return one row, one column. Overrides RegionPattern and useful for installments where Region cannot be inferred by hostname
 	DetectPhysicalEnvironmentQuery             string            // Optional query (executed on topology instance) that returns the physical environment of an instance. If provided, must return one row, one column. Overrides PhysicalEnvironmentPattern and useful for installments where env cannot be inferred by hostname
@@ -356,7 +359,11 @@ func newConfiguration() *Configuration {
 		DetectInstanceAliasQuery:                   "",
 		DetectPromotionRuleQuery:                   "",
 		DataCenterPattern:                          "",
+		DataCenterMap:                              make(map[string]string),
+		RegionPattern:                              "",
+		RegionMap:                                  make(map[string]string),
 		PhysicalEnvironmentPattern:                 "",
+		PhysicalEnvironmentMap:                     make(map[string]string),
 		DetectDataCenterQuery:                      "",
 		DetectPhysicalEnvironmentQuery:             "",
 		DetectSemiSyncEnforcedQuery:                "",

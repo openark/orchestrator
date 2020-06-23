@@ -93,6 +93,7 @@ This sample is followed by a field breakdown:
     "Replicas": [ ],
     "ClusterName": "mysql.01.instance.com:3306",
     "DataCenter": "",
+    "Region": "",
     "PhysicalEnvironment": "",
     "ReplicationDepth": 1,
     "IsCoMaster": false,
@@ -139,8 +140,9 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `ReplicationLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `Replicas`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
-* `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable
-* `PhysicalEnvironment`: (metadata) name of environment, infered by `PhysicalEnvironmentPattern` config variable
+* `DataCenter`: (metadata) name of data center, determined by `DataCenterPattern`, `DataCenterMap`, and `DetectDataCenterQuery`config variables
+* `Region`: (metadata) name of region, determined by `RegionPattern`, `RegionMap`, and `DetectRegionQuery`config variables
+* `PhysicalEnvironment`: (metadata) name of environment, determined by `PhysicalEnvironmentPattern`, `PhysicalEnvironmentMap`, and `DetectPhysicalEnvironmentQuery` config variables
 * `ReplicationDepth`: distance from the master (master is `0`, direct replica is `1` and so on)
 * `IsCoMaster`: true when this instanceis part of a master-master pair
 * `IsLastCheckValid`: whether last attempt at reading this instane succeeeded
