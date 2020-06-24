@@ -124,12 +124,14 @@ func (q *Queue) collectStatistics() {
 	}
 }
 
-// QueueLen returns the length of the queue (channel size + queued size)
+// QueueLen returns the length of the 2 queue maps, those keys which
+// are queued, queuedKeys (not being processed yet) and consumedKeys
+// (those where discovery is actively taking place)
 func (q *Queue) QueueLen() int {
 	q.Lock()
 	defer q.Unlock()
 
-	return len(q.queue) + len(q.queuedKeys)
+	return len(q.queuedKeys) + len(q.consumedKeys)
 }
 
 // Push enqueues a key if it is not on a queue and is not being
