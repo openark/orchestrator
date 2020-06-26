@@ -157,6 +157,7 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 		FirstSeen:                       first,
 		LastSeen:                        last,
 		CountDistinctInstanceKeys:       len(names[InstanceKeys]),
+		CountDistinctOkInstanceKeys:     len(names[OkInstanceKeys]),
 		CountDistinctFailedInstanceKeys: len(names[FailedInstanceKeys]),
 		FailedDiscoveries:               counters[FailedDiscoveries],
 		SuccessfulDiscoveries:           counters[Discoveries],
