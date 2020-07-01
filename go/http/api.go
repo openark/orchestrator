@@ -3853,5 +3853,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "seeds", this.Seeds)
 
 	// Configurable status check endpoint
-	m.Get(config.Config.StatusEndpoint, this.StatusCheck)
+	if config.Config.StatusEndpoint == config.DefaultStatusAPIEndpoint {
+		this.registerAPIRequestNoProxy(m, "status", this.StatusCheck)
+	} else {
+		m.Get(config.Config.StatusEndpoint, this.StatusCheck)
+	}
 }
