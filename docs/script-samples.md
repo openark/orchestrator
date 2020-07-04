@@ -141,7 +141,7 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
   "Binlog_format": "ROW",
   "BinlogRowImage": "FULL",
   "LogBinEnabled": true,
-  "LogSlaveUpdatesEnabled": true,
+  "LogReplicationUpdatesEnabled": true,
   "SelfBinlogCoordinates": {
     "LogFile": "mysql-bin.000002",
     "LogPos": 333006336,
@@ -152,8 +152,8 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
     "Port": 0
   },
   "IsDetachedMaster": false,
-  "Slave_SQL_Running": false,
-  "Slave_IO_Running": false,
+  "ReplicationSQLThreadRuning": false,
+  "ReplicationIOThreadRuning": false,
   "HasReplicationFilters": false,
   "GTIDMode": "OFF",
   "SupportsOracleGTID": false,
@@ -185,11 +185,11 @@ $ orchestrator-client -c api -path instance/$master_host/3306 | jq .
   "SQLDelay": 0,
   "ExecutedGtidSet": "",
   "GtidPurged": "",
-  "SlaveLagSeconds": {
+  "ReplicationLagSeconds": {
     "Int64": 0,
     "Valid": true
   },
-  "SlaveHosts": [
+  "Replicas": [
     {
       "Hostname": "mysql-2222.dc1.domain.net",
       "Port": 3306
@@ -286,14 +286,14 @@ mysql-00ff.dc1.domain.net
 #### How many replicas to a specific instance?
 
 ```shell
-$ orchestrator-client -c api -path instance/$master_host/3306 | jq '.SlaveHosts | length'
+$ orchestrator-client -c api -path instance/$master_host/3306 | jq '.Replicas | length'
 3
 ```
 
 #### How many replicas to each of a cluster's members?
 
 ```shell
-$ orchestrator-client -c api -path cluster/alias/mycluster | jq '.[].SlaveHosts | length'
+$ orchestrator-client -c api -path cluster/alias/mycluster | jq '.[].Replicas | length'
 3
 0
 2
@@ -337,7 +337,7 @@ start slave io_thread;
 Compare with:
 
 ```shell
-$ orchestrator-client -c stop-slave -i mysql-bb00.dc1.domain.net
+$ orchestrator-client -c stop-replica -i mysql-bb00.dc1.domain.net
 mysql-bb00.dc1.domain.net:3306
 
 $ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r

@@ -22,8 +22,8 @@ import (
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.

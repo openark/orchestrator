@@ -57,7 +57,7 @@
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
-  "SlaveLagQuery": "",
+  "ReplicationLagQuery": "",
   "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
   "DetectClusterDomainQuery": "",
   "DetectInstanceAliasQuery": "",
@@ -98,6 +98,7 @@
   "SkipBinlogEventsContaining": [],
   "ReduceReplicationAnalysisCount": true,
   "FailureDetectionPeriodBlockMinutes": 60,
+  "FailMasterPromotionOnLagMinutes": 0,
   "RecoveryPeriodBlockSeconds": 3600,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
@@ -125,9 +126,6 @@
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
-  "PostTakeMasterProcesses": [
-    "echo 'Running PostTakeMasterProcesses Hook' >> /tmp/recovery.log"
-  ],
   "PostGracefulTakeoverProcesses": [
     "echo 'Planned takeover complete' >> /tmp/recovery.log"
   ],
@@ -136,9 +134,9 @@
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
-  "MasterFailoverDetachSlaveMasterHost": false,
+  "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
-  "PostponeSlaveRecoveryOnLagMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",

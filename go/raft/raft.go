@@ -26,9 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/util"
 
 	"github.com/hashicorp/raft"
 	"github.com/patrickmn/go-cache"
@@ -104,7 +104,7 @@ func computeLeaderURI() (uri string, err error) {
 		scheme = "https"
 	}
 
-	hostname := config.Config.RaftAdvertise
+	hostname := strings.Split(config.Config.RaftAdvertise, ":")[0]
 	listenTokens := strings.Split(config.Config.ListenAddress, ":")
 	if len(listenTokens) < 2 {
 		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)

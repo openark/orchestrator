@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+orchestrator-client -c ack-all-recoveries --reason "system-tests"
+mysqladmin -uci -pci -h 127.0.0.1 --port=10114 shutdown
+sleep 20

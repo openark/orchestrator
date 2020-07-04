@@ -39,20 +39,29 @@ Different environments require different actions taken on recovery/promotion
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
+  "FailMasterPromotionOnLagMinutes": 0,
   "FailMasterPromotionIfSQLThreadNotUpToDate": true,
   "DelayMasterPromotionIfSQLThreadNotUpToDate": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 10,
   "DetachLostReplicasAfterMasterFailover": true,
+  "MasterFailoverDetachReplicaMasterHost": false,
+  "MasterFailoverLostInstancesDowntimeMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
 }
 ```
 
-- `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`.
+- `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`. When `true`, overrides `MasterFailoverDetachSlaveMasterHost`.
 - `PreventCrossDataCenterMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same DC. It will do its best to find a replacement from same DC, and will abort (fail) the failover if it cannot find one. See also `DetectDataCenterQuery` and `DataCenterPattern` configuration variables.
 - `PreventCrossRegionMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same region. It will do its best to find a replacement from same region, and will abort (fail) the failover if it cannot find one. See also `DetectRegionQuery` and `RegionPattern` configuration variables.
+- `FailMasterPromotionOnLagMinutes`: defaults `0` (not failing promotion). Can be used to fail a promotion if the candidate replica is too far behind. Example: replicas were broken for 5 hours, and then master failed. One might want to prevent the failover in order to recover the binary logs / relay logs for those lost 5 hours.
+  To use this flag, you must set `ReplicationLagQuery` and use a heartbeat mechanism such as `pt-heartbeat`. The MySQL built-in `Seconds_behind_master` output of `SHOW SLAVE STATUS` (pre 8.0) does not report replication lag when replication is broken.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
 - `DelayMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. When `true`, 'orchestrator' will wait for the SQL thread to catch up before promoting a new master.
   `FailMasterPromotionIfSQLThreadNotUpToDate` and `DelayMasterPromotionIfSQLThreadNotUpToDate` are mutually exclusive.
 - `DetachLostReplicasAfterMasterFailover`: some replicas may get lost during recovery. When `true`, `orchestrator` will forcibly break their replication via `detach-replica` command to make sure no one assumes they're at all functional.
+- `MasterFailoverDetachReplicaMasterHost` : when `true`, `orchestrator` will issue a `detach-replica-master-host` on promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Default: `false`. Meaningless if `ApplyMySQLPromotionAfterMasterFailover` is `true`. `MasterFailoverDetachSlaveMasterHost` is an alias to this.
+- `MasterFailoverLostInstancesDowntimeMinutes`: number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). Set to 0 to disable. Default: 0.
+- `PostponeReplicaRecoveryOnLagMinutes`: on crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature. Default: 0. `PostponeSlaveRecoveryOnLagMinutes` is an alias to this.
 
 ### Hooks
 
@@ -141,14 +150,14 @@ And, in the event a recovery was successful:
 - `{failureCluster}`
 - `{failureClusterAlias}`
 - `{failureClusterDomain}`
-- `{countReplicas}` aka `{countSlaves}`
+- `{countReplicas}` (replaces `{countSlaves}`)
 - `{isDowntimed}`
 - `{autoMasterRecovery}`
 - `{autoIntermediateMasterRecovery}`
 - `{orchestratorHost}`
-- `{lostReplicas}` aka `{lostSlaves}`
+- `{lostReplicas}` (replaces `{lostSlaves}`)
 - `{countLostReplicas}`
-- `{replicaHosts}` aka `{slaveHosts}`
+- `{replicaHosts}` (replaces `{slaveHosts}`)
 - `{isSuccessful}`
 - `{command}` (`"force-master-failover"`, `"force-master-takeover"`, `"graceful-master-takeover"` if applicable)
 

@@ -2,7 +2,7 @@
 
 * By default, `orchestrator` only polls a server once a minute (configurable via `InstancePollSeconds`). This means that any status you see is essentially an estimation. Different instances get polled at different times. The status you see on the _cluster_ page, for example, does not necessarily reflect a given point in time, but rather a combination of different points in time in the last minute (or whatever poll interval you use).
 
-The `problems` drop down to the right is also executed asynchonously. You may therefore see the same instance in two
+The `problems` drop down to the right is also executed asynchronously. You may therefore see the same instance in two
 places (once in the `cluster` page, once in the `problems` drop down) in two different states.
 
 If you want to get the most up to date instance status, use the "Refresh" button on the instance's _settings dialog_.  

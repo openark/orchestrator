@@ -441,7 +441,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -518,7 +518,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -624,7 +624,7 @@ function Cluster() {
         };
       }
       if (instancesAreSiblings(node, droppableNode)) {
-        if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
+        if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogReplicationUpdatesEnabled) {
           return {
             accept: false
           };
@@ -787,7 +787,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -842,7 +842,7 @@ function Cluster() {
       }
       if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
         // droppableNode has master
-        if (!droppableNode.LogSlaveUpdatesEnabled) {
+        if (!droppableNode.LogReplicationUpdatesEnabled) {
           // Obviously can't handle.
           return {
             accept: false
@@ -1204,7 +1204,7 @@ function Cluster() {
         if (isAnonymized()) {
           instanceDescription = anonymizeInstanceId(instance.id);
         }
-        instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
+        instanceDescription += ", " + instance.ReplicationLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
         instance.Problems.forEach(function(problem) {
@@ -1216,6 +1216,7 @@ function Cluster() {
       aggergateInstance.title = "[aggregation]";
       if (dataCenter) {
         aggergateInstance.title = "[aggregation in " + dataCenter + "]";
+        aggergateInstance.InstanceAlias = aggergateInstance.title;
       }
       aggergateInstance.canonicalTitle = aggergateInstance.title;
       aggergateInstance.aggregatedInstances = instances; // includes itself
@@ -1305,8 +1306,15 @@ function Cluster() {
       })
     }
     knownDCs = uniq(knownDCs);
+    if (isColorizeDC() && !isAnonymized()) {
+      $('<span>Data centers:</span>').appendTo('#cluster_legend');
+    }
     for (i = 0; i < knownDCs.length; ++i) {
-      dcColorsMap[knownDCs[i]] = renderColors[i % renderColors.length];
+      var color = renderColors[i % renderColors.length]
+      dcColorsMap[knownDCs[i]] = color;
+      if (isColorizeDC() && !isAnonymized() && knownDCs[i]) {
+        $('<span>' + knownDCs[i] + '</span>').addClass("dc").css('border-color', color).appendTo('#cluster_legend');
+      }
     }
   }
 
@@ -1545,7 +1553,7 @@ function Cluster() {
         if (replica.SQLDelay > 0) {
           return
         }
-        if (!replica.LogSlaveUpdatesEnabled) {
+        if (!replica.LogReplicationUpdatesEnabled) {
           return
         }
         if (replica.lastCheckInvalidProblem()) {
@@ -1572,7 +1580,7 @@ function Cluster() {
         if (!sibling.LogBinEnabled) {
           return
         }
-        if (!sibling.LogSlaveUpdatesEnabled) {
+        if (!sibling.LogReplicationUpdatesEnabled) {
           return
         }
         if (sibling.lastCheckInvalidProblem()) {
@@ -1668,10 +1676,12 @@ function Cluster() {
     instances.forEach(function(instance) {
       if (instance.isMaster) {
         getData("/api/recently-active-instance-recovery/" + instance.Key.Hostname + "/" + instance.Key.Port, function(recoveries) {
+          if (!recoveries) {
+            return
+          }
           // Result is an array: either empty (no active recovery) or with multiple entries
-          recoveries.forEach(function(recoveryEntry) {
-            addInfo('<strong>' + instance.title + '</strong> has just recently (' + recoveryEntry.RecoveryEndTimestamp + ') been promoted as result of <strong>' + recoveryEntry.AnalysisEntry.Analysis + '</strong>. It may still take some time to rebuild topology graph.');
-          });
+          var recoveryEntry = recoveries[0];
+          addInfo('<strong>' + instance.title + '</strong> has just recently (' + recoveryEntry.RecoveryEndTimestamp + ') been promoted as result of <strong>' + recoveryEntry.AnalysisEntry.Analysis + '</strong>. It may still take some time to rebuild topology graph.');
         });
       }
     });
@@ -1757,10 +1767,12 @@ function Cluster() {
       });
     });
     getData("/api/recently-active-cluster-recovery/" + currentClusterName(), function(recoveries) {
+      if (!recoveries) {
+        return
+      }
       // Result is an array: either empty (no active recovery) or with multiple entries
-      recoveries.forEach(function(recoveryEntry) {
-        addInfo('This cluster just recently (' + recoveryEntry.RecoveryEndTimestamp + ') recovered from <strong><a href="' + appUrl('/web/audit-recovery/cluster/' + currentClusterName()) + '">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
-      });
+      var recoveryEntry = recoveries[0]
+      addInfo('This cluster just recently (' + recoveryEntry.RecoveryEndTimestamp + ') recovered from <strong><a href="' + appUrl('/web/audit-recovery/cluster/' + currentClusterName()) + '">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
     });
     getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function(blockedRecoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries

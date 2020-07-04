@@ -18,13 +18,14 @@ package inst
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/math"
+	"github.com/openark/orchestrator/go/config"
 )
 
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
@@ -32,62 +33,75 @@ const ReasonableDiscoveryLatency = 500 * time.Millisecond
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
-	Key                       InstanceKey
-	InstanceAlias             string
-	Uptime                    uint
-	ServerID                  uint
-	ServerUUID                string
-	Version                   string
-	VersionComment            string
-	FlavorName                string
-	ReadOnly                  bool
-	Binlog_format             string
-	BinlogRowImage            string
-	LogBinEnabled             bool
-	LogSlaveUpdatesEnabled    bool
-	SelfBinlogCoordinates     BinlogCoordinates
-	MasterKey                 InstanceKey
-	MasterUUID                string
-	AncestryUUID              string
-	IsDetachedMaster          bool
-	Slave_SQL_Running         bool
-	Slave_IO_Running          bool
-	ReplicationSQLThreadState ReplicationThreadState
-	ReplicationIOThreadState  ReplicationThreadState
-	HasReplicationFilters     bool
-	GTIDMode                  string
-	SupportsOracleGTID        bool
-	UsingOracleGTID           bool
-	UsingMariaDBGTID          bool
-	UsingPseudoGTID           bool
-	ReadBinlogCoordinates     BinlogCoordinates
-	ExecBinlogCoordinates     BinlogCoordinates
-	IsDetached                bool
-	RelaylogCoordinates       BinlogCoordinates
-	LastSQLError              string
-	LastIOError               string
-	SecondsBehindMaster       sql.NullInt64
-	SQLDelay                  uint
-	ExecutedGtidSet           string
-	GtidPurged                string
-	GtidErrant                string
+	Key                          InstanceKey
+	InstanceAlias                string
+	Uptime                       uint
+	ServerID                     uint
+	ServerUUID                   string
+	Version                      string
+	VersionComment               string
+	FlavorName                   string
+	ReadOnly                     bool
+	Binlog_format                string
+	BinlogRowImage               string
+	LogBinEnabled                bool
+	LogSlaveUpdatesEnabled       bool // for API backwards compatibility. Equals `LogReplicationUpdatesEnabled`
+	LogReplicationUpdatesEnabled bool
+	SelfBinlogCoordinates        BinlogCoordinates
+	MasterKey                    InstanceKey
+	MasterUUID                   string
+	AncestryUUID                 string
+	IsDetachedMaster             bool
+
+	Slave_SQL_Running          bool // for API backwards compatibility. Equals `ReplicationSQLThreadRuning`
+	ReplicationSQLThreadRuning bool
+	Slave_IO_Running           bool // for API backwards compatibility. Equals `ReplicationIOThreadRuning`
+	ReplicationIOThreadRuning  bool
+	ReplicationSQLThreadState  ReplicationThreadState
+	ReplicationIOThreadState   ReplicationThreadState
+
+	HasReplicationFilters bool
+	GTIDMode              string
+	SupportsOracleGTID    bool
+	UsingOracleGTID       bool
+	UsingMariaDBGTID      bool
+	UsingPseudoGTID       bool
+	ReadBinlogCoordinates BinlogCoordinates
+	ExecBinlogCoordinates BinlogCoordinates
+	IsDetached            bool
+	RelaylogCoordinates   BinlogCoordinates
+	LastSQLError          string
+	LastIOError           string
+	SecondsBehindMaster   sql.NullInt64
+	SQLDelay              uint
+	ExecutedGtidSet       string
+	GtidPurged            string
+	GtidErrant            string
 
 	masterExecutedGtidSet string // Not exported
 
-	SlaveLagSeconds                 sql.NullInt64
-	SlaveHosts                      InstanceKeyMap
-	ClusterName                     string
-	SuggestedClusterAlias           string
-	DataCenter                      string
-	Region                          string
-	PhysicalEnvironment             string
-	ReplicationDepth                uint
-	IsCoMaster                      bool
-	HasReplicationCredentials       bool
-	ReplicationCredentialsAvailable bool
-	SemiSyncEnforced                bool
-	SemiSyncMasterEnabled           bool
-	SemiSyncReplicaEnabled          bool
+	SlaveLagSeconds                   sql.NullInt64 // for API backwards compatibility. Equals `ReplicationLagSeconds`
+	ReplicationLagSeconds             sql.NullInt64
+	SlaveHosts                        InstanceKeyMap // for API backwards compatibility. Equals `Replicas`
+	Replicas                          InstanceKeyMap
+	ClusterName                       string
+	SuggestedClusterAlias             string
+	DataCenter                        string
+	Region                            string
+	PhysicalEnvironment               string
+	ReplicationDepth                  uint
+	IsCoMaster                        bool
+	HasReplicationCredentials         bool
+	ReplicationCredentialsAvailable   bool
+	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
+	SemiSyncEnforced                  bool
+	SemiSyncMasterEnabled             bool
+	SemiSyncReplicaEnabled            bool
+	SemiSyncMasterTimeout             uint
+	SemiSyncMasterWaitForReplicaCount uint
+	SemiSyncMasterStatus              bool
+	SemiSyncMasterClients             uint
+	SemiSyncReplicaStatus             bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool
@@ -113,14 +127,32 @@ type Instance struct {
 	Problems []string
 
 	LastDiscoveryLatency time.Duration
+
+	seed bool // Means we force this instance to be written to backend, even if it's invalid, empty or forgotten
 }
 
 // NewInstance creates a new, empty instance
 func NewInstance() *Instance {
 	return &Instance{
-		SlaveHosts: make(map[InstanceKey]bool),
-		Problems:   []string{},
+		Replicas: make(map[InstanceKey]bool),
+		Problems: []string{},
 	}
+}
+
+func (this *Instance) MarshalJSON() ([]byte, error) {
+	i := struct {
+		Instance
+	}{}
+	i.Instance = *this
+	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
+	// flip
+	i.SlaveHosts = i.Replicas
+	i.SlaveLagSeconds = this.ReplicationLagSeconds
+	i.LogSlaveUpdatesEnabled = this.LogReplicationUpdatesEnabled
+	i.Slave_SQL_Running = this.ReplicationSQLThreadRuning
+	i.Slave_IO_Running = this.ReplicationIOThreadRuning
+
+	return json.Marshal(i)
 }
 
 // Equals tests that this instance is the same instance as other. The function does not test
@@ -171,7 +203,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	return IsSmallerMajorVersion(this.Version, other.Version)
 }
 
-// IsSmallerMajorVersionByString cehcks if this instance has a smaller major version number than given one
+// IsSmallerMajorVersionByString checks if this instance has a smaller major version number than given one
 func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
 	return IsSmallerMajorVersion(this.Version, otherVersion)
 }
@@ -219,6 +251,13 @@ func (this *Instance) IsOracleMySQL() bool {
 		return false
 	}
 	return true
+}
+
+func (this *Instance) SetSeed() {
+	this.seed = true
+}
+func (this *Instance) IsSeed() bool {
+	return this.seed
 }
 
 // applyFlavorName
@@ -316,7 +355,7 @@ func (this *Instance) NextGTID() (string, error) {
 
 // AddReplicaKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
-	this.SlaveHosts.AddKey(*replicaKey)
+	this.Replicas.AddKey(*replicaKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
@@ -357,7 +396,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 		return false, fmt.Errorf("instance does not have binary logs enabled: %+v", other.Key)
 	}
 	if other.IsReplica() {
-		if !other.LogSlaveUpdatesEnabled {
+		if !other.LogReplicationUpdatesEnabled {
 			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 		}
 		// OK for a master to not have log_slave_updates
@@ -366,7 +405,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
-	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+	if this.LogBinEnabled && this.LogReplicationUpdatesEnabled {
 		if this.IsSmallerBinlogFormat(other) {
 			return false, fmt.Errorf("Cannot replicate from %+v binlog format on %+v to %+v on %+v", other.Binlog_format, other.Key, this.Binlog_format, this.Key)
 		}
@@ -413,7 +452,7 @@ func (this *Instance) CanMove() (bool, error) {
 		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
 	if !this.SecondsBehindMaster.Valid {
-		return false, fmt.Errorf("%+v: cannot determine slave lag", this.Key)
+		return false, fmt.Errorf("%+v: cannot determine replication lag", this.Key)
 	}
 	if !this.HasReasonableMaintenanceReplicationLag() {
 		return false, fmt.Errorf("%+v: lags too much", this.Key)
@@ -477,10 +516,10 @@ func (this *Instance) LagStatusString() string {
 	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
 		return "null"
 	}
-	if this.IsReplica() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
+	if this.IsReplica() && this.ReplicationLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return fmt.Sprintf("%+vs", this.ReplicationLagSeconds.Int64)
 	}
-	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
+	return fmt.Sprintf("%+vs", this.ReplicationLagSeconds.Int64)
 }
 
 func (this *Instance) descriptionTokens() (tokens []string) {
@@ -499,14 +538,24 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 	}
 	{
 		extraTokens := []string{}
-		if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+		if this.LogBinEnabled && this.LogReplicationUpdatesEnabled {
 			extraTokens = append(extraTokens, ">>")
 		}
 		if this.UsingGTID() || this.SupportsOracleGTID {
-			extraTokens = append(extraTokens, "GTID")
+			token := "GTID"
+			if this.GtidErrant != "" {
+				token = fmt.Sprintf("%s:errant", token)
+			}
+			extraTokens = append(extraTokens, token)
 		}
 		if this.UsingPseudoGTID {
 			extraTokens = append(extraTokens, "P-GTID")
+		}
+		if this.SemiSyncMasterStatus {
+			extraTokens = append(extraTokens, "semi:master")
+		}
+		if this.SemiSyncReplicaStatus {
+			extraTokens = append(extraTokens, "semi:replica")
 		}
 		if this.IsDowntimed {
 			extraTokens = append(extraTokens, "downtimed")

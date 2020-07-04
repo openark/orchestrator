@@ -1,7 +1,7 @@
 [Unit]
 Description=orchestrator: MySQL replication management and visualization
-Documentation=https://github.com/github/orchestrator
-After=syslog.target network.target
+Documentation=https://github.com/openark/orchestrator
+After=syslog.target network.target mysqld.service mysql.service 
 
 [Service]
 Type=simple
@@ -9,3 +9,6 @@ WorkingDirectory=/usr/local/orchestrator
 ExecStart=/usr/local/orchestrator/orchestrator http
 EnvironmentFile=-/etc/sysconfig/orchestrator
 ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

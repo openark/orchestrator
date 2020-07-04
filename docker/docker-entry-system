@@ -1,0 +1,43 @@
+#!/bin/bash
+
+echo "export PS1=\"\\[\\e[0;33m\\]\\h \\[\\e[0;97m\\]\\w\\[\\e[0;37m\\]\\\$ \"" >> /etc/bash.bashrc
+echo "alias redeploy-ci-env='(cd /orchestrator/orchestrator-ci-env ; ./script/docker-entry)'" >> /etc/bash.bashrc
+
+echo "setting up orchestrator..."
+sudo cp etc/systemd/orchestrator.service /etc/systemd/system/
+sudo mkdir -p /usr/local/orchestrator
+sudo cp bin/orchestrator /usr/local/orchestrator/
+sudo cp -R resources /usr/local/orchestrator/
+sudo cp resources/bin/orchestrator-client /usr/bin
+sudo cp tests/system/orchestrator-ci-system.conf.json /etc/orchestrator.conf.json
+
+echo "starting orchestrator service..."
+sudo systemctl daemon-reload
+sudo systemctl start orchestrator
+sudo systemctl status orchestrator
+echo "checking if service is healthy..."
+orchestrator-client -c api -path status | jq .Details.Healthy
+
+echo "Sleeping gracefully to let orchestrator detect the topology..."
+sleep 20
+
+echo ""
+echo "==============================================="
+echo "Welcome to orchestrator system test environment"
+echo "==============================================="
+echo ""
+echo "- orchestrator config file is at /etc/orchestrator.conf.json"
+echo "- Consul is running on standard port :8500"
+echo "- There is a MySQL cluster named 'ci' up and running."
+echo "  MySQL nodes are accessible with username 'ci', password 'ci' at ports :10111-:10114"
+echo "- HAProxy routes traffic to MySQL master on port :13306"
+echo ""
+echo "Here's how to invoke orchestrator-client:"
+echo "---"
+echo ""
+echo "orchestrator-client -c clusters-alias"
+orchestrator-client -c clusters-alias
+echo "orchestrator-client -c topology-tabulated -alias ci"
+orchestrator-client -c topology-tabulated -alias ci
+echo "---"
+echo ""
