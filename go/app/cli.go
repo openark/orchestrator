@@ -52,6 +52,11 @@ func (a stringSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a stringSlice) Less(i, j int) bool { return a[i] < a[j] }
 
 var commandSynonyms = map[string]string{
+	"stop-slave":                  "stop-replica",
+	"start-slave":                 "start-replica",
+	"restart-slave":               "restart-replica",
+	"reset-slave":                 "reset-replica",
+	"restart-slave-statements":    "restart-replica-statements",
 	"relocate-slaves":             "relocate-replicas",
 	"regroup-slaves":              "regroup-replicas",
 	"move-up-slaves":              "move-up-replicas",
@@ -604,7 +609,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("stop-slave", "Replication, general", `Issue a STOP SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.StopSlave(instanceKey)
+			_, err := inst.StopReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -613,7 +618,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("start-slave", "Replication, general", `Issue a START SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.StartSlave(instanceKey)
+			_, err := inst.StartReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -622,7 +627,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("restart-slave", "Replication, general", `STOP and START SLAVE on an instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.RestartSlave(instanceKey)
+			_, err := inst.RestartReplication(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -631,7 +636,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("reset-slave", "Replication, general", `Issues a RESET SLAVE command; use with care`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.ResetSlaveOperation(instanceKey)
+			_, err := inst.ResetReplicationOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -727,7 +732,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			statements, err := inst.GetSlaveRestartPreserveStatements(instanceKey, *config.RuntimeCLIFlags.Statement)
+			statements, err := inst.GetReplicationRestartPreserveStatements(instanceKey, *config.RuntimeCLIFlags.Statement)
 			if err != nil {
 				log.Fatale(err)
 			}

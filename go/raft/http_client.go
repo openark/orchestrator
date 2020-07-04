@@ -40,7 +40,7 @@ func setupHttpClient() error {
 	}
 
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify,
+		InsecureSkipVerify: config.Config.SSLSkipVerify,
 	}
 	if config.Config.UseSSL {
 		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)

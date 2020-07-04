@@ -46,9 +46,9 @@ $(document).ready(function() {
       });
       moreInfo += "</ul></div>";
     }
-    if (audit.AnalysisEntry.SlaveHosts.length > 0) {
+    if (audit.AnalysisEntry.Replicas.length > 0) {
       moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
-      audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
+      audit.AnalysisEntry.Replicas.forEach(function(instanceKey) {
         moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
       });
       moreInfo += "</ul></div>";

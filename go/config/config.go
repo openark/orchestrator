@@ -35,6 +35,7 @@ var (
 
 const (
 	LostInRecoveryDowntimeSeconds int = 60 * 60 * 24 * 365
+	DefaultStatusAPIEndpoint          = "/api/status"
 )
 
 var configurationLoaded chan bool = make(chan bool)
@@ -288,7 +289,7 @@ func newConfiguration() *Configuration {
 		ListenSocket:                               "",
 		HTTPAdvertise:                              "",
 		AgentsServerPort:                           ":3001",
-		StatusEndpoint:                             "/api/status",
+		StatusEndpoint:                             DefaultStatusAPIEndpoint,
 		StatusOUVerify:                             false,
 		BackendDB:                                  "mysql",
 		SQLite3DataFile:                            "",

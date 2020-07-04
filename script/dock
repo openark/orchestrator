@@ -7,6 +7,7 @@
 #   dock hub:                 build hub.docker.com image with latest tag
 #   dock pkg [target-path]:   build orchestrator release packages and copy to target path (default path: /tmp/orchestrator-release)
 #   dock system:              create and run a system test environment
+#   dock raft:                build and run orchestrator in a 3-node raft setup
 
 command="$1"
 
@@ -38,7 +39,11 @@ case "$command" in
     docker_target="orchestrator-system"
     docker build . -f docker/Dockerfile.system -t "${docker_target}" && docker run --rm -it -p 3000:3000 "${docker_target}:latest"
     ;;
+  "raft")
+    docker_target="orchestrator-raft"
+    docker build . -f docker/Dockerfile.raft -t "${docker_target}" && docker run --rm -it -p 3007:3007 -p 3008:3008 -p 3009:3009 "${docker_target}:latest"
+    ;;
   *)
-    >&2 echo "Usage: dock dock <test|alpine|packages|system> [arg]"
+    >&2 echo "Usage: dock dock <test|alpine|packages|system|raft> [arg]"
     exit 1
 esac
