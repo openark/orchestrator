@@ -1063,6 +1063,27 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 	return instanceKeys, nil
 }
 
+// ReadInstances returns a list of all instances from the database
+func ReadAllInstances() ([](*Instance), error) {
+	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
+	const (
+		condition = "1=1"
+		orderBy   = ""
+	)
+
+	instances, err := readInstancesByCondition(condition, nil, orderBy)
+	if err != nil {
+		return nil, fmt.Errorf("ReadAllInstances: %+v", err)
+	}
+
+	// update counters if we picked anything up
+	if len(instances) > 0 {
+		readInstanceCounter.Inc(int64(len(instances)))
+	}
+
+	return instances, nil
+}
+
 func ReadInstancePromotionRule(instance *Instance) (err error) {
 	var promotionRule CandidatePromotionRule = NeutralPromoteRule
 	query := `
