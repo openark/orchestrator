@@ -7,6 +7,114 @@
 			"revision": ""
 		},
 		{
+			"checksumSHA1": "iuiC7A7wOFd5yW+dWPfqrA7/+kw=",
+			"path": "github.com/github/orchestrator/go/agent",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "Bg9u/kV6h8UDomi+seCeS0ObFW0=",
+			"path": "github.com/github/orchestrator/go/app",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "WM3XeVcV33FaU7X9ZFwTwgeMV9A=",
+			"path": "github.com/github/orchestrator/go/attributes",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "oqQPwpFaI1BURT+aQY7tWmRD/hI=",
+			"path": "github.com/github/orchestrator/go/collection",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "wFf+W9sW7SvOGpP6BxPU52gtdnE=",
+			"path": "github.com/github/orchestrator/go/config",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "/eWwXETCHtdyugHJksJEYQtMZxo=",
+			"path": "github.com/github/orchestrator/go/db",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "L2tPDVHm9XyBrSZfgTsmmKXAh14=",
+			"path": "github.com/github/orchestrator/go/discovery",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "TUE/bpXSXkIX4Xc1jyLng1v6UZk=",
+			"path": "github.com/github/orchestrator/go/http",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "nlZv9LugvCEeiYvxqQoEf4JJnl8=",
+			"path": "github.com/github/orchestrator/go/inst",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "g7kuOZV4BDq8SPKTjnyahynrDMQ=",
+			"path": "github.com/github/orchestrator/go/kv",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "7Qt/K2w2hyY7HhS34jVe6v9tH94=",
+			"path": "github.com/github/orchestrator/go/logic",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "+LU3nqwz7tfL4VCd95QBYV4nIa4=",
+			"path": "github.com/github/orchestrator/go/metrics",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "EOy4Yoj4yWcUogrXFIgavI89sSw=",
+			"path": "github.com/github/orchestrator/go/metrics/query",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "Hy1RHnxz3DekQW3w1uoHzk5ZDpQ=",
+			"path": "github.com/github/orchestrator/go/os",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "kj1byPnJsEiyGCVdI1Qq1lh+XQE=",
+			"path": "github.com/github/orchestrator/go/process",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "e0Bqs5Xgx1C+jdoSNS25uHNRl9w=",
+			"path": "github.com/github/orchestrator/go/raft",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "J3tnyOcj1PO0R6NLKRXdiW8EsIY=",
+			"path": "github.com/github/orchestrator/go/ssl",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
+			"checksumSHA1": "KDqktDyTEroUuSXQxrMbRqbtBlE=",
+			"path": "github.com/github/orchestrator/go/util",
+			"revision": "71b91a6828ca48317137fc58875cedfc0b8ff74d",
+			"revisionTime": "2020-01-26T14:03:17Z"
+		},
+		{
 			"checksumSHA1": "VCKsz7001qwfA2bHLo/AOn0xos0=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "bf7f34fef176d890dfcc6e94319ac747291bc09a",
@@ -23,6 +131,12 @@
 			"path": "github.com/patrickmn/go-cache",
 			"revision": "1881a9bccb818787f68c52bfba648c6cf34c34fa",
 			"revisionTime": "2016-01-27T17:00:04Z"
+		},
+		{
+			"checksumSHA1": "kkJ5Y0GWprMPM+DzPPkDHKd7pDo=",
+			"path": "github.com/prometheus/client_golang",
+			"revision": "b0cdec211b8bf9d5b1edabff4d32088a11f18310",
+			"revisionTime": "2020-06-24T15:55:36Z"
 		},
 		{
 			"checksumSHA1": "/r6ySR3hhHOXoxpCvWdCMXQMZxw=",
