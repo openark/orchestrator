@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package main
+package lib
 
 import (
 	"github.com/openark/orchestrator/go/app"
@@ -29,5 +29,4 @@ func RunService(configFile string) {
 	}
 	config.SetRunAsLibrary()
 	app.Http(true)
-
 }
