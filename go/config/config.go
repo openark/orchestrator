@@ -29,6 +29,16 @@ import (
 	"github.com/openark/golib/log"
 )
 
+var runAsLibrary bool = false
+
+func IsRunAsLibrary() bool {
+	return runAsLibrary
+}
+
+func SetRunAsLibrary() {
+	runAsLibrary = true
+}
+
 var (
 	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )

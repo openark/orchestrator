@@ -27,6 +27,7 @@ func RunService(configFile string) {
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
+	config.SetRunAsLibrary()
 	app.Http(true)
 
 }

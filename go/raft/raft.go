@@ -349,7 +349,7 @@ func HealthyMembers() (advertised []string) {
 
 // Monitor is a utility function to routinely observe leadership state.
 // It doesn't actually do much; merely takes notes.
-func Monitor() {
+func Monitor() error {
 	t := time.Tick(5 * time.Second)
 	heartbeat := time.Tick(1 * time.Minute)
 	followerHealthTick := time.Tick(config.RaftHealthPollSeconds * time.Second)
@@ -374,7 +374,11 @@ func Monitor() {
 				go PublishCommand("request-health-report", athenticationToken)
 			}
 		case err := <-fatalRaftErrorChan:
-			log.Fatale(err)
+			if config.IsRunAsLibrary() {
+				return log.Errorf("Fatal raft error: %+v", err)
+			} else {
+				log.Fatale(err)
+			}
 		}
 	}
 }
