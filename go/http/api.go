@@ -3876,8 +3876,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequestNoProxy(m, "leader-check", this.LeaderCheck)
 	this.registerAPIRequestNoProxy(m, "leader-check/:errorStatusCode", this.LeaderCheck)
 	this.registerAPIRequestNoProxy(m, "grab-election", this.GrabElection)
-	this.registerAPIRequestNoProxy(m, "raft-add-peer/:addr", this.RaftAddPeer)
-	this.registerAPIRequestNoProxy(m, "raft-remove-peer/:addr", this.RaftRemovePeer)
+	this.registerAPIRequest(m, "raft-add-peer/:addr", this.RaftAddPeer)       // delegated to the raft leader
+	this.registerAPIRequest(m, "raft-remove-peer/:addr", this.RaftRemovePeer) // delegated to the raft leader
 	this.registerAPIRequestNoProxy(m, "raft-yield/:node", this.RaftYield)
 	this.registerAPIRequestNoProxy(m, "raft-yield-hint/:hint", this.RaftYieldHint)
 	this.registerAPIRequestNoProxy(m, "raft-peers", this.RaftPeers)
