@@ -206,15 +206,15 @@ func IsEncryptedPEM(pemFile string) bool {
 // ListenAndServeTLS acts identically to http.ListenAndServeTLS, except that it
 // expects TLS configuration.
 // TODO: refactor so this is testable?
-func ListenAndServeTLS(addr string, handler nethttp.Handler, tlsConfig *tls.Config) error {
-	if addr == "" {
+func ListenAndServeTLS(server *nethttp.Server, tlsConfig *tls.Config) error {
+	if server.Addr == "" {
 		// On unix Listen calls getaddrinfo to parse the port, so named ports are fine as long
 		// as they exist in /etc/services
-		addr = ":https"
+		server.Addr = ":https"
 	}
-	l, err := tls.Listen("tcp", addr, tlsConfig)
+	l, err := tls.Listen("tcp", server.Addr, tlsConfig)
 	if err != nil {
 		return err
 	}
-	return nethttp.Serve(l, handler)
+	return server.Serve(l)
 }
