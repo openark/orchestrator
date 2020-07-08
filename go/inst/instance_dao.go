@@ -429,7 +429,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
 						semiSyncMasterPluginLoaded = true
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_timeout" {
-						instance.SemiSyncMasterTimeout = m.GetInt64("Value")
+						instance.SemiSyncMasterTimeout = m.GetUint64("Value")
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_master_wait_for_slave_count" {
 						instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("Value")
 					} else if m.GetString("Variable_name") == "rpl_semi_sync_slave_enabled" {
@@ -1139,7 +1139,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.SemiSyncAvailable = m.GetBool("semi_sync_available")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
-	instance.SemiSyncMasterTimeout = m.GetInt64("semi_sync_master_timeout")
+	instance.SemiSyncMasterTimeout = m.GetUint64("semi_sync_master_timeout")
 	instance.SemiSyncMasterWaitForReplicaCount = m.GetUint("semi_sync_master_wait_for_slave_count")
 	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
 	instance.SemiSyncMasterStatus = m.GetBool("semi_sync_master_status")
