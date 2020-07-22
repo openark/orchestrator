@@ -317,7 +317,7 @@ var generateSQLBase = []string{
 			in_active_period tinyint unsigned NOT NULL DEFAULT 0,
 			start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			end_active_period_unixtime int unsigned,
-			end_recovery timestamp NULL,
+			end_recovery timestamp NULL DEFAULT NULL,
 			processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
 			processcing_node_token varchar(128) NOT NULL,
 			successor_hostname varchar(128) DEFAULT NULL,
@@ -407,7 +407,7 @@ var generateSQLBase = []string{
 			port smallint(5) unsigned NOT NULL,
 			downtime_active tinyint(4) DEFAULT NULL,
 			begin_timestamp timestamp DEFAULT CURRENT_TIMESTAMP,
-			end_timestamp timestamp,
+			end_timestamp timestamp NULL DEFAULT NULL,
 			owner varchar(128) CHARACTER SET utf8 NOT NULL,
 			reason text CHARACTER SET utf8 NOT NULL,
 			PRIMARY KEY (hostname, port)

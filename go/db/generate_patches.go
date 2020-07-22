@@ -576,4 +576,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN semi_sync_available TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_enforced
 	`,
+	`
+		ALTER TABLE /* sqlite3-skip */
+			database_instance
+			MODIFY semi_sync_master_timeout BIGINT UNSIGNED NOT NULL DEFAULT 0
+	`,
 }
