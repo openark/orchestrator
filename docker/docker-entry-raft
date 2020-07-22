@@ -1,0 +1,44 @@
+#!/bin/bash
+
+
+deploy_and_run_orchestrator() {
+  local NODE_ID="$1"
+
+  echo "setting up orchestrator-$NODE_ID..."
+
+  sudo mkdir -p "/tmp/orchestrator-$NODE_ID"
+
+  sudo cp conf/orchestrator-raft-env.conf.json "/etc/orchestrator-$NODE_ID.conf.json"
+  sudo sed -i "/etc/orchestrator-$NODE_ID.conf.json" -e "s/NODE_ID_PLACEHOLDER/$NODE_ID/g"
+
+  sudo cp etc/systemd/orchestrator.service "/etc/systemd/system/orchestrator-${NODE_ID}.service"
+  sudo sed -i "/etc/systemd/system/orchestrator-${NODE_ID}.service" -e "s~/usr/local/orchestrator/orchestrator~/usr/local/orchestrator/orchestrator --config=/etc/orchestrator-$NODE_ID.conf.json~g"
+
+  echo "starting orchestrator-$NODE_ID service..."
+  sudo systemctl daemon-reload
+  sudo systemctl start "orchestrator-$NODE_ID"
+  sudo systemctl status "orchestrator-$NODE_ID"
+  echo "checking if service is healthy..."
+  orchestrator-client -api "http://127.0.0.1:300$NODE_ID" -c api -path status | jq .Details.Healthy
+}
+
+sudo mkdir -p /usr/local/orchestrator
+sudo cp bin/orchestrator /usr/local/orchestrator/
+sudo cp -R resources /usr/local/orchestrator/
+sudo cp resources/bin/orchestrator-client /usr/bin
+
+for id in 7 8 9 ; do
+  deploy_and_run_orchestrator "$id"
+done
+
+echo "export PS1=\"\\[\\e[0;33m\\]\\h \\[\\e[0;97m\\]\\w\\[\\e[0;37m\\]\\\$ \"" >> /etc/bash.bashrc
+echo 'export ORCHESTRATOR_API="http://127.0.0.1:3007/api http://127.0.0.1:3008/api http://127.0.0.1:3009/api"' | sudo tee /etc/profile.d/orchestrator-client.sh
+
+echo ""
+echo "Here's how to invoke orchestrator-client:"
+echo "---"
+echo ""
+echo "orchestrator-client -c api -path status | jq ."
+orchestrator-client -c api -path status | jq .
+echo "---"
+echo ""

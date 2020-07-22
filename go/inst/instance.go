@@ -97,7 +97,7 @@ type Instance struct {
 	SemiSyncEnforced                  bool
 	SemiSyncMasterEnabled             bool
 	SemiSyncReplicaEnabled            bool
-	SemiSyncMasterTimeout             uint
+	SemiSyncMasterTimeout             uint64
 	SemiSyncMasterWaitForReplicaCount uint
 	SemiSyncMasterStatus              bool
 	SemiSyncMasterClients             uint

@@ -35,6 +35,7 @@ var (
 
 const (
 	LostInRecoveryDowntimeSeconds int = 60 * 60 * 24 * 365
+	DefaultStatusAPIEndpoint          = "/api/status"
 )
 
 var configurationLoaded chan bool = make(chan bool)
@@ -124,8 +125,9 @@ type Configuration struct {
 	MySQLOrchestratorSSLCAFile                 string   // Certificate Authority PEM file used to authenticate with the Orchestrator mysql instance with TLS
 	MySQLOrchestratorSSLSkipVerify             bool     // If true, do not strictly validate mutual TLS certs for the Orchestrator mysql instances
 	MySQLOrchestratorUseMutualTLS              bool     // Turn on TLS authentication with the Orchestrator MySQL instance
-	MySQLConnectTimeoutSeconds                 int      // Number of seconds before connection is aborted (driver-side)
 	MySQLOrchestratorReadTimeoutSeconds        int      // Number of seconds before backend mysql read operation is aborted (driver-side)
+	MySQLOrchestratorRejectReadOnly            bool     // Reject read only connections https://github.com/go-sql-driver/mysql#rejectreadonly
+	MySQLConnectTimeoutSeconds                 int      // Number of seconds before connection is aborted (driver-side)
 	MySQLDiscoveryReadTimeoutSeconds           int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for discovery queries.
 	MySQLTopologyReadTimeoutSeconds            int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for all but discovery queries.
 	MySQLConnectionLifetimeSeconds             int      // Number of seconds the mysql driver will keep database connection alive before recycling it
@@ -287,7 +289,7 @@ func newConfiguration() *Configuration {
 		ListenSocket:                               "",
 		HTTPAdvertise:                              "",
 		AgentsServerPort:                           ":3001",
-		StatusEndpoint:                             "/api/status",
+		StatusEndpoint:                             DefaultStatusAPIEndpoint,
 		StatusOUVerify:                             false,
 		BackendDB:                                  "mysql",
 		SQLite3DataFile:                            "",
@@ -306,6 +308,7 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorUseMutualTLS:              false,
 		MySQLConnectTimeoutSeconds:                 2,
 		MySQLOrchestratorReadTimeoutSeconds:        30,
+		MySQLOrchestratorRejectReadOnly:            false,
 		MySQLDiscoveryReadTimeoutSeconds:           10,
 		MySQLTopologyReadTimeoutSeconds:            600,
 		MySQLConnectionLifetimeSeconds:             0,
