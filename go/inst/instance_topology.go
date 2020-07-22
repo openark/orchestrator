@@ -65,7 +65,11 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 			prefix += "-" + fillerCharacter
 		}
 	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	entryAlias := ""
+	if instance.InstanceAlias != "" {
+		entryAlias = fmt.Sprintf(" (%s)", instance.InstanceAlias)
+	}
+	entry := fmt.Sprintf("%s%s%s", prefix, instance.Key.DisplayString(), entryAlias)
 	if extendedOutput {
 		if tabulated {
 			entry = fmt.Sprintf("%s%s%s", entry, tabulatorScharacter, instance.TabulatedDescription(tabulatorScharacter))
