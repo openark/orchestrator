@@ -62,7 +62,6 @@ No.
 
 ### Does orchestrator support MySQL Group Replication?
 
-
 Partially. Replication groups in single primary mode are somewhat supported under MySQL 8.0. The extent of the support 
 so far is:
 
