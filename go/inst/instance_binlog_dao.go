@@ -533,7 +533,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 		}
 		// Got here? Unfound. Keep looking
 		if minBinlogCoordinates != nil && minBinlogCoordinates.LogFile == currentBinlog.LogFile {
-			log.Debugf("Heuristic master binary logs search failed; continuing exhaustive search")
+			log.Debugf("Heuristic main binary logs search failed; continuing exhaustive search")
 			minBinlogCoordinates = nil
 		} else {
 			currentBinlog, err = currentBinlog.PreviousFileCoordinates()
@@ -628,29 +628,29 @@ func special56To57filterProcessing(instance *Instance, other *Instance) (bool, b
 	}
 
 	filterInstance := instance.FlavorNameAndMajorVersion() == "MySQL-5.7" && // 5.7 replica
-		other.FlavorNameAndMajorVersion() == "MySQL-5.6" // replicating under 5.6 master
+		other.FlavorNameAndMajorVersion() == "MySQL-5.6" // replicating under 5.6 main
 
 	// The logic for other is a bit weird and may require us
-	// to check the instance's master.  To avoid this do some
-	// preliminary checks first to avoid the "master" access
+	// to check the instance's main.  To avoid this do some
+	// preliminary checks first to avoid the "main" access
 	// unless absolutely needed.
 	if instance.LogBinEnabled || // instance writes binlogs (not relay logs)
 		instance.FlavorNameAndMajorVersion() != "MySQL-5.7" || // instance NOT 5.7 replica
-		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new master is NOT 5.7
-		return filterInstance, false /* good exit status avoiding checking master */, nil
+		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new main is NOT 5.7
+		return filterInstance, false /* good exit status avoiding checking main */, nil
 	}
 
-	// We need to check if the master is 5.6
-	// - Do not call GetInstanceMaster() as that requires the
-	//   master to be available, and this code may be called
-	//   during a master/intermediate master failover when the
-	//   master may not actually be reachable.
-	master, _, err := ReadInstance(&instance.MasterKey)
+	// We need to check if the main is 5.6
+	// - Do not call GetInstanceMain() as that requires the
+	//   main to be available, and this code may be called
+	//   during a main/intermediate main failover when the
+	//   main may not actually be reachable.
+	main, _, err := ReadInstance(&instance.MainKey)
 	if err != nil {
-		return false, false, log.Errorf("special56To57filterProcessing: ReadInstance(%+v) fails: %+v", instance.MasterKey, err)
+		return false, false, log.Errorf("special56To57filterProcessing: ReadInstance(%+v) fails: %+v", instance.MainKey, err)
 	}
 
-	filterOther := master.FlavorNameAndMajorVersion() == "MySQL-5.6" // master(instance) == 5.6
+	filterOther := main.FlavorNameAndMajorVersion() == "MySQL-5.6" // main(instance) == 5.6
 
 	return filterInstance, filterOther, nil
 }
@@ -757,7 +757,7 @@ func GetNextBinlogCoordinatesToMatch(
 			case RelayLog:
 				// Argghhhh! SHOW RELAY LOG EVENTS IN '...' statement returns CRAPPY values for End_log_pos:
 				// instead of returning the end log pos of the current statement in the *relay log*, it shows
-				// the end log pos of the matching statement in the *master's binary log*!
+				// the end log pos of the matching statement in the *main's binary log*!
 				// Yes, there's logic to this. But this means the next-ccordinates are meaningless.
 				// As result, in the case where we exhaust (following) the relay log, we cannot do our last
 				// nice sanity test that we've indeed reached the Relay_log_pos coordinate; we are only at the
@@ -794,9 +794,9 @@ func GetNextBinlogCoordinatesToMatch(
 			log.Debugf("> %s", formatEventCleanly(instanceEvent, &beautifyCoordinatesLength))
 		}
 		{
-			// Extract next binlog/relaylog entry from other (intended master):
+			// Extract next binlog/relaylog entry from other (intended main):
 			// - this must have binlogs. We may need to filter anonymous events if we were processing
-			//   a relay log on instance and the instance's master runs 5.6
+			//   a relay log on instance and the instance's main runs 5.6
 			var event *BinlogEvent
 			var err error
 			for done := false; !done; {
@@ -813,7 +813,7 @@ func GetNextBinlogCoordinatesToMatch(
 			if event == nil {
 				// end of binary logs for otherInstance: this is unexpected and means instance is more advanced
 				// than otherInstance
-				return nil, noMatchedEvents, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a replica (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
+				return nil, noMatchedEvents, log.Errorf("Unexpected end of binary logs for assumed main (%+v). This means the instance which attempted to be a replica (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
 			}
 
 			otherEvent = *event // make a physical copy

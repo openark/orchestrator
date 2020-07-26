@@ -168,7 +168,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		// Instances that _are_ in our own database will self-discover. No need
 		// to explicitly discover them.
 		discoveredKeys := 0
-		// v2: read keys + master keys
+		// v2: read keys + main keys
 		for _, minimalInstance := range snapshotData.MinimalInstances {
 			if !existingKeysMap.HasKey(minimalInstance.Key) {
 				if err := inst.WriteInstance(minimalInstance.ToInstance(), false, nil); err == nil {

@@ -97,7 +97,7 @@ func TestCatalog_Registration(t *testing.T) {
 	service := &AgentService{
 		ID:      "redis1",
 		Service: "redis",
-		Tags:    []string{"master", "v1"},
+		Tags:    []string{"main", "v1"},
 		Port:    8000,
 	}
 

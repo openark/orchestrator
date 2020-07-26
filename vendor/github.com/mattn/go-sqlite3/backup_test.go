@@ -103,7 +103,7 @@ func testBackup(t *testing.T, testRowCount int, usePerPageSteps bool) {
 
 	// Confirm that the destination database is initially empty.
 	var destTableCount int
-	err = destDb.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'").Scan(&destTableCount)
+	err = destDb.QueryRow("SELECT COUNT(*) FROM sqlite_main WHERE type = 'table'").Scan(&destTableCount)
 	if err != nil {
 		t.Fatal("Failed to check the destination table count:", err)
 	}
@@ -205,7 +205,7 @@ func testBackup(t *testing.T, testRowCount int, usePerPageSteps bool) {
 
 	// Confirm that the "test" table now exists in the destination database.
 	var doesTestTableExist bool
-	err = destDb.QueryRow("SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'test' LIMIT 1) AS test_table_exists").Scan(&doesTestTableExist)
+	err = destDb.QueryRow("SELECT EXISTS (SELECT 1 FROM sqlite_main WHERE type = 'table' AND name = 'test' LIMIT 1) AS test_table_exists").Scan(&doesTestTableExist)
 	if err != nil {
 		t.Fatal("Failed to check if the \"test\" table exists in the destination database:", err)
 	}

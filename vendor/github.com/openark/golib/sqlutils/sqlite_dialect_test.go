@@ -84,7 +84,7 @@ func TestToSqlite3AlterTable(t *testing.T) {
 		statement := `
 			ALTER TABLE
 				database_instance
-				ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER slave_lag_seconds
+				ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER subordinate_lag_seconds
 		`
 		result := stripSpaces(ToSqlite3Dialect(statement))
 		test.S(t).ExpectEquals(result, stripSpaces(`
@@ -97,13 +97,13 @@ func TestToSqlite3AlterTable(t *testing.T) {
 		statement := `
 			ALTER TABLE
 				database_instance
-				ADD INDEX master_host_port_idx (master_host, master_port)
+				ADD INDEX main_host_port_idx (main_host, main_port)
 		`
 		result := stripSpaces(ToSqlite3Dialect(statement))
 		test.S(t).ExpectEquals(result, stripSpaces(`
 			create index
-				master_host_port_idx_database_instance
-				on database_instance (master_host, master_port)
+				main_host_port_idx_database_instance
+				on database_instance (main_host, main_port)
 			`))
 	}
 	{
@@ -126,14 +126,14 @@ func TestCreateIndex(t *testing.T) {
 	{
 		statement := `
 			create index
-				master_host_port_idx_database_instance
-				on database_instance (master_host(128), master_port)
+				main_host_port_idx_database_instance
+				on database_instance (main_host(128), main_port)
 		`
 		result := stripSpaces(ToSqlite3Dialect(statement))
 		test.S(t).ExpectEquals(result, stripSpaces(`
 			create index
-				master_host_port_idx_database_instance
-				on database_instance (master_host, master_port)
+				main_host_port_idx_database_instance
+				on database_instance (main_host, main_port)
 			`))
 	}
 }
@@ -205,14 +205,14 @@ func TestToSqlite3GeneralConversions(t *testing.T) {
 		test.S(t).ExpectEquals(result, "select datetime(some_table.some_column, printf('+%d minute', ?))")
 	}
 	{
-		statement := "AND master_instance.last_attempted_check <= master_instance.last_seen + interval ? minute"
+		statement := "AND main_instance.last_attempted_check <= main_instance.last_seen + interval ? minute"
 		result := ToSqlite3Dialect(statement)
-		test.S(t).ExpectEquals(result, "AND master_instance.last_attempted_check <= datetime(master_instance.last_seen, printf('+%d minute', ?))")
+		test.S(t).ExpectEquals(result, "AND main_instance.last_attempted_check <= datetime(main_instance.last_seen, printf('+%d minute', ?))")
 	}
 	{
-		statement := "select concat(master_instance.port, '') as port"
+		statement := "select concat(main_instance.port, '') as port"
 		result := ToSqlite3Dialect(statement)
-		test.S(t).ExpectEquals(result, "select (master_instance.port || '') as port")
+		test.S(t).ExpectEquals(result, "select (main_instance.port || '') as port")
 	}
 	{
 		statement := "select concat( 'abc' , 'def') as s"

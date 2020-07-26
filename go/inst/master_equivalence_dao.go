@@ -23,56 +23,56 @@ import (
 	"github.com/openark/orchestrator/go/db"
 )
 
-func WriteMasterPositionEquivalence(master1Key *InstanceKey, master1BinlogCoordinates *BinlogCoordinates,
-	master2Key *InstanceKey, master2BinlogCoordinates *BinlogCoordinates) error {
-	if master1Key.Equals(master2Key) {
+func WriteMainPositionEquivalence(main1Key *InstanceKey, main1BinlogCoordinates *BinlogCoordinates,
+	main2Key *InstanceKey, main2BinlogCoordinates *BinlogCoordinates) error {
+	if main1Key.Equals(main2Key) {
 		// Not interesting
 		return nil
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into master_position_equivalence (
-        			master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos,
-        			master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos,
+        	insert into main_position_equivalence (
+        			main1_hostname, main1_port, main1_binary_log_file, main1_binary_log_pos,
+        			main2_hostname, main2_port, main2_binary_log_file, main2_binary_log_pos,
         			last_suggested)
         		values (?, ?, ?, ?, ?, ?, ?, ?, NOW()) 
         		on duplicate key update last_suggested=values(last_suggested)
 				
-				`, master1Key.Hostname, master1Key.Port, master1BinlogCoordinates.LogFile, master1BinlogCoordinates.LogPos,
-			master2Key.Hostname, master2Key.Port, master2BinlogCoordinates.LogFile, master2BinlogCoordinates.LogPos,
+				`, main1Key.Hostname, main1Key.Port, main1BinlogCoordinates.LogFile, main1BinlogCoordinates.LogPos,
+			main2Key.Hostname, main2Key.Port, main2BinlogCoordinates.LogFile, main2BinlogCoordinates.LogPos,
 		)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
 
-func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinates) (result [](*InstanceBinlogCoordinates), err error) {
+func GetEquivalentMainCoordinates(instanceCoordinates *InstanceBinlogCoordinates) (result [](*InstanceBinlogCoordinates), err error) {
 	query := `
 		select 
-				master1_hostname as hostname,
-				master1_port as port,
-				master1_binary_log_file as binlog_file,
-				master1_binary_log_pos as binlog_pos
+				main1_hostname as hostname,
+				main1_port as port,
+				main1_binary_log_file as binlog_file,
+				main1_binary_log_pos as binlog_pos
 			from 
-				master_position_equivalence
+				main_position_equivalence
 			where
-				master2_hostname = ?
-				and master2_port = ?
-				and master2_binary_log_file = ?
-				and master2_binary_log_pos = ?
+				main2_hostname = ?
+				and main2_port = ?
+				and main2_binary_log_file = ?
+				and main2_binary_log_pos = ?
 		union
 		select 
-				master2_hostname as hostname,
-				master2_port as port,
-				master2_binary_log_file as binlog_file,
-				master2_binary_log_pos as binlog_pos
+				main2_hostname as hostname,
+				main2_port as port,
+				main2_binary_log_file as binlog_file,
+				main2_binary_log_pos as binlog_pos
 			from 
-				master_position_equivalence
+				main_position_equivalence
 			where
-				master1_hostname = ?
-				and master1_port = ?
-				and master1_binary_log_file = ?
-				and master1_binary_log_pos = ?
+				main1_hostname = ?
+				and main1_port = ?
+				and main1_binary_log_file = ?
+				and main1_binary_log_pos = ?
 		`
 	args := sqlutils.Args(
 		instanceCoordinates.Key.Hostname,
@@ -104,7 +104,7 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 }
 
 func GetEquivalentBinlogCoordinatesFor(instanceCoordinates *InstanceBinlogCoordinates, belowKey *InstanceKey) (*BinlogCoordinates, error) {
-	possibleCoordinates, err := GetEquivalentMasterCoordinates(instanceCoordinates)
+	possibleCoordinates, err := GetEquivalentMainCoordinates(instanceCoordinates)
 	if err != nil {
 		return nil, err
 	}
@@ -116,11 +116,11 @@ func GetEquivalentBinlogCoordinatesFor(instanceCoordinates *InstanceBinlogCoordi
 	return nil, nil
 }
 
-// ExpireMasterPositionEquivalence expires old master_position_equivalence
-func ExpireMasterPositionEquivalence() error {
+// ExpireMainPositionEquivalence expires old main_position_equivalence
+func ExpireMainPositionEquivalence() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	delete from master_position_equivalence 
+        	delete from main_position_equivalence 
 				where last_suggested < NOW() - INTERVAL ? HOUR
 				`, config.Config.UnseenInstanceForgetHours,
 		)

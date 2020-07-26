@@ -45,17 +45,17 @@ type Instance struct {
 	Binlog_format                string
 	BinlogRowImage               string
 	LogBinEnabled                bool
-	LogSlaveUpdatesEnabled       bool // for API backwards compatibility. Equals `LogReplicationUpdatesEnabled`
+	LogSubordinateUpdatesEnabled       bool // for API backwards compatibility. Equals `LogReplicationUpdatesEnabled`
 	LogReplicationUpdatesEnabled bool
 	SelfBinlogCoordinates        BinlogCoordinates
-	MasterKey                    InstanceKey
-	MasterUUID                   string
+	MainKey                    InstanceKey
+	MainUUID                   string
 	AncestryUUID                 string
-	IsDetachedMaster             bool
+	IsDetachedMain             bool
 
-	Slave_SQL_Running          bool // for API backwards compatibility. Equals `ReplicationSQLThreadRuning`
+	Subordinate_SQL_Running          bool // for API backwards compatibility. Equals `ReplicationSQLThreadRuning`
 	ReplicationSQLThreadRuning bool
-	Slave_IO_Running           bool // for API backwards compatibility. Equals `ReplicationIOThreadRuning`
+	Subordinate_IO_Running           bool // for API backwards compatibility. Equals `ReplicationIOThreadRuning`
 	ReplicationIOThreadRuning  bool
 	ReplicationSQLThreadState  ReplicationThreadState
 	ReplicationIOThreadState   ReplicationThreadState
@@ -72,17 +72,17 @@ type Instance struct {
 	RelaylogCoordinates   BinlogCoordinates
 	LastSQLError          string
 	LastIOError           string
-	SecondsBehindMaster   sql.NullInt64
+	SecondsBehindMain   sql.NullInt64
 	SQLDelay              uint
 	ExecutedGtidSet       string
 	GtidPurged            string
 	GtidErrant            string
 
-	masterExecutedGtidSet string // Not exported
+	mainExecutedGtidSet string // Not exported
 
-	SlaveLagSeconds                   sql.NullInt64 // for API backwards compatibility. Equals `ReplicationLagSeconds`
+	SubordinateLagSeconds                   sql.NullInt64 // for API backwards compatibility. Equals `ReplicationLagSeconds`
 	ReplicationLagSeconds             sql.NullInt64
-	SlaveHosts                        InstanceKeyMap // for API backwards compatibility. Equals `Replicas`
+	SubordinateHosts                        InstanceKeyMap // for API backwards compatibility. Equals `Replicas`
 	Replicas                          InstanceKeyMap
 	ClusterName                       string
 	SuggestedClusterAlias             string
@@ -90,17 +90,17 @@ type Instance struct {
 	Region                            string
 	PhysicalEnvironment               string
 	ReplicationDepth                  uint
-	IsCoMaster                        bool
+	IsCoMain                        bool
 	HasReplicationCredentials         bool
 	ReplicationCredentialsAvailable   bool
-	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
+	SemiSyncAvailable                 bool // when both semi sync plugins (main & replica) are loaded
 	SemiSyncEnforced                  bool
-	SemiSyncMasterEnabled             bool
+	SemiSyncMainEnabled             bool
 	SemiSyncReplicaEnabled            bool
-	SemiSyncMasterTimeout             uint64
-	SemiSyncMasterWaitForReplicaCount uint
-	SemiSyncMasterStatus              bool
-	SemiSyncMasterClients             uint
+	SemiSyncMainTimeout             uint64
+	SemiSyncMainWaitForReplicaCount uint
+	SemiSyncMainStatus              bool
+	SemiSyncMainClients             uint
 	SemiSyncReplicaStatus             bool
 
 	LastSeenTimestamp    string
@@ -165,11 +165,11 @@ func (this *Instance) MarshalJSON() ([]byte, error) {
 	i.Instance = *this
 	// change terminology. Users of the orchestrator API can switch to new terminology and avoid using old terminology
 	// flip
-	i.SlaveHosts = i.Replicas
-	i.SlaveLagSeconds = this.ReplicationLagSeconds
-	i.LogSlaveUpdatesEnabled = this.LogReplicationUpdatesEnabled
-	i.Slave_SQL_Running = this.ReplicationSQLThreadRuning
-	i.Slave_IO_Running = this.ReplicationIOThreadRuning
+	i.SubordinateHosts = i.Replicas
+	i.SubordinateLagSeconds = this.ReplicationLagSeconds
+	i.LogSubordinateUpdatesEnabled = this.LogReplicationUpdatesEnabled
+	i.Subordinate_SQL_Running = this.ReplicationSQLThreadRuning
+	i.Subordinate_IO_Running = this.ReplicationIOThreadRuning
 
 	return json.Marshal(i)
 }
@@ -324,23 +324,23 @@ func (this *Instance) FlavorNameAndMajorVersion() string {
 
 // IsReplica makes simple heuristics to decide whether this instance is a replica of another instance
 func (this *Instance) IsReplica() bool {
-	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
+	return this.MainKey.Hostname != "" && this.MainKey.Hostname != "_" && this.MainKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server),
+// IsMain makes simple heuristics to decide whether this instance is a main (not replicating from any other server),
 // either via traditional async/semisync replication or group replication
-func (this *Instance) IsMaster() bool {
-	// If traditional replication is configured, it is for sure not a master
+func (this *Instance) IsMain() bool {
+	// If traditional replication is configured, it is for sure not a main
 	if this.IsReplica() {
 		return false
 	}
 	// If traditional replication is not configured, and it is also not part of a replication group, this host is
-	// a master
+	// a main
 	if !this.IsReplicationGroupMember() {
 		return true
 	}
 	// If traditional replication is not configured, and this host is part of a group, it is only considered a
-	// master if it has the role of group Primary. Otherwise it is not a master.
+	// main if it has the role of group Primary. Otherwise it is not a main.
 	if this.ReplicationGroupMemberRole == GroupReplicationMemberRolePrimary {
 		return true
 	}
@@ -387,9 +387,9 @@ func (this *Instance) NextGTID() (string, error) {
 		return tokens[len(tokens)-1]
 	}
 	// executed GTID set: 4f6d62ed-df65-11e3-b395-60672090eb04:1,b9b4712a-df64-11e3-b391-60672090eb04:1-6
-	executedGTIDsFromMaster := lastToken(this.ExecutedGtidSet, ",")
-	// executedGTIDsFromMaster: b9b4712a-df64-11e3-b391-60672090eb04:1-6
-	executedRange := lastToken(executedGTIDsFromMaster, ":")
+	executedGTIDsFromMain := lastToken(this.ExecutedGtidSet, ",")
+	// executedGTIDsFromMain: b9b4712a-df64-11e3-b391-60672090eb04:1-6
+	executedRange := lastToken(executedGTIDsFromMain, ":")
 	// executedRange: 1-6
 	lastExecutedNumberToken := lastToken(executedRange, "-")
 	// lastExecutedNumber: 6
@@ -398,7 +398,7 @@ func (this *Instance) NextGTID() (string, error) {
 		return "", err
 	}
 	nextNumber := lastExecutedNumber + 1
-	nextGTID := fmt.Sprintf("%s:%d", firstToken(executedGTIDsFromMaster, ":"), nextNumber)
+	nextGTID := fmt.Sprintf("%s:%d", firstToken(executedGTIDsFromMain, ":"), nextNumber)
 	return nextGTID, nil
 }
 
@@ -420,13 +420,13 @@ func (this *Instance) GetNextBinaryLog(binlogCoordinates BinlogCoordinates) (Bin
 	return binlogCoordinates.NextFileCoordinates()
 }
 
-// IsReplicaOf returns true if this instance claims to replicate from given master
-func (this *Instance) IsReplicaOf(master *Instance) bool {
-	return this.MasterKey.Equals(&master.Key)
+// IsReplicaOf returns true if this instance claims to replicate from given main
+func (this *Instance) IsReplicaOf(main *Instance) bool {
+	return this.MainKey.Equals(&main.Key)
 }
 
-// IsReplicaOf returns true if this i supposed master of given replica
-func (this *Instance) IsMasterOf(replica *Instance) bool {
+// IsReplicaOf returns true if this i supposed main of given replica
+func (this *Instance) IsMainOf(replica *Instance) bool {
 	return replica.IsReplicaOf(this)
 }
 
@@ -451,9 +451,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	}
 	if other.IsReplica() {
 		if !other.LogReplicationUpdatesEnabled {
-			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
+			return false, fmt.Errorf("instance does not have log_subordinate_updates enabled: %+v", other.Key)
 		}
-		// OK for a master to not have log_slave_updates
+		// OK for a main to not have log_subordinate_updates
 		// Not OK for a replica, for it has to relay the logs.
 	}
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
@@ -485,9 +485,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
 	// replicas with SQLDelay are a special case
 	if this.SQLDelay > 0 {
-		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+		return math.AbsInt64(this.SecondsBehindMain.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
 	}
-	return this.SecondsBehindMaster.Int64 <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+	return this.SecondsBehindMain.Int64 <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
 }
 
 // CanMove returns true if this instance's state allows it to be repositioned. For example,
@@ -505,7 +505,7 @@ func (this *Instance) CanMove() (bool, error) {
 	if !this.ReplicationIOThreadState.IsRunning() {
 		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
-	if !this.SecondsBehindMaster.Valid {
+	if !this.SecondsBehindMain.Valid {
 		return false, fmt.Errorf("%+v: cannot determine replication lag", this.Key)
 	}
 	if !this.HasReasonableMaintenanceReplicationLag() {
@@ -514,8 +514,8 @@ func (this *Instance) CanMove() (bool, error) {
 	return true, nil
 }
 
-// CanMoveAsCoMaster returns true if this instance's state allows it to be repositioned.
-func (this *Instance) CanMoveAsCoMaster() (bool, error) {
+// CanMoveAsCoMain returns true if this instance's state allows it to be repositioned.
+func (this *Instance) CanMoveAsCoMain() (bool, error) {
 	if !this.IsLastCheckValid {
 		return false, fmt.Errorf("%+v: last check invalid", this.Key)
 	}
@@ -567,7 +567,7 @@ func (this *Instance) LagStatusString() string {
 	if this.IsReplica() && !this.ReplicaRunning() {
 		return "null"
 	}
-	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
+	if this.IsReplica() && !this.SecondsBehindMain.Valid {
 		return "null"
 	}
 	if this.IsReplica() && this.ReplicationLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
@@ -605,8 +605,8 @@ func (this *Instance) descriptionTokens() (tokens []string) {
 		if this.UsingPseudoGTID {
 			extraTokens = append(extraTokens, "P-GTID")
 		}
-		if this.SemiSyncMasterStatus {
-			extraTokens = append(extraTokens, "semi:master")
+		if this.SemiSyncMainStatus {
+			extraTokens = append(extraTokens, "semi:main")
 		}
 		if this.SemiSyncReplicaStatus {
 			extraTokens = append(extraTokens, "semi:replica")
