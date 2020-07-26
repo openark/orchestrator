@@ -600,8 +600,16 @@ function normalizeInstance(instance) {
   instance.title = instance.Key.Hostname + ':' + instance.Key.Port;
   instance.canonicalTitle = instance.title;
   instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
-  instance.masterId = getInstanceId(instance.MasterKey.Hostname,
-    instance.MasterKey.Port);
+  // If this host is a replication group member, we set its masterId to the group primary, unless the instance is itself
+  // the primary. In that case, we set it to its async/semi-sync master (if configured). Notice that for group members
+  // whose role is not defined (e.g. because they are in ERROR state) we still set their master ID to the group primary.
+  // Setting the masterId to the group primary is what allows us to visualize group secondary members as replicating
+  // from the group primary.
+  if (instance.ReplicationGroupName != "" && (instance.ReplicationGroupMemberRole == "SECONDARY" || instance.ReplicationGroupMemberRole == ""))
+    masterKey = instance.ReplicationGroupPrimaryInstanceKey;
+  else
+    masterKey = instance.MasterKey;
+  instance.masterId = getInstanceId(masterKey.Hostname, masterKey.Port);
 
   instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.ReplicationIOThreadRuning;
   instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.ReplicationIOThreadRuning;
@@ -665,6 +673,9 @@ function normalizeInstanceProblem(instance) {
   instance.errantGTIDProblem = function() {
     return instanceProblemIfExists('errant_gtid');
   }
+  instance.replicationGroupMemberStateProblem = function() {
+    return instanceProblemIfExists("group_replication_member_not_online")
+  }
 
   instance.problem = null;
   instance.Problems = instance.Problems || [];
@@ -691,6 +702,9 @@ function normalizeInstanceProblem(instance) {
   } else if (instance.errantGTIDProblem()) {
     instance.problemDescription = "Replica has GTID entries not found on its master";
     instance.problemOrder = 6;
+  } else if (instance.replicationGroupMemberStateProblem()) {
+    instance.problemDescription = "Replication group member in state " + instance.ReplicationGroupMemberState;
+    instance.problemOrder = 7;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
@@ -908,6 +922,16 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs replication updates"></span> ');
     }
+    // Icons for GR
+    var text_style;
+    if (instance.ReplicationGroupName != "") {
+      if (instance.ReplicationGroupMemberRole == "PRIMARY")
+        text_style = "";
+      else
+        text_style = "text-muted";
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon '+ text_style +' glyphicon-tower" title="Group replication '+ instance.ReplicationGroupMemberRole + ' ' + instance.ReplicationGroupMemberState +'"></span> ');
+    }
+
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
@@ -940,6 +964,15 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       instance.renderHint = "danger";
     } else if (instance.replicationLagProblem()) {
       instance.renderHint = "warning";
+    } else if (instance.replicationGroupMemberStateProblem()) {
+      switch (instance.ReplicationGroupMemberState) {
+        case "RECOVERING":
+          instance.renderHint = "warning";
+          break;
+        default:
+          instance.renderHint = "danger";
+          break;
+      }
     }
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
