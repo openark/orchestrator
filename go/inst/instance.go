@@ -333,21 +333,18 @@ func (this *Instance) IsMaster() bool {
 	// If traditional replication is configured, it is for sure not a master
 	if this.IsReplica() {
 		return false
-	} else {
-		// If traditional replication is not configured, and it is also not part of a replication group, this host is
-		// a master
-		if !this.IsReplicationGroupMember() {
-			return true
-		} else {
-			// If traditional replication is not configured, and this host is part of a group, it is only considered a
-			// master if it has the role of group Primary. Otherwise it is not a master.
-			if this.ReplicationGroupMemberRole == GroupReplicationMemberRolePrimary {
-				return true
-			} else {
-				return false
-			}
-		}
 	}
+	// If traditional replication is not configured, and it is also not part of a replication group, this host is
+	// a master
+	if !this.IsReplicationGroupMember() {
+		return true
+	}
+	// If traditional replication is not configured, and this host is part of a group, it is only considered a
+	// master if it has the role of group Primary. Otherwise it is not a master.
+	if this.ReplicationGroupMemberRole == GroupReplicationMemberRolePrimary {
+		return true
+	}
+	return false
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
