@@ -46,7 +46,7 @@ const (
 	raftTimeout            = 10 * time.Second
 )
 
-var RaftNotRunning = fmt.Errorf("raft is not configured/running")
+var RaftNotRunning error = fmt.Errorf("raft is not configured/running")
 var store *Store
 var raftSetupComplete int64
 var ThisHostname string
@@ -215,6 +215,9 @@ func normalizeRaftNode(node string) (string, error) {
 // data and opinion are trustworthy.
 // Comapre that to a node which has left (or has not yet joined) the quorum: it has stale data.
 func IsPartOfQuorum() bool {
+	if GetLeader() == "" {
+		return false
+	}
 	state := GetState()
 	return state == raft.Leader || state == raft.Follower
 }
@@ -281,6 +284,14 @@ func Yield() error {
 	return getRaft().Yield()
 }
 
+func GetRaftBind() string {
+	return store.raftBind
+}
+
+func GetRaftAdvertise() string {
+	return store.raftAdvertise
+}
+
 func GetPeers() ([]string, error) {
 	if !IsRaftEnabled() {
 		return []string{}, RaftNotRunning
@@ -305,6 +316,24 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 		return nil, err
 	}
 	return store.genericCommand(op, b)
+}
+
+func AddPeer(addr string) (response interface{}, err error) {
+	addr, err = normalizeRaftNode(addr)
+	if err != nil {
+		return "", err
+	}
+	err = store.AddPeer(addr)
+	return addr, err
+}
+
+func RemovePeer(addr string) (response interface{}, err error) {
+	addr, err = normalizeRaftNode(addr)
+	if err != nil {
+		return "", err
+	}
+	err = store.RemovePeer(addr)
+	return addr, err
 }
 
 func PublishYield(toPeer string) (response interface{}, err error) {
