@@ -488,8 +488,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
 	// primary
 	if instance.IsReplicationGroupSecondary() {
-		return instance, log.Errorf("MoveBelow: %+v is a secondary replication group member, hence, it cannot"+
-			" be relocated", instance.Key)
+		return instance, log.Errorf("MoveBelow: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
 	}
 
 	if sibling.IsBinlogServer() {
