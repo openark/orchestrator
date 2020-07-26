@@ -97,7 +97,7 @@ type Instance struct {
 	SemiSyncEnforced                  bool
 	SemiSyncMasterEnabled             bool
 	SemiSyncReplicaEnabled            bool
-	SemiSyncMasterTimeout             uint
+	SemiSyncMasterTimeout             uint64
 	SemiSyncMasterWaitForReplicaCount uint
 	SemiSyncMasterStatus              bool
 	SemiSyncMasterClients             uint
@@ -129,13 +129,32 @@ type Instance struct {
 	LastDiscoveryLatency time.Duration
 
 	seed bool // Means we force this instance to be written to backend, even if it's invalid, empty or forgotten
+
+	/* All things Group Replication below */
+
+	// Group replication global variables
+	ReplicationGroupName            string
+	ReplicationGroupIsSinglePrimary bool
+
+	// Replication group members information. See
+	// https://dev.mysql.com/doc/refman/8.0/en/replication-group-members-table.html for details.
+	ReplicationGroupMemberState string
+	ReplicationGroupMemberRole  string
+
+	// List of all known members of the same group
+	ReplicationGroupMembers InstanceKeyMap
+
+	// Primary of the replication group
+	ReplicationGroupPrimaryInstanceKey InstanceKey
 }
 
 // NewInstance creates a new, empty instance
+
 func NewInstance() *Instance {
 	return &Instance{
-		Replicas: make(map[InstanceKey]bool),
-		Problems: []string{},
+		Replicas:                make(map[InstanceKey]bool),
+		ReplicationGroupMembers: make(map[InstanceKey]bool),
+		Problems:                []string{},
 	}
 }
 
@@ -228,6 +247,21 @@ func (this *Instance) IsNDB() bool {
 	return strings.Contains(this.Version, "-ndb-")
 }
 
+// IsReplicationGroup checks whether the host thinks it is part of a known replication group. Notice that this might
+// return True even if the group has decided to expel the member represented by this instance, as the instance might not
+// know that under certain circumstances
+func (this *Instance) IsReplicationGroupMember() bool {
+	return this.ReplicationGroupName != ""
+}
+
+func (this *Instance) IsReplicationGroupPrimary() bool {
+	return this.IsReplicationGroupMember() && this.ReplicationGroupPrimaryInstanceKey.Equals(&this.Key)
+}
+
+func (this *Instance) IsReplicationGroupSecondary() bool {
+	return this.IsReplicationGroupMember() && !this.ReplicationGroupPrimaryInstanceKey.Equals(&this.Key)
+}
+
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
@@ -293,9 +327,24 @@ func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
+// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server),
+// either via traditional async/semisync replication or group replication
 func (this *Instance) IsMaster() bool {
-	return !this.IsReplica()
+	// If traditional replication is configured, it is for sure not a master
+	if this.IsReplica() {
+		return false
+	}
+	// If traditional replication is not configured, and it is also not part of a replication group, this host is
+	// a master
+	if !this.IsReplicationGroupMember() {
+		return true
+	}
+	// If traditional replication is not configured, and this host is part of a group, it is only considered a
+	// master if it has the role of group Primary. Otherwise it is not a master.
+	if this.ReplicationGroupMemberRole == GroupReplicationMemberRolePrimary {
+		return true
+	}
+	return false
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
@@ -356,6 +405,11 @@ func (this *Instance) NextGTID() (string, error) {
 // AddReplicaKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
 	this.Replicas.AddKey(*replicaKey)
+}
+
+// AddGroupMemberKey adds a group member to the list of this instance's group members.
+func (this *Instance) AddGroupMemberKey(groupMemberKey *InstanceKey) {
+	this.ReplicationGroupMembers.AddKey(*groupMemberKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
