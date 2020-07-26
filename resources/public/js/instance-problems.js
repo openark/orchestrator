@@ -33,7 +33,6 @@ $(document).ready(function() {
     }
     instances.sort(SortByProblemOrder);
 
-
     var countProblemInstances = 0;
     instances.forEach(function(instance) {
       var considerInstance = instance.hasProblem
