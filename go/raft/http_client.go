@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/ssl"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/ssl"
 
 	"github.com/openark/golib/log"
 )
@@ -40,7 +40,7 @@ func setupHttpClient() error {
 	}
 
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify,
+		InsecureSkipVerify: config.Config.SSLSkipVerify,
 	}
 	if config.Config.UseSSL {
 		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)

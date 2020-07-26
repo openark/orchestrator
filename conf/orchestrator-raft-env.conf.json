@@ -1,0 +1,92 @@
+{
+  "Debug": true,
+  "EnableSyslog": false,
+  "ListenAddress": ":300NODE_ID_PLACEHOLDER",
+  "MySQLTopologyUser": "ci",
+  "MySQLTopologyPassword": "ci",
+  "BackendDB": "sqlite",
+  "SQLite3DataFile": "/tmp/orchestrator-NODE_ID_PLACEHOLDER/orchestrator.sqlite3",
+  "MySQLConnectTimeoutSeconds": 1,
+  "DefaultInstancePort": 3306,
+  "DiscoverByShowSlaveHosts": true,
+  "InstancePollSeconds": 1,
+  "HostnameResolveMethod": "none",
+  "MySQLHostnameResolveMethod": "@@report_host",
+  "SkipBinlogServerUnresolveCheck": true,
+  "ExpiryHostnameResolvesMinutes": 60,
+  "VerifyReplicationFilters": false,
+  "ReasonableMaintenanceReplicationLagSeconds": 20,
+  "CandidateInstanceExpireMinutes": 60,
+  "ReadOnly": false,
+  "AuthenticationMethod": "",
+  "ReplicationLagQuery": "select timestampdiff(second, ts, now()) from test.heartbeat",
+  "DetectClusterAliasQuery": "SELECT 'ci'",
+  "DetectClusterDomainQuery": "",
+  "DetectInstanceAliasQuery": "",
+  "DetectPromotionRuleQuery": "",
+  "DetectDataCenterQuery": "select CASE @@port WHEN 10111 THEN 'dc-east-1' WHEN 10112 THEN 'dc-east-1' WHEN 10113 THEN 'dc-east-2' WHEN 10114 THEN 'dc-west' END",
+  "DetectRegionQuery": "select IF(@@port = 10114, 'rgn-west', 'rgn-east')",
+  "DetectPhysicalEnvironmentQuery": "select 'prod'",
+  "DetectSemiSyncEnforcedQuery": "",
+  "DiscoverySeeds": [
+    "127.0.0.1:10111"
+  ],
+  "ServeAgentsHttp": false,
+  "UseSSL": false,
+  "UseMutualTLS": false,
+  "MySQLTopologyUseMixedTLS": false,
+  "StatusEndpoint": "/api/status",
+  "StatusSimpleHealth": true,
+  "StatusOUVerify": false,
+  "BinlogEventsChunkSize": 10000,
+  "SkipBinlogEventsContaining": [],
+  "ReduceReplicationAnalysisCount": false,
+  "FailureDetectionPeriodBlockMinutes": 5,
+  "FailMasterPromotionOnLagMinutes": 1,
+  "RecoveryPeriodBlockSeconds": 5,
+  "RecoveryIgnoreHostnameFilters": [],
+  "RecoverMasterClusterFilters": [
+    "*"
+  ],
+  "RecoverIntermediateMasterClusterFilters": [
+    "*"
+  ],
+  "OnFailureDetectionProcesses": [
+    "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
+  ],
+  "PreFailoverProcesses": [
+    "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
+  ],
+  "PostFailoverProcesses": [
+    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostUnsuccessfulFailoverProcesses": [],
+  "PostMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostIntermediateMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
+  "CoMasterRecoveryMustPromoteOtherCoMaster": true,
+  "DetachLostSlavesAfterMasterFailover": true,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": true,
+  "MasterFailoverDetachReplicaMasterHost": false,
+  "MasterFailoverLostInstancesDowntimeMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
+  "RaftEnabled": true,
+  "RaftDataDir": "/tmp/orchestrator-NODE_ID_PLACEHOLDER",
+  "RaftBind": "127.0.0.1:1000NODE_ID_PLACEHOLDER",
+  "RaftNodes": [
+    "127.0.0.1:10007",
+    "127.0.0.1:10008",
+    "127.0.0.1:10009"
+  ]
+}

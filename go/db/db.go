@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
 )
 
 var (
@@ -52,7 +52,7 @@ func getMySQLURI() string {
 	if mysqlURI != "" {
 		return mysqlURI
 	}
-	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
+	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&rejectReadOnly=%t&interpolateParams=true",
 		config.Config.MySQLOrchestratorUser,
 		config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost,
@@ -60,6 +60,7 @@ func getMySQLURI() string {
 		config.Config.MySQLOrchestratorDatabase,
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
+		config.Config.MySQLOrchestratorRejectReadOnly,
 	)
 	if config.Config.MySQLOrchestratorUseMutualTLS {
 		mysqlURI, _ = SetupMySQLOrchestratorTLS(mysqlURI)

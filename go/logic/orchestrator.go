@@ -26,17 +26,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/github/orchestrator/go/agent"
-	"github.com/github/orchestrator/go/collection"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/discovery"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
-	ometrics "github.com/github/orchestrator/go/metrics"
-	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/agent"
+	"github.com/openark/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/discovery"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/kv"
+	ometrics "github.com/openark/orchestrator/go/metrics"
+	"github.com/openark/orchestrator/go/process"
+	"github.com/openark/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 	"github.com/sjmudd/stopwatch"
@@ -279,8 +279,8 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	// Investigate replicas:
-	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
+	// Investigate replicas and members of the same replication group:
+	for _, replicaKey := range append(instance.ReplicationGroupMembers.GetInstanceKeys(), instance.Replicas.GetInstanceKeys()...) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
@@ -564,6 +564,7 @@ func ContinuousDiscovery() {
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go inst.ExpireInjectedPseudoGTID()
+					go inst.ExpireStaleInstanceBinlogCoordinates()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()

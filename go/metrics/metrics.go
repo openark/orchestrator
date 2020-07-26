@@ -17,7 +17,7 @@
 package metrics
 
 import (
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 	"time"
 )
 

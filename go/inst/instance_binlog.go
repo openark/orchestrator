@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/config"
 )
 
 // Event entries may contains table IDs (can be different for same tables on different servers)

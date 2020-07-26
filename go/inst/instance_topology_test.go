@@ -3,9 +3,9 @@ package inst
 import (
 	"math/rand"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
+	"github.com/openark/orchestrator/go/config"
 	"testing"
 )
 
@@ -47,7 +47,7 @@ func applyGeneralGoodToGoReplicationParams(instances [](*Instance)) {
 	for _, instance := range instances {
 		instance.IsLastCheckValid = true
 		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
+		instance.LogReplicationUpdatesEnabled = true
 	}
 }
 
@@ -229,7 +229,7 @@ func TestIsGenerallyValidAsCandidateReplica(t *testing.T) {
 	for _, instance := range instances {
 		instance.IsLastCheckValid = true
 		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = false
+		instance.LogReplicationUpdatesEnabled = false
 	}
 	for _, instance := range instances {
 		test.S(t).ExpectFalse(isGenerallyValidAsCandidateReplica(instance))
@@ -274,7 +274,7 @@ func TestChooseCandidateReplicaNoCandidateReplica(t *testing.T) {
 	for _, instance := range instances {
 		instance.IsLastCheckValid = true
 		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = false
+		instance.LogReplicationUpdatesEnabled = false
 	}
 	_, _, _, _, _, err := chooseCandidateReplica(instances)
 	test.S(t).ExpectNotNil(err)
@@ -296,7 +296,7 @@ func TestChooseCandidateReplica(t *testing.T) {
 func TestChooseCandidateReplica2(t *testing.T) {
 	instances, instancesMap := generateTestInstances()
 	applyGeneralGoodToGoReplicationParams(instances)
-	instancesMap[i830Key.StringCode()].LogSlaveUpdatesEnabled = false
+	instancesMap[i830Key.StringCode()].LogReplicationUpdatesEnabled = false
 	instancesMap[i820Key.StringCode()].LogBinEnabled = false
 	instances = sortedReplicas(instances, NoStopReplication)
 	candidate, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := chooseCandidateReplica(instances)

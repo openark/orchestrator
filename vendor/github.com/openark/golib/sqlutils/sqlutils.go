@@ -21,13 +21,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/openark/golib/log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/openark/golib/log"
 )
 
 const DateTimeFormat = "2006-01-02 15:04:05.999999"
@@ -133,7 +134,7 @@ func (this *RowMap) GetIntD(key string, def int) int {
 }
 
 func (this *RowMap) GetUint(key string) uint {
-	res, _ := strconv.Atoi(this.GetString(key))
+	res, _ := strconv.ParseUint(this.GetString(key), 10, 0)
 	return uint(res)
 }
 
@@ -143,6 +144,19 @@ func (this *RowMap) GetUintD(key string, def uint) uint {
 		return def
 	}
 	return uint(res)
+}
+
+func (this *RowMap) GetUint64(key string) uint64 {
+	res, _ := strconv.ParseUint(this.GetString(key), 10, 0)
+	return res
+}
+
+func (this *RowMap) GetUint64D(key string, def uint64) uint64 {
+	res, err := strconv.ParseUint(this.GetString(key), 10, 0)
+	if err != nil {
+		return def
+	}
+	return uint64(res)
 }
 
 func (this *RowMap) GetBool(key string) bool {
@@ -245,13 +259,15 @@ func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error, args ...interface{}) (err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
-			err = errors.New(fmt.Sprintf("QueryRowsMap unexpected error: %+v", derr))
+			err = fmt.Errorf("QueryRowsMap unexpected error: %+v", derr)
 		}
 	}()
 
 	var rows *sql.Rows
 	rows, err = db.Query(query, args...)
-	defer rows.Close()
+	if rows != nil {
+		defer rows.Close()
+	}
 	if err != nil && err != sql.ErrNoRows {
 		return log.Errore(err)
 	}

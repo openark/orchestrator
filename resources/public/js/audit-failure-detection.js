@@ -1,13 +1,12 @@
 $(document).ready(function() {
   showLoader();
-  var uri = "/api/audit-failure-detection/" + currentPage();
+  var apiUri = "/api/audit-failure-detection/" + currentPage();
   if (clusterAlias() != "") {
-    uri = "/api/audit-failure-detection/alias/" + clusterAlias();
+    apiUri = "/api/audit-failure-detection/alias/" + clusterAlias() + "/" + currentPage();
+  } else if (detectionId() > 0) {
+    apiUri = "/api/audit-failure-detection/id/" + detectionId();
   }
-  if (detectionId() > 0) {
-    uri = "/api/audit-failure-detection/id/" + detectionId();
-  }
-  $.get(appUrl(uri), function(auditEntries) {
+  $.get(appUrl(apiUri), function(auditEntries) {
     auditEntries = auditEntries || [];
     $.get(appUrl("/api/replication-analysis-changelog"), function(analysisChangelog) {
       analysisChangelog = analysisChangelog || [];
@@ -16,6 +15,10 @@ $(document).ready(function() {
   }, "json");
 
   function displayAudit(auditEntries, analysisChangelog) {
+    var baseWebUri = appUrl("/web/audit-failure-detection/");
+    if (clusterAlias()) {
+      baseWebUri += "alias/" + clusterAlias() + "/";
+    }
     var changelogMap = {}
     analysisChangelog.forEach(function(changelogEntry) {
       changelogMap[getInstanceId(changelogEntry.AnalyzedInstanceKey.Hostname, changelogEntry.AnalyzedInstanceKey.Port)] = changelogEntry.Changelog;
@@ -49,9 +52,9 @@ $(document).ready(function() {
 
       var moreInfo = "";
       moreInfo += '<div>Detected: ' + audit.RecoveryStartTimestamp + '</div>';
-      if (audit.AnalysisEntry.SlaveHosts.length > 0) {
+      if (audit.AnalysisEntry.Replicas.length > 0) {
         moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
-        audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
+        audit.AnalysisEntry.Replicas.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });
         moreInfo += "</ul></div>";
@@ -93,10 +96,10 @@ $(document).ready(function() {
       $("#audit .pager .next").addClass("disabled");
     }
     $("#audit .pager .previous").not(".disabled").find("a").click(function() {
-      window.location.href = appUrl("/web/audit-failure-detection/" + (currentPage() - 1));
+      window.location.href = appUrl(baseWebUri + (currentPage() - 1));
     });
     $("#audit .pager .next").not(".disabled").find("a").click(function() {
-      window.location.href = appUrl("/web/audit-failure-detection/" + (currentPage() + 1));
+      window.location.href = appUrl(baseWebUri + (currentPage() + 1));
     });
     $("#audit .pager .disabled a").click(function() {
       return false;
