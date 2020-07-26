@@ -279,8 +279,8 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	// Investigate replicas:
-	for _, replicaKey := range instance.Replicas.GetInstanceKeys() {
+	// Investigate replicas and members of the same replication group:
+	for _, replicaKey := range append(instance.ReplicationGroupMembers.GetInstanceKeys(), instance.Replicas.GetInstanceKeys()...) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
