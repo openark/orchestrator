@@ -160,20 +160,20 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			master_instance.last_checked <= master_instance.last_seen
 			and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		) = 1 AS is_last_check_valid,
+		/* To be considered a master, traditional async replication must not be present/valid AND the host should either */
+		/* not be a replication group member OR be the primary of the replication group */
 		MIN(master_instance.last_check_partial_success) as last_check_partial_success,
-		-- To be considered a master, traditional async replication must not be present/valid AND the host should either
-		-- not be a replication group member OR be the primary of the replication group
-    	MIN(
-        		(
-					master_instance.master_host IN ('' , '_')
-					OR master_instance.master_port = 0
-            		OR substr(master_instance.master_host, 1, 2) = '//'
-        		) 
-        		AND (
-            		master_instance.replication_group_name = ''
-            		OR master_instance.replication_group_member_role = 'PRIMARY'
-        		)
-        ) AS is_master,
+		MIN(
+			(
+				master_instance.master_host IN ('', '_')
+				OR master_instance.master_port = 0
+				OR substr(master_instance.master_host, 1, 2) = '//'
+			)
+			AND (
+				master_instance.replication_group_name = ''
+				OR master_instance.replication_group_member_role = 'PRIMARY'
+			)
+		) AS is_master,
 		MIN(master_instance.is_co_master) AS is_co_master,
 		MIN(
 			CONCAT(

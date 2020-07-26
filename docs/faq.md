@@ -62,27 +62,21 @@ No.
 
 ### Does orchestrator support MySQL Group Replication?
 
-Partially. Replication groups in single primary mode are somewhat supported under MySQL 8.0. The extent of the support 
-so far is:
+Partially. Replication groups in single primary mode are somewhat supported under MySQL 8.0. The extent of the support so far is:
 
 * Orchestrator understands that all group members are part of the same cluster, retrieves replication group information
   as part of instance discovery, stores it in its database, and exposes it via the API.
 * The orchestrator web UI displays single primary group members. They are shown like this:
     * All group secondary members as replicating from the primary.
-    * All group members have an icon that shows they are group members (as opposed to traditional async/semi-sync 
-      replicas).
+    * All group members have an icon that shows they are group members (as opposed to traditional async/semi-sync replicas).
     * Hovering over the icon mentioned above provides information about the state and role of the DB instance in the
       group.
-* Some relocation operations are forbidden for group members. In particular, orchestrator will refuse to relocate a 
-  secondary group member, as it, by definition, replicates always from the group primary. It will also reject an attempt
-  to relocate a group primary under a secondary of the same group.
+* Some relocation operations are forbidden for group members. In particular, orchestrator will refuse to relocate a secondary group member, as it, by definition, replicates always from the group primary. It will also reject an attempt to relocate a group primary under a secondary of the same group.
 
-No support has been added (yet) to handling group member failure. If all you have is a single replication group, this is
-fine, because you don't need it; the group will handle all failures as long as it can secure a majority.
+No support has been added (yet) to handling group member failure. If all you have is a single replication group, this is fine, because you don't need it; the group will handle all failures as long as it can secure a majority.
 
 If, however, you have the primary of a group as a replica to another instance; or you have replicas under your group
-members, know that this has not been tested and results are, therefore, unpredictable at the moment. It *might* work,
-but it might also create a singularity and suck your database under the event horizon.
+members, know that this has not been tested and results are, therefore, unpredictable at the moment. It *might* work, but it might also create a singularity and suck your database under the event horizon.
 
 ### Does orchestrator support Yet Another Type of Replication?
 

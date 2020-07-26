@@ -3178,13 +3178,13 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
 		MEMBER_ID,
 		MEMBER_HOST,
 		MEMBER_PORT,
-		MEMBER_STATE, 
+		MEMBER_STATE,
 		MEMBER_ROLE,
 		@@global.group_replication_group_name,
 		@@global.group_replication_single_primary_mode
-  	FROM
+	FROM
 		performance_schema.replication_group_members
-  	 `
+	`
 	rows, err := db.Query(q)
 	if err != nil {
 		_, grNotSupported := GroupReplicationNotSupportedErrors[err.(*mysql.MySQLError).Number]
