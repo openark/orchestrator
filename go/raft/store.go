@@ -48,6 +48,7 @@ func (store *Store) Open(peerNodes []string) error {
 	config := raft.DefaultConfig()
 	config.SnapshotThreshold = 1
 	config.SnapshotInterval = snapshotInterval
+	config.ShutdownOnRemove = false
 
 	// Setup Raft communication.
 	advertise, err := net.ResolveTCPAddr("tcp", store.raftAdvertise)
@@ -116,16 +117,28 @@ func (store *Store) Open(peerNodes []string) error {
 	return nil
 }
 
-// Join joins a node, located at addr, to this store. The node must be ready to
+// AddPeer adds a node, located at addr, to this store. The node must be ready to
 // respond to Raft communications at that address.
-func (store *Store) Join(addr string) error {
-	log.Infof("received join request for remote node as %s", addr)
+func (store *Store) AddPeer(addr string) error {
+	log.Infof("received join request for remote node %s", addr)
 
 	f := store.raft.AddPeer(addr)
 	if f.Error() != nil {
 		return f.Error()
 	}
 	log.Infof("node at %s joined successfully", addr)
+	return nil
+}
+
+// RemovePeer removes a node from this raft setup
+func (store *Store) RemovePeer(addr string) error {
+	log.Infof("received remove request for remote node %s", addr)
+
+	f := store.raft.RemovePeer(addr)
+	if f.Error() != nil {
+		return f.Error()
+	}
+	log.Infof("node at %s removed successfully", addr)
 	return nil
 }
 
