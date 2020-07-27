@@ -25,37 +25,37 @@ import (
 	"github.com/openark/orchestrator/go/kv"
 )
 
-func GetClusterMasterKVKey(clusterAlias string) string {
-	return fmt.Sprintf("%s%s", config.Config.KVClusterMasterPrefix, clusterAlias)
+func GetClusterMainKVKey(clusterAlias string) string {
+	return fmt.Sprintf("%s%s", config.Config.KVClusterMainPrefix, clusterAlias)
 }
 
-func getClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVPair {
+func getClusterMainKVPair(clusterAlias string, mainKey *InstanceKey) *kv.KVPair {
 	if clusterAlias == "" {
 		return nil
 	}
-	if masterKey == nil {
+	if mainKey == nil {
 		return nil
 	}
-	return kv.NewKVPair(GetClusterMasterKVKey(clusterAlias), masterKey.StringCode())
+	return kv.NewKVPair(GetClusterMainKVKey(clusterAlias), mainKey.StringCode())
 }
 
-// GetClusterMasterKVPairs returns all KV pairs associated with a master. This includes the
-// full identity of the master as well as a breakdown by hostname, port, ipv4, ipv6
-func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPairs [](*kv.KVPair)) {
-	masterKVPair := getClusterMasterKVPair(clusterAlias, masterKey)
-	if masterKVPair == nil {
+// GetClusterMainKVPairs returns all KV pairs associated with a main. This includes the
+// full identity of the main as well as a breakdown by hostname, port, ipv4, ipv6
+func GetClusterMainKVPairs(clusterAlias string, mainKey *InstanceKey) (kvPairs [](*kv.KVPair)) {
+	mainKVPair := getClusterMainKVPair(clusterAlias, mainKey)
+	if mainKVPair == nil {
 		return kvPairs
 	}
-	kvPairs = append(kvPairs, masterKVPair)
+	kvPairs = append(kvPairs, mainKVPair)
 
 	addPair := func(keySuffix, value string) {
-		key := fmt.Sprintf("%s/%s", masterKVPair.Key, keySuffix)
+		key := fmt.Sprintf("%s/%s", mainKVPair.Key, keySuffix)
 		kvPairs = append(kvPairs, kv.NewKVPair(key, value))
 	}
 
-	addPair("hostname", masterKey.Hostname)
-	addPair("port", fmt.Sprintf("%d", masterKey.Port))
-	if ipv4, ipv6, err := readHostnameIPs(masterKey.Hostname); err == nil {
+	addPair("hostname", mainKey.Hostname)
+	addPair("port", fmt.Sprintf("%d", mainKey.Port))
+	if ipv4, ipv6, err := readHostnameIPs(mainKey.Hostname); err == nil {
 		addPair("ipv4", ipv4)
 		addPair("ipv6", ipv6)
 	}
@@ -81,17 +81,17 @@ func mappedClusterNameToAlias(clusterName string) string {
 type ClusterInfo struct {
 	ClusterName                            string
 	ClusterAlias                           string // Human friendly alias
-	ClusterDomain                          string // CNAME/VIP/A-record/whatever of the master of this cluster
+	ClusterDomain                          string // CNAME/VIP/A-record/whatever of the main of this cluster
 	CountInstances                         uint
 	HeuristicLag                           int64
-	HasAutomatedMasterRecovery             bool
-	HasAutomatedIntermediateMasterRecovery bool
+	HasAutomatedMainRecovery             bool
+	HasAutomatedIntermediateMainRecovery bool
 }
 
 // ReadRecoveryInfo
 func (this *ClusterInfo) ReadRecoveryInfo() {
-	this.HasAutomatedMasterRecovery = this.filtersMatchCluster(config.Config.RecoverMasterClusterFilters)
-	this.HasAutomatedIntermediateMasterRecovery = this.filtersMatchCluster(config.Config.RecoverIntermediateMasterClusterFilters)
+	this.HasAutomatedMainRecovery = this.filtersMatchCluster(config.Config.RecoverMainClusterFilters)
+	this.HasAutomatedIntermediateMainRecovery = this.filtersMatchCluster(config.Config.RecoverIntermediateMainClusterFilters)
 }
 
 // filtersMatchCluster will see whether the given filters match the given cluster details

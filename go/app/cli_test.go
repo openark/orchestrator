@@ -27,7 +27,7 @@ func TestKnownCommands(t *testing.T) {
 	}
 	test.S(t).ExpectEquals(commandsMap["no-such-command"], "")
 	test.S(t).ExpectEquals(commandsMap["relocate"], "Smart relocation")
-	test.S(t).ExpectEquals(commandsMap["relocate-slaves"], "")
+	test.S(t).ExpectEquals(commandsMap["relocate-subordinates"], "")
 	test.S(t).ExpectEquals(commandsMap["relocate-replicas"], "Smart relocation")
 
 	for _, synonym := range commandSynonyms {

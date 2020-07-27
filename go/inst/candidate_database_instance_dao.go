@@ -26,7 +26,7 @@ import (
 	"github.com/openark/orchestrator/go/db"
 )
 
-// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
+// RegisterCandidateInstance markes a given instance as suggested for successoring a main in the event of failover.
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 	if candidate.LastSuggestedString == "" {
 		candidate = candidate.WithCurrentTime()
@@ -53,7 +53,7 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// ExpireCandidateInstances removes stale master candidate suggestions.
+// ExpireCandidateInstances removes stale main candidate suggestions.
 func ExpireCandidateInstances() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`

@@ -21,12 +21,12 @@ func TestGetSynonymPath(t *testing.T) {
 	api := HttpAPI{}
 
 	{
-		path := "relocate-slaves"
+		path := "relocate-subordinates"
 		synonym := api.getSynonymPath(path)
 		test.S(t).ExpectEquals(synonym, "relocate-replicas")
 	}
 	{
-		path := "relocate-slaves/:host/:port"
+		path := "relocate-subordinates/:host/:port"
 		synonym := api.getSynonymPath(path)
 		test.S(t).ExpectEquals(synonym, "relocate-replicas/:host/:port")
 	}
@@ -46,7 +46,7 @@ func TestKnownPaths(t *testing.T) {
 	test.S(t).ExpectTrue(pathsMap["health"])
 	test.S(t).ExpectTrue(pathsMap["lb-check"])
 	test.S(t).ExpectTrue(pathsMap["relocate"])
-	test.S(t).ExpectTrue(pathsMap["relocate-slaves"])
+	test.S(t).ExpectTrue(pathsMap["relocate-subordinates"])
 
 	for path, synonym := range apiSynonyms {
 		test.S(t).ExpectTrue(pathsMap[path])

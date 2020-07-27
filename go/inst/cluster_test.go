@@ -25,59 +25,59 @@ import (
 	"testing"
 )
 
-var masterKey = InstanceKey{Hostname: "host1", Port: 3306}
+var mainKey = InstanceKey{Hostname: "host1", Port: 3306}
 
 func init() {
 	config.Config.HostnameResolveMethod = "none"
-	config.Config.KVClusterMasterPrefix = "test/master/"
+	config.Config.KVClusterMainPrefix = "test/main/"
 	config.MarkConfigurationLoaded()
 	log.SetLevel(log.ERROR)
 }
 
-func TestGetClusterMasterKVKey(t *testing.T) {
-	kvKey := GetClusterMasterKVKey("foo")
-	test.S(t).ExpectEquals(kvKey, "test/master/foo")
+func TestGetClusterMainKVKey(t *testing.T) {
+	kvKey := GetClusterMainKVKey("foo")
+	test.S(t).ExpectEquals(kvKey, "test/main/foo")
 }
 
-func TestGetClusterMasterKVPair(t *testing.T) {
+func TestGetClusterMainKVPair(t *testing.T) {
 	{
-		kvPair := getClusterMasterKVPair("myalias", &masterKey)
+		kvPair := getClusterMainKVPair("myalias", &mainKey)
 		test.S(t).ExpectNotNil(kvPair)
-		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
-		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
+		test.S(t).ExpectEquals(kvPair.Key, "test/main/myalias")
+		test.S(t).ExpectEquals(kvPair.Value, mainKey.StringCode())
 	}
 	{
-		kvPair := getClusterMasterKVPair("", &masterKey)
+		kvPair := getClusterMainKVPair("", &mainKey)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
 	{
-		kvPair := getClusterMasterKVPair("myalias", nil)
+		kvPair := getClusterMainKVPair("myalias", nil)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
 }
 
-func TestGetClusterMasterKVPairs(t *testing.T) {
-	kvPairs := GetClusterMasterKVPairs("myalias", &masterKey)
+func TestGetClusterMainKVPairs(t *testing.T) {
+	kvPairs := GetClusterMainKVPairs("myalias", &mainKey)
 	test.S(t).ExpectTrue(len(kvPairs) >= 2)
 
 	{
 		kvPair := kvPairs[0]
-		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
-		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
+		test.S(t).ExpectEquals(kvPair.Key, "test/main/myalias")
+		test.S(t).ExpectEquals(kvPair.Value, mainKey.StringCode())
 	}
 	{
 		kvPair := kvPairs[1]
-		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/hostname")
-		test.S(t).ExpectEquals(kvPair.Value, masterKey.Hostname)
+		test.S(t).ExpectEquals(kvPair.Key, "test/main/myalias/hostname")
+		test.S(t).ExpectEquals(kvPair.Value, mainKey.Hostname)
 	}
 	{
 		kvPair := kvPairs[2]
-		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/port")
-		test.S(t).ExpectEquals(kvPair.Value, fmt.Sprintf("%d", masterKey.Port))
+		test.S(t).ExpectEquals(kvPair.Key, "test/main/myalias/port")
+		test.S(t).ExpectEquals(kvPair.Value, fmt.Sprintf("%d", mainKey.Port))
 	}
 }
 
-func TestGetClusterMasterKVPairs2(t *testing.T) {
-	kvPairs := GetClusterMasterKVPairs("", &masterKey)
+func TestGetClusterMainKVPairs2(t *testing.T) {
+	kvPairs := GetClusterMainKVPairs("", &mainKey)
 	test.S(t).ExpectEquals(len(kvPairs), 0)
 }

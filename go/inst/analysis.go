@@ -29,34 +29,34 @@ type StructureAnalysisCode string
 
 const (
 	NoProblem                                               AnalysisCode = "NoProblem"
-	DeadMasterWithoutReplicas                                            = "DeadMasterWithoutReplicas"
-	DeadMaster                                                           = "DeadMaster"
-	DeadMasterAndReplicas                                                = "DeadMasterAndReplicas"
-	DeadMasterAndSomeReplicas                                            = "DeadMasterAndSomeReplicas"
-	UnreachableMasterWithLaggingReplicas                                 = "UnreachableMasterWithLaggingReplicas"
-	UnreachableMaster                                                    = "UnreachableMaster"
-	MasterSingleReplicaNotReplicating                                    = "MasterSingleReplicaNotReplicating"
-	MasterSingleReplicaDead                                              = "MasterSingleReplicaDead"
-	AllMasterReplicasNotReplicating                                      = "AllMasterReplicasNotReplicating"
-	AllMasterReplicasNotReplicatingOrDead                                = "AllMasterReplicasNotReplicatingOrDead"
-	LockedSemiSyncMasterHypothesis                                       = "LockedSemiSyncMasterHypothesis"
-	LockedSemiSyncMaster                                                 = "LockedSemiSyncMaster"
-	MasterWithoutReplicas                                                = "MasterWithoutReplicas"
-	DeadCoMaster                                                         = "DeadCoMaster"
-	DeadCoMasterAndSomeReplicas                                          = "DeadCoMasterAndSomeReplicas"
-	UnreachableCoMaster                                                  = "UnreachableCoMaster"
-	AllCoMasterReplicasNotReplicating                                    = "AllCoMasterReplicasNotReplicating"
-	DeadIntermediateMaster                                               = "DeadIntermediateMaster"
-	DeadIntermediateMasterWithSingleReplica                              = "DeadIntermediateMasterWithSingleReplica"
-	DeadIntermediateMasterWithSingleReplicaFailingToConnect              = "DeadIntermediateMasterWithSingleReplicaFailingToConnect"
-	DeadIntermediateMasterAndSomeReplicas                                = "DeadIntermediateMasterAndSomeReplicas"
-	DeadIntermediateMasterAndReplicas                                    = "DeadIntermediateMasterAndReplicas"
-	UnreachableIntermediateMasterWithLaggingReplicas                     = "UnreachableIntermediateMasterWithLaggingReplicas"
-	UnreachableIntermediateMaster                                        = "UnreachableIntermediateMaster"
-	AllIntermediateMasterReplicasFailingToConnectOrDead                  = "AllIntermediateMasterReplicasFailingToConnectOrDead"
-	AllIntermediateMasterReplicasNotReplicating                          = "AllIntermediateMasterReplicasNotReplicating"
-	FirstTierReplicaFailingToConnectToMaster                             = "FirstTierReplicaFailingToConnectToMaster"
-	BinlogServerFailingToConnectToMaster                                 = "BinlogServerFailingToConnectToMaster"
+	DeadMainWithoutReplicas                                            = "DeadMainWithoutReplicas"
+	DeadMain                                                           = "DeadMain"
+	DeadMainAndReplicas                                                = "DeadMainAndReplicas"
+	DeadMainAndSomeReplicas                                            = "DeadMainAndSomeReplicas"
+	UnreachableMainWithLaggingReplicas                                 = "UnreachableMainWithLaggingReplicas"
+	UnreachableMain                                                    = "UnreachableMain"
+	MainSingleReplicaNotReplicating                                    = "MainSingleReplicaNotReplicating"
+	MainSingleReplicaDead                                              = "MainSingleReplicaDead"
+	AllMainReplicasNotReplicating                                      = "AllMainReplicasNotReplicating"
+	AllMainReplicasNotReplicatingOrDead                                = "AllMainReplicasNotReplicatingOrDead"
+	LockedSemiSyncMainHypothesis                                       = "LockedSemiSyncMainHypothesis"
+	LockedSemiSyncMain                                                 = "LockedSemiSyncMain"
+	MainWithoutReplicas                                                = "MainWithoutReplicas"
+	DeadCoMain                                                         = "DeadCoMain"
+	DeadCoMainAndSomeReplicas                                          = "DeadCoMainAndSomeReplicas"
+	UnreachableCoMain                                                  = "UnreachableCoMain"
+	AllCoMainReplicasNotReplicating                                    = "AllCoMainReplicasNotReplicating"
+	DeadIntermediateMain                                               = "DeadIntermediateMain"
+	DeadIntermediateMainWithSingleReplica                              = "DeadIntermediateMainWithSingleReplica"
+	DeadIntermediateMainWithSingleReplicaFailingToConnect              = "DeadIntermediateMainWithSingleReplicaFailingToConnect"
+	DeadIntermediateMainAndSomeReplicas                                = "DeadIntermediateMainAndSomeReplicas"
+	DeadIntermediateMainAndReplicas                                    = "DeadIntermediateMainAndReplicas"
+	UnreachableIntermediateMainWithLaggingReplicas                     = "UnreachableIntermediateMainWithLaggingReplicas"
+	UnreachableIntermediateMain                                        = "UnreachableIntermediateMain"
+	AllIntermediateMainReplicasFailingToConnectOrDead                  = "AllIntermediateMainReplicasFailingToConnectOrDead"
+	AllIntermediateMainReplicasNotReplicating                          = "AllIntermediateMainReplicasNotReplicating"
+	FirstTierReplicaFailingToConnectToMain                             = "FirstTierReplicaFailingToConnectToMain"
+	BinlogServerFailingToConnectToMain                                 = "BinlogServerFailingToConnectToMain"
 )
 
 const (
@@ -68,7 +68,7 @@ const (
 	DifferentGTIDModesStructureWarning                                         = "DifferentGTIDModesStructureWarning"
 	ErrantGTIDStructureWarning                                                 = "ErrantGTIDStructureWarning"
 	NoFailoverSupportStructureWarning                                          = "NoFailoverSupportStructureWarning"
-	NoWriteableMasterStructureWarning                                          = "NoWriteableMasterStructureWarning"
+	NoWriteableMainStructureWarning                                          = "NoWriteableMainStructureWarning"
 	NotEnoughValidSemiSyncReplicasStructureWarning                             = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
@@ -99,46 +99,46 @@ type ReplicationAnalysisHints struct {
 }
 
 const (
-	ForceMasterFailoverCommandHint    string = "force-master-failover"
-	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
-	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
+	ForceMainFailoverCommandHint    string = "force-main-failover"
+	ForceMainTakeoverCommandHint    string = "force-main-takeover"
+	GracefulMainTakeoverCommandHint string = "graceful-main-takeover"
 )
 
 type AnalysisInstanceType string
 
 const (
-	AnalysisInstanceTypeMaster             AnalysisInstanceType = "master"
-	AnalysisInstanceTypeCoMaster           AnalysisInstanceType = "co-master"
-	AnalysisInstanceTypeIntermediateMaster AnalysisInstanceType = "intermediate-master"
+	AnalysisInstanceTypeMain             AnalysisInstanceType = "main"
+	AnalysisInstanceTypeCoMain           AnalysisInstanceType = "co-main"
+	AnalysisInstanceTypeIntermediateMain AnalysisInstanceType = "intermediate-main"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
-	AnalyzedInstanceMasterKey                 InstanceKey
+	AnalyzedInstanceMainKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
 	AnalyzedInstanceDataCenter                string
 	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
 	AnalyzedInstanceBinlogCoordinates         BinlogCoordinates
-	IsMaster                                  bool
-	IsCoMaster                                bool
+	IsMain                                  bool
+	IsCoMain                                bool
 	LastCheckValid                            bool
 	LastCheckPartialSuccess                   bool
 	CountReplicas                             uint
 	CountValidReplicas                        uint
 	CountValidReplicatingReplicas             uint
-	CountReplicasFailingToConnectToMaster     uint
+	CountReplicasFailingToConnectToMain     uint
 	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	Replicas                                  InstanceKeyMap
-	SlaveHosts                                InstanceKeyMap // for backwards compatibility. Equals `Replicas`
-	IsFailingToConnectToMaster                bool
+	SubordinateHosts                                InstanceKeyMap // for backwards compatibility. Equals `Replicas`
+	IsFailingToConnectToMain                bool
 	Analysis                                  AnalysisCode
 	Description                               string
 	StructureAnalysis                         []StructureAnalysisCode
 	IsDowntimed                               bool
-	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterReplicasNotReplicating)
+	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMainReplicasNotReplicating)
 	DowntimeEndTimestamp                      string
 	DowntimeRemainingSeconds                  int
 	IsBinlogServer                            bool
@@ -146,10 +146,10 @@ type ReplicationAnalysis struct {
 	OracleGTIDImmediateTopology               bool
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
-	SemiSyncMasterEnabled                     bool
-	SemiSyncMasterStatus                      bool
-	SemiSyncMasterWaitForReplicaCount         uint
-	SemiSyncMasterClients                     uint
+	SemiSyncMainEnabled                     bool
+	SemiSyncMainStatus                      bool
+	SemiSyncMainWaitForReplicaCount         uint
+	SemiSyncMainClients                     uint
 	CountSemiSyncReplicasEnabled              uint
 	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
@@ -185,7 +185,7 @@ func (this *ReplicationAnalysis) MarshalJSON() ([]byte, error) {
 	}{}
 	i.ReplicationAnalysis = *this
 	// backwards compatibility
-	i.SlaveHosts = i.Replicas
+	i.SubordinateHosts = i.Replicas
 
 	return json.Marshal(i)
 }
@@ -208,15 +208,15 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 	return strings.Join(result, ", ")
 }
 
-// Get a string description of the analyzed instance type (master? co-master? intermediate-master?)
+// Get a string description of the analyzed instance type (main? co-main? intermediate-main?)
 func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType {
-	if this.IsCoMaster {
-		return AnalysisInstanceTypeCoMaster
+	if this.IsCoMain {
+		return AnalysisInstanceTypeCoMain
 	}
-	if this.IsMaster {
-		return AnalysisInstanceTypeMaster
+	if this.IsMain {
+		return AnalysisInstanceTypeMain
 	}
-	return AnalysisInstanceTypeIntermediateMaster
+	return AnalysisInstanceTypeIntermediateMain
 }
 
 // ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
