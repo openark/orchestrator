@@ -514,18 +514,16 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 			return false
 		}
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: promotedReplicaIsIdeal(%+v)", promoted.Key))
-		if promoted.Key.Equals(candidateInstanceKey) {
-			return true
+		if candidateInstanceKey != nil { //explicit request to promote a specific server
+			return promoted.Key.Equals(candidateInstanceKey)
 		}
-		if candidateInstanceKey == nil { // No explicit request to promote a specific server
-			if promoted.DataCenter == topologyRecovery.AnalysisEntry.AnalyzedInstanceDataCenter &&
-				promoted.PhysicalEnvironment == topologyRecovery.AnalysisEntry.AnalyzedInstancePhysicalEnvironment {
-				if promoted.PromotionRule == inst.MustPromoteRule || promoted.PromotionRule == inst.PreferPromoteRule ||
-					(hasBestPromotionRule && promoted.PromotionRule != inst.MustNotPromoteRule) {
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: found %+v to be ideal candidate; will optimize recovery", promoted.Key))
-					postponedAll = true
-					return true
-				}
+		if promoted.DataCenter == topologyRecovery.AnalysisEntry.AnalyzedInstanceDataCenter &&
+			promoted.PhysicalEnvironment == topologyRecovery.AnalysisEntry.AnalyzedInstancePhysicalEnvironment {
+			if promoted.PromotionRule == inst.MustPromoteRule || promoted.PromotionRule == inst.PreferPromoteRule ||
+				(hasBestPromotionRule && promoted.PromotionRule != inst.MustNotPromoteRule) {
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: found %+v to be ideal candidate; will optimize recovery", promoted.Key))
+				postponedAll = true
+				return true
 			}
 		}
 		return false
