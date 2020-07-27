@@ -5,6 +5,7 @@ Multiple Dockerfiles are available, to:
 - Build and test `orchestrator`
 - Create distribution files
 - Run a minimal `orchestrator` daemon
+- Run a 3-node raft setup
 - Run a full blown CI environment
 
 [`script/dock`](https://github.com/openark/orchestrator/blob/master/script/dock) is a convenience script to build/spawn each of these docker images.
@@ -81,3 +82,18 @@ Tips:
 - Use `redeploy-ci-env` to re-create the MySQL topology, and recreate and restart the heartbeat, consul, consul-template and haproxy services. This resets the services to their original state.
 
 Uses [`Dockerfile.system`](https://github.com/openark/orchestrator/blob/master/docker/Dockerfile.system)
+
+## Run a raft setup
+
+Execute:
+```
+$ script/dock raft
+```
+
+This will spin three `orchestrator` services:
+
+1. Listens on `http://127.0.0.1:3007`, advertising raft on `127.0.0.1:10007`
+2. Listens on `http://127.0.0.1:3008`, advertising raft on `127.0.0.1:10008`
+3. Listens on `http://127.0.0.1:3009`, advertising raft on `127.0.0.1:10009`
+
+`orchestrator-client` is configured to connect to any of the nodes.
