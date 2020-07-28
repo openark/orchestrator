@@ -2322,7 +2322,7 @@ func RegroupReplicasPseudoGTID(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2388,7 +2388,7 @@ func RegroupReplicasPseudoGTID(
 		AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 		return err
 	}
-	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica, false) {
 		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
 	} else {
 		err = allMatchingFunc()
@@ -2423,7 +2423,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2503,7 +2503,7 @@ func RegroupReplicasGTID(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	lostReplicas [](*Instance),
 	movedReplicas [](*Instance),
@@ -2524,15 +2524,23 @@ func RegroupReplicasGTID(
 	if onCandidateReplicaChosen != nil {
 		onCandidateReplicaChosen(candidateReplica)
 	}
+	replicasToMove := append(equalReplicas, laterReplicas...)
+	hasBestPromotionRule := true
+	if candidateReplica != nil {
+		for _, replica := range replicasToMove {
+			if replica.PromotionRule.BetterThan(candidateReplica.PromotionRule) {
+				hasBestPromotionRule = false
+			}
+		}
+	}
 	moveGTIDFunc := func() error {
-		replicasToMove := append(equalReplicas, laterReplicas...)
 		log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
 
 		movedReplicas, unmovedReplicas, err, _ = moveReplicasViaGTID(replicasToMove, candidateReplica, postponedFunctionsContainer)
 		unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
 		return log.Errore(err)
 	}
-	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica, hasBestPromotionRule) {
 		postponedFunctionsContainer.AddPostponedFunction(moveGTIDFunc, fmt.Sprintf("regroup-replicas-gtid %+v", candidateReplica.Key))
 	} else {
 		err = moveGTIDFunc()
