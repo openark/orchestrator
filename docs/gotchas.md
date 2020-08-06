@@ -7,11 +7,6 @@ places (once in the `cluster` page, once in the `problems` drop down) in two dif
 
 If you want to get the most up to date instance status, use the "Refresh" button on the instance's _settings dialog_.  
 
-* Similarly, on `Long Queries` page the queries presented are true to a point in time in the last minute (or otherwise the
-`InstancePollSeconds` settings). Thus, it is possible that by the time you look at this page, the queries listed will have been
-completed. If you choose to click the `Kill query` button, please be advised that you might actually be killing a *different*
-query, executing on same connection following up on the by-now-completed listed long running query.
-
 * It could take a couple of minutes for `orchestrator` to fully detect a cluster's topology. The time depends on the depth
 of the topology (if you have replicas-of-replicas the time increases). This is due to the fact that `orchestrator` polls the instances independently, and an insight on the topology must propagate from master to replica on the next polling occasion.
 
