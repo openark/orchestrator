@@ -72,6 +72,7 @@ Authored by [Shlomi Noach](https://github.com/shlomi-noach):
 - Orchestrator Chef Cookbook (1): https://github.com/silviabotros/chef-orchestrator
 - Orchestrator Chef Cookbook (2): https://supermarket.chef.io/cookbooks/orchestrator
 - Nagios / Icinga check based on Orchestrator API: https://github.com/mcrauwel/go-check-orchestrator
+- Light Python wrapper for Orchestrator API: https://github.com/stirlab/python-mysql-orchestrator
 
 #### Developers
 
