@@ -3,7 +3,7 @@
 
  This is also the place to make a discussion before creating a PR.
 
- If this is a bug report, please provide a test case and the error output. Udeful infromation:
+ If this is a bug report, please provide a test case and the error output. Useful information:
  - your orchestrator.conf.json config file/contents
  - your topology (e.g. run `orchestrator-client -c topology -alias my-cluster`)
  - what did you do?

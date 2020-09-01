@@ -19,12 +19,12 @@ package inst
 import (
 	"fmt"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/process"
+	"github.com/openark/orchestrator/go/util"
 )
 
 // ReadActiveMaintenance returns the list of currently active maintenance entries

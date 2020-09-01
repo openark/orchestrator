@@ -22,9 +22,9 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"

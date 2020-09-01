@@ -10,6 +10,7 @@ package mysql
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 )
 
@@ -110,7 +111,7 @@ func TestConvertUnsignedIntegers(t *testing.T) {
 			t.Fatalf("%T type not convertible %s", value, err)
 		}
 
-		if output != int64(42) {
+		if output != uint64(42) {
 			t.Fatalf("%T type not converted, got %#v %T", value, output, output)
 		}
 	}
@@ -120,7 +121,21 @@ func TestConvertUnsignedIntegers(t *testing.T) {
 		t.Fatal("uint64 high-bit not convertible", err)
 	}
 
-	if output != "18446744073709551615" {
-		t.Fatalf("uint64 high-bit not converted, got %#v %T", output, output)
+	if output != ^uint64(0) {
+		t.Fatalf("uint64 high-bit converted, got %#v %T", output, output)
+	}
+}
+
+func TestConvertJSON(t *testing.T) {
+	raw := json.RawMessage("{}")
+
+	out, err := converter{}.ConvertValue(raw)
+
+	if err != nil {
+		t.Fatal("json.RawMessage was failed in convert", err)
+	}
+
+	if _, ok := out.(json.RawMessage); !ok {
+		t.Fatalf("json.RawMessage converted, got %#v %T", out, out)
 	}
 }

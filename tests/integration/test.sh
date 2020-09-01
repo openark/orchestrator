@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Local integration tests. To be used by CI.
-# See https://github.com/github/orchestrator/tree/doc/local-tests.md
+# See https://github.com/openark/orchestrator/tree/doc/local-tests.md
 #
 
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
@@ -27,6 +27,7 @@ function run_queries() {
     cat $queries_file |
       sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" |
       sed -e "s/current_timestamp + interval 1 minute/datetime('now', '+1 minute')/g" |
+      sed -e "s/current_timestamp - interval 1 minute/datetime('now', '-1 minute')/g" |
       sqlite3 $sqlite_file
   else
     # Assume mysql
@@ -189,6 +190,7 @@ generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
+  touch "$test_mysql_defaults_file" # required even for sqlite because config file references the my.cnf cgf file
   echo "- generate_config_file OK"
 }
 
@@ -201,7 +203,7 @@ test_all() {
   echo "- deploy_internal_db OK"
 
   test_pattern="${1:-.}"
-  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+  find $tests_path -mindepth 1 -maxdepth 1 ! -path . -type d | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     test_single "$test_name"
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"

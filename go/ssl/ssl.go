@@ -10,10 +10,10 @@ import (
 	nethttp "net/http"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/go-martini/martini"
 	"github.com/howeyc/gopass"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/config"
 )
 
 var cipherSuites = []uint16{
@@ -54,19 +54,30 @@ func NewTLSConfig(caFile string, verifyCert bool) (*tls.Config, error) {
 		log.Info("verifyCert requested, client certificates will be verified")
 		c.ClientAuth = tls.VerifyClientCertIfGiven
 	}
+	caPool, err := ReadCAFile(caFile)
+	if err != nil {
+		return &c, err
+	}
+	c.ClientCAs = caPool
+	c.BuildNameToCertificate()
+	return &c, nil
+}
+
+// Returns CA certificate. If caFile is non-empty, it will be loaded.
+func ReadCAFile(caFile string) (*x509.CertPool, error) {
+	var caCertPool *x509.CertPool
 	if caFile != "" {
 		data, err := ioutil.ReadFile(caFile)
 		if err != nil {
-			return &c, err
+			return nil, err
 		}
-		c.ClientCAs = x509.NewCertPool()
-		if !c.ClientCAs.AppendCertsFromPEM(data) {
-			return &c, errors.New("No certificates parsed")
+		caCertPool = x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(data) {
+			return nil, errors.New("No certificates parsed")
 		}
 		log.Info("Read in CA file:", caFile)
 	}
-	c.BuildNameToCertificate()
-	return &c, nil
+	return caCertPool, nil
 }
 
 // Verify that the OU of the presented client certificate matches the list

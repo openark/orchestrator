@@ -17,9 +17,9 @@
 package inst
 
 import (
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
+	"github.com/openark/orchestrator/go/config"
 	"testing"
 )
 
@@ -119,9 +119,9 @@ func TestCanReplicateFrom(t *testing.T) {
 	test.S(t).ExpectEquals(canReplicate, false) //binlog not yet enabled
 
 	i55.LogBinEnabled = true
-	i55.LogSlaveUpdatesEnabled = true
+	i55.LogReplicationUpdatesEnabled = true
 	i56.LogBinEnabled = true
-	i56.LogSlaveUpdatesEnabled = true
+	i56.LogReplicationUpdatesEnabled = true
 
 	canReplicate, _ = i56.CanReplicateFrom(&i55)
 	test.S(t).ExpectEquals(canReplicate, false) //serverid not set
@@ -134,8 +134,8 @@ func TestCanReplicateFrom(t *testing.T) {
 	canReplicate, _ = i55.CanReplicateFrom(&i56)
 	test.S(t).ExpectFalse(canReplicate)
 
-	iStatement := Instance{Key: key1, Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	iRow := Instance{Key: key2, Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+	iStatement := Instance{Key: key1, Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogReplicationUpdatesEnabled: true}
+	iRow := Instance{Key: key2, Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogReplicationUpdatesEnabled: true}
 	canReplicate, err = iRow.CanReplicateFrom(&iStatement)
 	test.S(t).ExpectNil(err)
 	test.S(t).ExpectTrue(canReplicate)
@@ -201,7 +201,7 @@ func TestHumanReadableDescription(t *testing.T) {
 		i57.UsingPseudoGTID = true
 		i57.LogBinEnabled = true
 		i57.Binlog_format = "ROW"
-		i57.LogSlaveUpdatesEnabled = true
+		i57.LogReplicationUpdatesEnabled = true
 		desc := i57.HumanReadableDescription()
 		test.S(t).ExpectEquals(desc, "[unknown,invalid,5.7.8-log,rw,ROW,>>,P-GTID]")
 	}
@@ -217,7 +217,7 @@ func TestTabulatedDescription(t *testing.T) {
 		i57.UsingPseudoGTID = true
 		i57.LogBinEnabled = true
 		i57.Binlog_format = "ROW"
-		i57.LogSlaveUpdatesEnabled = true
+		i57.LogReplicationUpdatesEnabled = true
 		desc := i57.TabulatedDescription("|")
 		test.S(t).ExpectEquals(desc, "unknown|invalid|5.7.8-log|rw|ROW|>>,P-GTID")
 	}
