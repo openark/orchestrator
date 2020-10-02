@@ -26,10 +26,10 @@ type CandidatePromotionRule string
 
 const (
 	MustPromoteRule      CandidatePromotionRule = "must"
-	PreferPromoteRule                           = "prefer"
-	NeutralPromoteRule                          = "neutral"
-	PreferNotPromoteRule                        = "prefer_not"
-	MustNotPromoteRule                          = "must_not"
+	PreferPromoteRule    CandidatePromotionRule = "prefer"
+	NeutralPromoteRule   CandidatePromotionRule = "neutral"
+	PreferNotPromoteRule CandidatePromotionRule = "prefer_not"
+	MustNotPromoteRule   CandidatePromotionRule = "must_not"
 )
 
 var promotionRuleOrderMap = map[CandidatePromotionRule]int{
@@ -40,8 +40,12 @@ var promotionRuleOrderMap = map[CandidatePromotionRule]int{
 	MustNotPromoteRule:   4,
 }
 
-func (this *CandidatePromotionRule) SmallerThan(other CandidatePromotionRule) bool {
-	return promotionRuleOrderMap[*this] < promotionRuleOrderMap[other]
+func (this *CandidatePromotionRule) BetterThan(other CandidatePromotionRule) bool {
+	otherOrder, ok := promotionRuleOrderMap[other]
+	if !ok {
+		return false
+	}
+	return promotionRuleOrderMap[*this] < otherOrder
 }
 
 // ParseCandidatePromotionRule returns a CandidatePromotionRule by name.

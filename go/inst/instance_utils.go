@@ -146,7 +146,7 @@ func (this *InstancesSorterByExec) Less(i, j int) bool {
 			return true
 		}
 		// Prefer candidates:
-		if this.instances[j].PromotionRule.SmallerThan(this.instances[i].PromotionRule) {
+		if this.instances[j].PromotionRule.BetterThan(this.instances[i].PromotionRule) {
 			return true
 		}
 	}
