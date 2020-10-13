@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	nethttp "net/http"
 	"strings"
 
@@ -14,6 +15,13 @@ import (
 	"github.com/howeyc/gopass"
 	"github.com/openark/golib/log"
 	"github.com/openark/orchestrator/go/config"
+)
+
+type IdentifierType int
+
+const (
+	IT_CommonName IdentifierType = iota
+	IT_OrganizationalUnit
 )
 
 var cipherSuites = []uint16{
@@ -82,33 +90,43 @@ func ReadCAFile(caFile string) (*x509.CertPool, error) {
 
 // Verify that the OU of the presented client certificate matches the list
 // of Valid OUs
-func Verify(r *nethttp.Request, validOUs []string) error {
-	if strings.Contains(r.URL.String(), config.Config.StatusEndpoint) && !config.Config.StatusOUVerify {
+func Verify(r *nethttp.Request, validIdentitifiers []string, it IdentifierType) error {
+	if config.Config.SSLSkipVerify {
+		log.Debug("TLS Verify: skipping verification")
+		return nil
+	}
+	if HasString(r.URL.String(), config.Config.SSLSkipVerifyEndpoints) {
+		log.Debug("TLS Verify: non-verifiable endpoint:", r.URL.String())
 		return nil
 	}
 	if r.TLS == nil {
-		return errors.New("No TLS")
+		return errors.New("TLS Verify: No TLS")
 	}
 	for _, chain := range r.TLS.VerifiedChains {
-		s := chain[0].Subject.OrganizationalUnit
-		log.Debug("All OUs:", strings.Join(s, " "))
-		for _, ou := range s {
-			log.Debug("Client presented OU:", ou)
-			if HasString(ou, validOUs) {
-				log.Debug("Found valid OU:", ou)
+		s := []string{}
+		if it == IT_CommonName {
+			s = append(s, chain[0].Subject.CommonName)
+		} else {
+			s = chain[0].Subject.OrganizationalUnit
+		}
+		log.Debug("TLS Verify: all identifiers:", strings.Join(s, " "))
+		for _, id := range s {
+			log.Debug("TLS Verify: Client presented identifier:", id)
+			if HasString(id, validIdentitifiers) {
+				log.Debug("TLS Verify: Found valid identifier:", id)
 				return nil
 			}
 		}
 	}
-	log.Error("No valid OUs found")
-	return errors.New("Invalid OU")
+	log.Error("TLS Verify: No valid client identitifiers found")
+	return errors.New("TLS Verify: Invalid client identity")
 }
 
 // TODO: make this testable?
-func VerifyOUs(validOUs []string) martini.Handler {
+func VerifyClient(validIdentifiers []string, it IdentifierType) martini.Handler {
 	return func(res nethttp.ResponseWriter, req *nethttp.Request, c martini.Context) {
-		log.Debug("Verifying client OU")
-		if err := Verify(req, validOUs); err != nil {
+		log.Debug("TLS: Verifying client certificate")
+		if err := Verify(req, validIdentifiers, it); err != nil {
 			nethttp.Error(res, err.Error(), nethttp.StatusUnauthorized)
 		}
 	}
@@ -217,4 +235,68 @@ func ListenAndServeTLS(addr string, handler nethttp.Handler, tlsConfig *tls.Conf
 		return err
 	}
 	return nethttp.Serve(l, handler)
+}
+
+func NewTLSTransport() (*nethttp.Transport, error) {
+	var transport *nethttp.Transport
+	tlsConfig, err := NewTLSConfig(config.Config.SSLCAFile, false)
+	if err != nil {
+		log.Errorf("Can't create TLS configuration for reverse proxy connection: %s", err)
+		return transport, err
+	}
+
+	if config.Config.SSLCertFile != "" || config.Config.SSLPrivateKeyFile != "" {
+		if err = AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
+			log.Errorf("Can't setup TLS key pairs for reverse proxy connection: %s", err)
+			return transport, err
+		}
+	}
+
+	verifyPeerCn := func(certificates [][]byte, _ [][]*x509.Certificate) error {
+		certs := make([]*x509.Certificate, len(certificates))
+		for i, asn1Data := range certificates {
+			cert, err := x509.ParseCertificate(asn1Data)
+			if err != nil {
+				log.Errorf("tls: failed to parse certificate from server: %v", err)
+				return err
+			}
+			certs[i] = cert
+		}
+
+		opts := x509.VerifyOptions{
+			Roots:         tlsConfig.ClientCAs,
+			Intermediates: x509.NewCertPool(),
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		}
+		for _, cert := range certs[1:] {
+			opts.Intermediates.AddCert(cert)
+		}
+
+		var err error
+		for _, cn := range config.Config.SSLValidCNs {
+			opts.DNSName = cn
+			_, err = certs[0].Verify(opts)
+			if err == nil {
+				log.Debugf("tls: accepted server certificate with CN %s", cn)
+				return nil
+			}
+		}
+		log.Debugf("tls: rejected server certificate")
+		return err
+	}
+
+	tlsConfig.ClientAuth = tls.RequireAnyClientCert
+	tlsConfig.VerifyPeerCertificate = verifyPeerCn
+	tlsConfig.InsecureSkipVerify = true
+
+	transport = &nethttp.Transport{
+		DialTLS: func(network, addr string) (net.Conn, error) {
+			conn, err := tls.Dial(network, addr, tlsConfig)
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
+		},
+	}
+	return transport, nil
 }
