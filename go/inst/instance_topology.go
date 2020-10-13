@@ -1009,9 +1009,9 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	if !master.HasReplicationCredentials {
 		// Let's try , if possible, to get credentials from replica. Best effort.
-		if replicationUser, replicationPassword, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
+		if credentials, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
 			log.Debugf("Got credentials from a replica. will now apply")
-			_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+			_, err = ChangeMasterCredentials(&master.Key, credentials)
 			if err != nil {
 				goto Cleanup
 			}
