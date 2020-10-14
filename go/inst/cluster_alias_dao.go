@@ -21,6 +21,7 @@ import (
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/db"
 )
 
@@ -161,6 +162,27 @@ func UpdateClusterAliases() error {
 		return err
 	}
 	return nil
+}
+
+// ForgetLongUnseenClusterAliases will remove entries of cluster_aliases that have long since been last seen.
+// This function is compatible with ForgetLongUnseenInstances
+func ForgetLongUnseenClusterAliases() error {
+	sqlResult, err := db.ExecOrchestrator(`
+			delete
+				from cluster_alias
+			where
+			last_registered < NOW() - interval ? hour`,
+		config.Config.UnseenInstanceForgetHours,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	AuditOperation("forget-clustr-aliases", nil, fmt.Sprintf("Forgotten aliases: %d", rows))
+	return err
 }
 
 // ReplaceAliasClusterName replaces alis mapping of one cluster name onto a new cluster name.

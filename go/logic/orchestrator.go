@@ -551,6 +551,7 @@ func ContinuousDiscovery() {
 					go inst.InjectUnseenMasters()
 
 					go inst.ForgetLongUnseenInstances()
+					go inst.ForgetLongUnseenClusterAliases()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()
 					go inst.DeleteInvalidHostnameResolves()
