@@ -3173,6 +3173,8 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 // PopulateGroupReplicationInformation obtains information about Group Replication  for this host as well as other hosts
 // who are members of the same group (if any).
 func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
+	// We exclude below hosts with state OFFLINE because they have joined no group yet, so there is no point in getting
+	// any group replication information from them
 	q := `
 	SELECT
 		MEMBER_ID,
@@ -3184,6 +3186,8 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
 		@@global.group_replication_single_primary_mode
 	FROM
 		performance_schema.replication_group_members
+	WHERE
+		MEMBER_STATE != 'OFFLINE'
 	`
 	rows, err := db.Query(q)
 	if err != nil {

@@ -57,6 +57,8 @@ const (
 	AllIntermediateMasterReplicasNotReplicating                          = "AllIntermediateMasterReplicasNotReplicating"
 	FirstTierReplicaFailingToConnectToMaster                             = "FirstTierReplicaFailingToConnectToMaster"
 	BinlogServerFailingToConnectToMaster                                 = "BinlogServerFailingToConnectToMaster"
+	// Group replication problems
+	DeadReplicationGroupMemberWithReplicas = "DeadReplicationGroupMemberWithReplicas"
 )
 
 const (
@@ -110,6 +112,7 @@ const (
 	AnalysisInstanceTypeMaster             AnalysisInstanceType = "master"
 	AnalysisInstanceTypeCoMaster           AnalysisInstanceType = "co-master"
 	AnalysisInstanceTypeIntermediateMaster AnalysisInstanceType = "intermediate-master"
+	AnalysisInstanceTypeGroupMember        AnalysisInstanceType = "group-member"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
@@ -122,6 +125,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstancePhysicalEnvironment       string
 	AnalyzedInstanceBinlogCoordinates         BinlogCoordinates
 	IsMaster                                  bool
+	IsReplicationGroupMember                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool
 	LastCheckPartialSuccess                   bool
@@ -212,6 +216,9 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType {
 	if this.IsCoMaster {
 		return AnalysisInstanceTypeCoMaster
+	}
+	if this.IsReplicationGroupMember {
+		return AnalysisInstanceTypeGroupMember
 	}
 	if this.IsMaster {
 		return AnalysisInstanceTypeMaster
