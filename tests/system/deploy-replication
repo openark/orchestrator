@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ ! -f orchestrator-ci-env/script/deploy-replication ] ; then
+  echo "ERROR: teardown_redeploy indicated, but orchestrator-ci-env not found"
+  test-refresh-connections
+  exit 1
+fi
+
+orchestrator-client -c api -path "reload-configuration" | jq -r '.Code'
+
+echo "# Redeploying replication"
+(cd orchestrator-ci-env && script/deploy-replication > $deploy_replication_file 2>&1)
+
+if ! test-refresh-connections ; then
+  echo "ERROR refreshing connections"
+  exit 1
+fi
+echo "# Discovering all instances"
+orchestrator-client -c all-instances | while read i ; do
+  test-retry orchestrator-client -c discover -i $i | grep -q . || echo "+ ERROR discovering $i"
+done
+orchestrator-client -c submit-masters-to-kv-stores | egrep ':.*:'
+echo "# Validating replicas"
+test-retry bash -c 'sleep 2 ; orchestrator-client -c which-replicas -i 127.0.0.1:10111 | wc -l | grep -q 3' || echo "+ ERROR validating replicas"
+orchestrator-client -c submit-masters-to-kv-stores | egrep ':.*:'
+
+(cd orchestrator-ci-env && script/run-heartbeat >> $deploy_replication_file 2>&1)
+sleep 2
+if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "show create table test.heartbeat" > /dev/null ; then
+  echo "ERROR: cannot find heartbeat table"
+  cat $deploy_replication_file
+  exit 1
+fi
+
+if ! mysql -uci -pci -h 127.0.0.1 --port=10111 -s -s -e "select * from test.heartbeat" | grep -q . ; then
+  echo "ERROR: cannot read heartbeat value"
+  cat $deploy_replication_file
+  exit 1
+fi

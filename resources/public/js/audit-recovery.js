@@ -2,13 +2,13 @@ $(document).ready(function() {
   $("#audit_recovery_steps").hide();
   showLoader();
   var apiUri = "/api/audit-recovery/" + currentPage();
-  if (auditCluster()) {
-    apiUri = "/api/audit-recovery/cluster/" + auditCluster() + "/" + currentPage();
-  }
-  if (recoveryId() > 0) {
+  if (clusterName()) {
+    apiUri = "/api/audit-recovery/cluster/" + clusterName() + "/" + currentPage();
+  } else if (clusterAlias()) {
+    apiUri = "/api/audit-recovery/alias/" + clusterAlias() + "/" + currentPage();;
+  } else if (recoveryId() > 0) {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
-  }
-  if (recoveryUid() != "") {
+  } else if (recoveryUid()) {
     apiUri = "/api/audit-recovery/uid/" + recoveryUid();
   }
   $.get(appUrl(apiUri), function(auditEntries) {
@@ -46,9 +46,9 @@ $(document).ready(function() {
       });
       moreInfo += "</ul></div>";
     }
-    if (audit.AnalysisEntry.SlaveHosts.length > 0) {
+    if (audit.AnalysisEntry.Replicas.length > 0) {
       moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
-      audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
+      audit.AnalysisEntry.Replicas.forEach(function(instanceKey) {
         moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
       });
       moreInfo += "</ul></div>";
@@ -114,8 +114,10 @@ $(document).ready(function() {
 
   function displayAudit(auditEntries) {
     var baseWebUri = appUrl("/web/audit-recovery/");
-    if (auditCluster()) {
-      baseWebUri += "cluster/" + auditCluster() + "/";
+    if (clusterName()) {
+      baseWebUri += "cluster/" + clusterName() + "/";
+    } else if (clusterAlias()) {
+      baseWebUri += "alias/" + clusterAlias() + "/";
     }
     var singleRecoveryAudit = (auditEntries.length == 1);
 

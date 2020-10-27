@@ -1,0 +1,5 @@
+#!/bin/bash
+
+orchestrator-client -c all-instances | while read i ; do
+  orchestrator-client -c which-gtid-errant -i $i
+done | grep . || :

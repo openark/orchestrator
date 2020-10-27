@@ -1,0 +1,1 @@
+orchestrator-client -c api -path all-instances | jq '.[] | .Replicas | length'

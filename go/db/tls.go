@@ -28,8 +28,8 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/ssl"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/ssl"
 )
 
 const Error3159 = "Error 3159:"

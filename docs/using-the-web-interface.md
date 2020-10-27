@@ -101,6 +101,3 @@ The `Audit` page presents with all actions taken via `orchestrator`: replica mov
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
 ![Orchestrator screenshot](images/orchestrator-audit-small.png)
-
-`Queries` -> `Long queries` page list last met long running queries over the entire topology. these would be
-queries running over `60` seconds, non-replication, non-event-scheduler.

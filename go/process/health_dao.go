@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"fmt"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // RegisterNode writes down this node in the node_health table
