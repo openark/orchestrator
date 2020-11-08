@@ -59,10 +59,14 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(fillerCharacter, (depth-1)*2)
-		if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
-			prefix += "+" + fillerCharacter
+		if instance.IsReplicationGroupSecondary() {
+			prefix += "‡" + fillerCharacter
 		} else {
-			prefix += "-" + fillerCharacter
+			if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
+				prefix += "+" + fillerCharacter
+			} else {
+				prefix += "-" + fillerCharacter
+			}
 		}
 	}
 	entryAlias := ""
@@ -116,12 +120,22 @@ func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated
 	var masterInstance *Instance
 	// Investigate replicas:
 	for _, instance := range instances {
-		master, ok := instancesMap[instance.MasterKey]
+		var masterOrGroupPrimary *Instance
+		var ok bool
+		// If the current instance is a a group member, get the group's primary instead of the classical replication
+		// source.
+		if instance.IsReplicationGroupMember() && instance.IsReplicationGroupSecondary() {
+			masterOrGroupPrimary, ok = instancesMap[instance.ReplicationGroupPrimaryInstanceKey]
+		} else {
+			masterOrGroupPrimary, ok = instancesMap[instance.MasterKey]
+		}
 		if ok {
-			if _, ok := replicationMap[master]; !ok {
-				replicationMap[master] = [](*Instance){}
+			if _, ok := replicationMap[masterOrGroupPrimary]; !ok {
+				replicationMap[masterOrGroupPrimary] = [](*Instance){}
 			}
-			replicationMap[master] = append(replicationMap[master], instance)
+			if !instance.IsReplicationGroupPrimary() || (instance.IsReplicationGroupPrimary() && instance.IsReplica()) {
+				replicationMap[masterOrGroupPrimary] = append(replicationMap[masterOrGroupPrimary], instance)
+			}
 		} else {
 			masterInstance = instance
 		}
