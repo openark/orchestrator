@@ -1525,6 +1525,22 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 		// Just recently attempted on this specific replica
 		return
 	}
+
+	instance, _, err := inst.ReadInstance(instanceKey)
+	if err != nil {
+		return
+	}
+	if instance.UsingMariaDBGTID {
+		// In MariaDB GTID, stopping and starting IO thread actually deletes relay logs.
+		// This is counter productive to our objective.
+		// Specifically, in a situation where the primary is unreachable and where replicas are lagging,
+		// we want to restart IO thread to see if lag is actually caused by locked primary. If this results
+		// with losing relay logs, then we've lost data.
+		// So, unfortunately we avoid this step in MariaDB GTID.
+		// See https://github.com/openark/orchestrator/issues/1260
+		return
+	}
+
 	go inst.ExecuteOnTopology(func() {
 		inst.RestartReplicationQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
