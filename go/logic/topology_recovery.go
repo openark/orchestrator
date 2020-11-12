@@ -2032,7 +2032,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 	}
 	log.Infof("GracefulMasterTakeover: Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
 
-	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
+	replicationCreds, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
 	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.GracefulMasterTakeoverCommandHint, &clusterMaster.Key)
 	if err != nil {
@@ -2083,7 +2083,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", *demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
 	}
 	if !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
-		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationCreds)
 		if err == nil {
 			err = credentialsErr
 		}
