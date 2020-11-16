@@ -28,8 +28,8 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/ssl"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/ssl"
 )
 
 const Error3159 = "Error 3159:"
@@ -103,8 +103,8 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
 
-		if config.Config.MySQLTopologyUseMutualTLS ||
-			config.Config.MySQLTopologySSLCertFile != "" ||
+		if (config.Config.MySQLTopologyUseMutualTLS && !config.Config.MySQLTopologySSLSkipVerify) &&
+			config.Config.MySQLTopologySSLCertFile != "" &&
 			config.Config.MySQLTopologySSLPrivateKeyFile != "" {
 			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
 				return "", log.Errorf("Can't setup TLS key pairs for %s: %s", uri, err)
@@ -123,15 +123,19 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 // Modify the supplied URI to call the TLS config
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	if !orchestratorTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, !config.Config.MySQLOrchestratorSSLSkipVerify)
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
 			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
-			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+		if (!config.Config.MySQLOrchestratorSSLSkipVerify) &&
+			config.Config.MySQLOrchestratorSSLCertFile != "" &&
+			config.Config.MySQLOrchestratorSSLPrivateKeyFile != "" {
+			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
+				return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+			}
 		}
 		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
 			return "", log.Fatalf("Can't register mysql TLS config for orchestrator: %s", err)

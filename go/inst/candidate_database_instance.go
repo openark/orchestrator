@@ -19,7 +19,7 @@ package inst
 import (
 	"fmt"
 
-	"github.com/github/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // CandidateDatabaseInstance contains information about explicit promotion rules for an instance

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo "# Reloading configuration"
+orchestrator-client -c api -path "reload-configuration" | jq -r '.Code'
+orchestrator-client -c ack-all-recoveries --reason "system-tests"
+orchestrator-client -c all-instances | while read i ; do
+  orchestrator-client -c end-downtime -i $i
+  orchestrator-client -c register-candidate -i $i --promotion-rule neutral
+done

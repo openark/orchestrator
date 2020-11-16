@@ -17,9 +17,9 @@
 package kv
 
 import (
-	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // Internal key-value store, based on relational backend
@@ -62,26 +62,6 @@ func (this *internalKVStore) GetKeyValue(key string) (value string, found bool, 
 	return value, found, log.Errore(err)
 }
 
-func (this *internalKVStore) AddKeyValue(key string, value string) (added bool, err error) {
-	sqlResult, err := db.ExecOrchestrator(`
-		insert ignore
-			into kv_store (
-        store_key, store_value, last_updated
-			) values (
-				?, ?, now()
-			)
-		`, key, value,
-	)
-	if err != nil {
-		return false, log.Errore(err)
-	}
-	rowsAffected, err := sqlResult.RowsAffected()
-	if err != nil {
-		return false, log.Errore(err)
-	}
-	return (rowsAffected > 0), nil
-}
-
-func (this *internalKVStore) DistributePairs(pairs [](*KVPair)) (err error) {
+func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }

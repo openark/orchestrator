@@ -19,9 +19,10 @@ package inst
 import (
 	"fmt"
 
-	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 )
 
 // ReadClusterNameByAlias
@@ -147,7 +148,7 @@ func UpdateClusterAliases() error {
 			replace into
 					cluster_alias (alias, cluster_name, last_registered)
 				select
-						cluster_name, cluster_name, now()
+						cluster_name as alias, cluster_name, now()
 				  from
 				    database_instance
 				  group by
@@ -161,6 +162,27 @@ func UpdateClusterAliases() error {
 		return err
 	}
 	return nil
+}
+
+// ForgetLongUnseenClusterAliases will remove entries of cluster_aliases that have long since been last seen.
+// This function is compatible with ForgetLongUnseenInstances
+func ForgetLongUnseenClusterAliases() error {
+	sqlResult, err := db.ExecOrchestrator(`
+			delete
+				from cluster_alias
+			where
+			last_registered < NOW() - interval ? hour`,
+		config.Config.UnseenInstanceForgetHours,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	AuditOperation("forget-clustr-aliases", nil, fmt.Sprintf("Forgotten aliases: %d", rows))
+	return err
 }
 
 // ReplaceAliasClusterName replaces alis mapping of one cluster name onto a new cluster name.
@@ -195,7 +217,7 @@ func ReplaceAliasClusterName(oldClusterName string, newClusterName string) (err 
 	return err
 }
 
-// ReadUnambiguousSuggestedClusterAliases reads hostname:port who have suggested cluster aliases,
+// ReadUnambiguousSuggestedClusterAliases reads potential master hostname:port who have suggested cluster aliases,
 // where no one else shares said suggested cluster alias. Such hostname:port are likely true owners
 // of the alias.
 func ReadUnambiguousSuggestedClusterAliases() (result map[string]InstanceKey, err error) {
@@ -210,6 +232,7 @@ func ReadUnambiguousSuggestedClusterAliases() (result map[string]InstanceKey, er
 			database_instance
 		where
 			suggested_cluster_alias != ''
+			and replication_depth=0
 		group by
 			suggested_cluster_alias
 		having

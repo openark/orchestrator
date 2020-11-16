@@ -1,0 +1,3 @@
+cluster_master="$(orchestrator-client -c which-cluster-master -alias ci)"
+cluster_master_path="$(echo $cluster_master | tr ':' '/')"
+orchestrator-client -c api -path instance/$cluster_master_path | jq '.Replicas | length'

@@ -32,22 +32,24 @@ Detection is independent of recovery, and is always enabled. `OnFailureDetection
 Observe the following list of potential failures:
 
 * DeadMaster
-* DeadMasterAndSlaves
-* DeadMasterAndSomeSlaves
-* DeadMasterWithoutSlaves
+* DeadMasterAndReplicas
+* DeadMasterAndSomeReplicas
+* DeadMasterWithoutReplicas
 * UnreachableMasterWithLaggingReplicas
 * UnreachableMaster
-* AllMasterSlavesNotReplicating
-* AllMasterSlavesNotReplicatingOrDead
+* LockedSemiSyncMaster
+* AllMasterReplicasNotReplicating
+* AllMasterReplicasNotReplicatingOrDead
 * DeadCoMaster
-* DeadCoMasterAndSomeSlaves
+* DeadCoMasterAndSomeReplicas
 * DeadIntermediateMaster
-* DeadIntermediateMasterWithSingleSlaveFailingToConnect
-* DeadIntermediateMasterWithSingleSlave
-* DeadIntermediateMasterAndSomeSlaves
-* DeadIntermediateMasterAndSlaves
-* AllIntermediateMasterSlavesFailingToConnectOrDead
-* AllIntermediateMasterSlavesNotReplicating
+* DeadIntermediateMasterWithSingleReplicaFailingToConnect
+* DeadIntermediateMasterWithSingleReplica
+* DeadIntermediateMasterAndSomeReplicas
+* DeadIntermediateMasterAndReplicas
+* AllIntermediateMasterReplicasFailingToConnectOrDead
+* AllIntermediateMasterReplicasNotReplicating
+* UnreachableIntermediateMasterWithLaggingReplicas
 * UnreachableIntermediateMaster
 * BinlogServerFailingToConnectToMaster
 
@@ -60,7 +62,7 @@ Briefly looking at some examples, here is how `orchestrator` reaches failure con
 
 This makes for a potential recovery process
 
-#### `DeadMasterAndSomeSlaves`:
+#### `DeadMasterAndSomeReplicas`:
 
 1. Master MySQL access failure
 2. Some of its replicas are also unreachable
@@ -94,12 +96,22 @@ This scenario can happen when the master is overloaded. Clients would see a "Too
 
 `orchestrator` responds to this scenario by restarting replication on all of master's immediate replicas. This will close the old client connections on those replicas and attempt to initiate new ones. These may now fail to connect, leading to a complete replication failure on all replicas. This will next lead `orchestrator` to analyze a `DeadMaster`.
 
+### LockedSemiSyncMaster
+
+1. Master is running with semi-sync enabled
+2. Number of connected semi-sync replicas falls short of expected `rpl_semi_sync_master_wait_for_slave_count`
+3. `rpl_semi_sync_master_timeout` is high enough such that master locks writes and does not fall back to asynchronous replication
+
+Remediation can be to disable semi-sync on the master, or to bring up (or enable) sufficient semi-sync replicas.
+
+At this time `orchestrator` does not invoke processes for this type of analysis.
 
 ### Failures of no interest
 
 The following scenarios are of no interest to `orchestrator`, and while the information and state are available to `orchestrator`, it does not recognize such scenarios as _failures_ per se; there's no detection hooks invoked and obviously no recoveries attempted:
 
 - Failure of simple replicas (_leaves_ on the replication topology graph)
+  Exception: semi sync replicas causing `LockedSemiSyncMaster`
 - Replication lags, even severe.
 
 ### Visibility

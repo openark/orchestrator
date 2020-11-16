@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/github/orchestrator/go/app"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/app"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/inst"
 )
 
 var AppVersion, GitCommit string

@@ -64,6 +64,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isAliased() {
+  return ($.cookie("alias") == "true");
+}
+
 function isSilentUI() {
   return ($.cookie("silent-ui") == "true");
 }
@@ -255,12 +259,12 @@ function openNodeModal(node) {
     } else {
       $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     }
-    $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=reset-replica]').appendTo(td.find("div"))
 
     td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
-    $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
-    $('#node_modal button[data-btn=restart-slave]').appendTo(td.find("div"))
-    $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=start-replica]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=restart-replica]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=stop-replica]').appendTo(td.find("div"))
 
     if (!node.replicationRunning) {
       if (node.LastSQLError) {
@@ -272,7 +276,7 @@ function openNodeModal(node) {
       }
     }
     addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
-    addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
+    addNodeModalDataAttribute("Replication lag", node.ReplicationLagSeconds.Valid ? node.ReplicationLagSeconds.Int64 : "null");
     addNodeModalDataAttribute("SQL delay", node.SQLDelay);
 
     var masterCoordinatesEl = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile + ":" + node.ExecBinlogCoordinates.LogPos);
@@ -302,7 +306,7 @@ function openNodeModal(node) {
       $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
     }
   } else {
-    $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
+    $('#node_modal button[data-btn=reset-replica]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
@@ -311,7 +315,7 @@ function openNodeModal(node) {
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
   }
-  var td = addNodeModalDataAttribute("Num replicas", node.SlaveHosts.length);
+  var td = addNodeModalDataAttribute("Num replicas", node.Replicas.length);
   $('#node_modal button[data-btn=regroup-replicas]').appendTo(td.find("div"))
   addNodeModalDataAttribute("Server ID", node.ServerID);
   if (node.ServerUUID) {
@@ -329,7 +333,7 @@ function openNodeModal(node) {
       format = format + "/" + node.BinlogRowImage;
     }
     addNodeModalDataAttribute("Binlog format", format);
-    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
+    var td = addNodeModalDataAttribute("Logs replication updates", booleanString(node.LogReplicationUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
@@ -358,6 +362,9 @@ function openNodeModal(node) {
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
   addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
+  addNodeModalDataAttribute("Region", node.Region);
+  addNodeModalDataAttribute("Data center", node.DataCenter);
+  addNodeModalDataAttribute("Physical environment", node.PhysicalEnvironment);
   addNodeModalDataAttribute("Cluster",
     '<a href="' + appUrl('/web/cluster/' + node.ClusterName) + '">' + node.ClusterName + '</a>');
   addNodeModalDataAttribute("Audit",
@@ -384,17 +391,14 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=skip-query]').click(function() {
     apiCommand("/api/skip-query/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=start-slave]').click(function() {
-    apiCommand("/api/start-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=start-replica]').click(function() {
+    apiCommand("/api/start-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=restart-slave]').click(function() {
-    apiCommand("/api/restart-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=restart-replica]').click(function() {
+    apiCommand("/api/restart-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal [data-btn=stop-slave]').click(function() {
-    apiCommand("/api/stop-slave/" + node.Key.Hostname + "/" + node.Key.Port);
-  });
-  $('#node_modal [data-btn=stop-slave-nice]').click(function() {
-    apiCommand("/api/stop-slave-nice/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=stop-replica]').click(function() {
+    apiCommand("/api/stop-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=detach-replica]').click(function() {
     apiCommand("/api/detach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
@@ -405,14 +409,14 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=reattach-replica-master-host]').click(function() {
     apiCommand("/api/reattach-replica-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reset-slave]').click(function() {
+  $('#node_modal button[data-btn=reset-replica]').click(function() {
     var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?" +
       "<p>This will stop and break the replication." +
       "<p>FYI, this is a destructive operation that cannot be easily reverted";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/reset-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/reset-replica/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
     return false;
@@ -499,18 +503,18 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
-  $('#node_modal button[data-btn=start-slave]').hide();
-  $('#node_modal button[data-btn=restart-slave]').hide();
-  $('#node_modal [data-btn-group=stop-slave]').hide();
+  $('#node_modal button[data-btn=start-replica]').hide();
+  $('#node_modal button[data-btn=restart-replica]').hide();
+  $('#node_modal button[data-btn=stop-replica]').hide();
 
   if (node.MasterKey.Hostname) {
     if (node.replicationRunning || node.replicationAttemptingToRun) {
-      $('#node_modal [data-btn-group=stop-slave]').show();
-      $('#node_modal button[data-btn=restart-slave]').show();
+      $('#node_modal button[data-btn=stop-replica]').show();
+      $('#node_modal button[data-btn=restart-replica]').show();
     } else if (!node.replicationRunning) {
-      $('#node_modal button[data-btn=start-slave]').show();
+      $('#node_modal button[data-btn=start-replica]').show();
     }
-    if (!node.Slave_SQL_Running && node.LastSQLError) {
+    if (!node.ReplicationSQLThreadRuning && node.LastSQLError) {
       $('#node_modal button[data-btn=skip-query]').show();
     }
   }
@@ -532,7 +536,7 @@ function openNodeModal(node) {
   }
 
   $('#node_modal button[data-btn=regroup-replicas]').hide();
-  if (node.SlaveHosts.length > 1) {
+  if (node.Replicas.length > 1) {
     $('#node_modal button[data-btn=regroup-replicas]').show();
   }
   $('#node_modal button[data-btn=regroup-replicas]').click(function() {
@@ -547,7 +551,7 @@ function openNodeModal(node) {
   });
 
   $('#node_modal button[data-btn=take-siblings]').hide();
-  if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
+  if (node.LogBinEnabled && node.LogReplicationUpdatesEnabled) {
     $('#node_modal button[data-btn=take-siblings]').show();
   }
   $('#node_modal button[data-btn=take-siblings]').click(function() {
@@ -596,12 +600,20 @@ function normalizeInstance(instance) {
   instance.title = instance.Key.Hostname + ':' + instance.Key.Port;
   instance.canonicalTitle = instance.title;
   instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
-  instance.masterId = getInstanceId(instance.MasterKey.Hostname,
-    instance.MasterKey.Port);
+  // If this host is a replication group member, we set its masterId to the group primary, unless the instance is itself
+  // the primary. In that case, we set it to its async/semi-sync master (if configured). Notice that for group members
+  // whose role is not defined (e.g. because they are in ERROR state) we still set their master ID to the group primary.
+  // Setting the masterId to the group primary is what allows us to visualize group secondary members as replicating
+  // from the group primary.
+  if (instance.ReplicationGroupName != "" && (instance.ReplicationGroupMemberRole == "SECONDARY" || instance.ReplicationGroupMemberRole == ""))
+    masterKey = instance.ReplicationGroupPrimaryInstanceKey;
+  else
+    masterKey = instance.MasterKey;
+  instance.masterId = getInstanceId(masterKey.Hostname, masterKey.Port);
 
-  instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
-  instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
-  instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
+  instance.replicationRunning = instance.ReplicationSQLThreadRuning && instance.ReplicationIOThreadRuning;
+  instance.replicationAttemptingToRun = instance.ReplicationSQLThreadRuning || instance.ReplicationIOThreadRuning;
+  instance.replicationLagReasonable = Math.abs(instance.ReplicationLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
   instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
   instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
@@ -661,8 +673,12 @@ function normalizeInstanceProblem(instance) {
   instance.errantGTIDProblem = function() {
     return instanceProblemIfExists('errant_gtid');
   }
+  instance.replicationGroupMemberStateProblem = function() {
+    return instanceProblemIfExists("group_replication_member_not_online")
+  }
 
   instance.problem = null;
+  instance.Problems = instance.Problems || [];
   if (instance.Problems.length > 0) {
     instance.problem = instance.Problems[0]; // highest priority one
   }
@@ -686,6 +702,9 @@ function normalizeInstanceProblem(instance) {
   } else if (instance.errantGTIDProblem()) {
     instance.problemDescription = "Replica has GTID entries not found on its master";
     instance.problemOrder = 6;
+  } else if (instance.replicationGroupMemberStateProblem()) {
+    instance.problemDescription = "Replication group member in state " + instance.ReplicationGroupMemberState;
+    instance.problemOrder = 7;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
@@ -704,7 +723,7 @@ function createVirtualInstance() {
     isMaster: false,
     isCoMaster: false,
     isVirtual: true,
-    SlaveLagSeconds: 0,
+    ReplicationLagSeconds: 0,
     SecondsSinceLastSeen: 0
   }
   normalizeInstanceProblem(virtualInstance);
@@ -800,15 +819,50 @@ function normalizeInstances(instances, maintenanceList) {
   return instancesMap;
 }
 
+function formattedInterval(n) {
+    var days = Math.floor(n / 24 / 3600);
+
+    n = n % (24 * 3600) ;
+    var hours = Math.floor(n / 3600);
+
+    n = n % 3600;
+    var minutes = Math.floor(n / 60);
+
+    n = n % 60;
+    var seconds = n;
+
+    var formatted = seconds.toString(10) + "s";
+    if (days != 0 || hours != 0 || minutes != 0) {
+        formatted = minutes.toString(10) + "m " + formatted;
+    }
+    if (days != 0 || hours != 0) {
+        formatted = hours.toString(10) + "h " + formatted;
+    }
+    if (days != 0) {
+        formatted = days.toString(10) + "d " + formatted;
+    }
+
+    return formatted;
+}
 
 function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
+  var tooltip = "";
+  if (isAnonymized()) {
+    tooltip = anonymizedInstanceId;
+  } else {
+    tooltip = (isAliased() ? instance.InstanceAlias : instance.title);
+    if (instance.Region) { tooltip += "\nRegion: " + instance.Region; }
+    if (instance.DataCenter) { tooltip += "\nData center: " + instance.DataCenter; }
+    if (instance.PhysicalEnvironment) { tooltip += "\nPhysical environment: " + instance.PhysicalEnvironment; }
+  }
+  popoverElement.find("h3").attr('title', tooltip);
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
+    (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.canonicalTitle) +
+    '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
@@ -859,15 +913,25 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.SemiSyncMasterEnabled) {
+    if (instance.SemiSyncMasterStatus) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-check" title="Semi sync enabled (master side)"></span> ');
     }
-    if (instance.SemiSyncReplicaEnabled) {
+    if (instance.SemiSyncReplicaStatus) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-saved" title="Semi sync enabled (replica side)"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
+    if (instance.LogBinEnabled && instance.LogReplicationUpdatesEnabled) {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs replication updates"></span> ');
     }
+    // Icons for GR
+    var text_style;
+    if (instance.ReplicationGroupName != "") {
+      if (instance.ReplicationGroupMemberRole == "PRIMARY")
+        text_style = "";
+      else
+        text_style = "text-muted";
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon '+ text_style +' glyphicon-tower" title="Group replication '+ instance.ReplicationGroupMemberRole + ' ' + instance.ReplicationGroupMemberState +'"></span> ');
+    }
+
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
@@ -900,13 +964,22 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       instance.renderHint = "danger";
     } else if (instance.replicationLagProblem()) {
       instance.renderHint = "warning";
+    } else if (instance.replicationGroupMemberStateProblem()) {
+      switch (instance.ReplicationGroupMemberState) {
+        case "RECOVERING":
+          instance.renderHint = "warning";
+          break;
+        default:
+          instance.renderHint = "danger";
+          break;
+      }
     }
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
     }
-    var statusMessage = instance.SlaveLagSeconds.Int64 + 's lag';
+    var statusMessage = formattedInterval(instance.ReplicationLagSeconds.Int64) + ' lag';
     if (indicateLastSeenInStatus) {
-      statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+      statusMessage = 'seen ' + formattedInterval(instance.SecondsSinceLastSeen.Int64) + ' ago';
     }
     var identityHtml = '';
     if (isAnonymized()) {
@@ -932,7 +1005,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       contentHtml += '<p><strong>Master</strong></p>';
     }
     if (renderType == "search") {
-      contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      if (instance.SuggestedClusterAlias) {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/alias/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
+      } else {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      }
     }
     if (renderType == "problems") {
       contentHtml += '<p>' + 'Problem: <strong title="' + instance.problemDescription + '">' + instance.problem.replace(/_/g, ' ') + '</strong>' + '</p>';

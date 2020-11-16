@@ -1,0 +1,1 @@
+orchestrator-client -c api -path all-instances | jq -r '.[] | select(.IsCoMaster == true) | .Key.Port'

@@ -62,7 +62,20 @@ No.
 
 ### Does orchestrator support MySQL Group Replication?
 
-No. Group replication (as of MySQL 5.7.17) is not supported.
+Partially. Replication groups in single primary mode are supported under MySQL 8.0. The extent of the support is:
+
+* Orchestrator understands that all group members are part of the same cluster, retrieves replication group information
+  as part of instance discovery, stores it in its database, and exposes it via the API.
+* The orchestrator web UI displays single primary group members. They are shown like this:
+    * All secondary group members as replicating from the primary.
+    * All group members have an icon that shows they are group members (as opposed to traditional async/semi-sync 
+      replicas).
+    * Hovering over the icon mentioned above provides information about the state and role of the DB instance in the
+      group.
+* Some relocation operations are forbidden for group members. In particular, orchestrator will refuse to relocate a 
+  secondary group member, as it, by definition, replicates always from the group primary. It will also reject an attempt
+  to relocate a group primary under a secondary of the same group.
+* Traditional async/semisync replicas from failed group members are relocated to a different group member. 
 
 ### Does orchestrator support Yet Another Type of Replication?
 
@@ -74,7 +87,7 @@ No.
 
 ### Is orchestrator open source?
 
-Yes. `Orchestrator` is released as open source under the Apache License 2.0 and is available at: https://github.com/github/orchestrator
+Yes. `Orchestrator` is released as open source under the Apache License 2.0 and is available at: https://github.com/openark/orchestrator
 
 ### Who develops orchestrator and why?
 

@@ -18,14 +18,15 @@ package inst
 
 import (
 	"fmt"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/openark/golib/log"
-	"github.com/openark/golib/sqlutils"
-	"github.com/rcrowley/go-metrics"
 	"log/syslog"
 	"os"
 	"time"
+
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/rcrowley/go-metrics"
 )
 
 // syslogWriter is optional, and defaults to nil (disabled)
@@ -60,7 +61,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	if config.Config.AuditLogFile != "" {
 		auditWrittenToFile = true
 		go func() error {
-			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0640)
 			if err != nil {
 				return log.Errore(err)
 			}
