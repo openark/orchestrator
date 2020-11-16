@@ -599,7 +599,7 @@ func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
 // keeping the current state of the replication threads.
 func DelayReplication(instanceKey *InstanceKey, seconds int) error {
 	query := fmt.Sprintf("change master to master_delay=%d", seconds)
-	statements, err := GetSlaveRestartPreserveStatements(instanceKey, query)
+	statements, err := GetReplicationRestartPreserveStatements(instanceKey, query)
 	if err != nil {
 		return err
 	}
