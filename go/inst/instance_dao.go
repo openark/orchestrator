@@ -2639,6 +2639,14 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 }
 
 // writeManyInstances stores instances in the orchestrator backend
+//
+// This may trigger this error: Error 1390: Prepared statement contains too
+// many placeholders if you are monitoring several thousand servers as it
+// may trigger the total number of place holders to exceed (uint)UINT_MAX16
+// in the MySQL source code.
+
+const tooManyPlaceholders = "Error 1390: Prepared statement contains too many placeholders"
+
 func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
 	writeInstances := [](*Instance){}
 	for _, instance := range instances {
@@ -2655,6 +2663,14 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return err
 	}
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
+		if strings.Contains(err.Error(), tooManyPlaceholders) {
+			return fmt.Errorf("writeManyInstances(?,%v,%v): error: %+v, len(instances): %v, len(args): %v.  Reduce InstanceWriteBufferSize to avoid len(args) being > 64k, a limit in the MySQL source code.",
+				instanceWasActuallyFound,
+				updateLastSeen,
+				err.Error(),
+				len(writeInstances),
+				len(args))
+		}
 		return err
 	}
 	return nil
