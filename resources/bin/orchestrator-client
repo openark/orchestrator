@@ -63,6 +63,7 @@ api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
 headers_auth="${ORCHESTRATOR_AUTH_USER_HEADER}"
 binlog=
+seconds=
 
 instance_hostport=
 destination_hostport=
@@ -92,11 +93,12 @@ for arg in "$@"; do
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
     "-headers-auth"|"--headers-auth")     set -- "$@" "-e" ;;
     "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
+    "-seconds"|"--seconds")               set -- "$@" "-s" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:e:n:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:e:n:h:S:" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -118,7 +120,8 @@ do
     b) basic_auth="$OPTARG" ;;
     e) headers_auth="$OPTARG" ;;
     n) binlog="$OPTARG" ;;
-    q) query="$OPTARG"
+    q) query="$OPTARG" ;;
+    S) seconds="$OPTARG"
   esac
 done
 
@@ -372,6 +375,8 @@ function prompt_help {
     pool name for pool related commands
   -H <hostname> -h <hostname>
     indicate host for resolve and raft operations
+  -S <seconds> --seconds
+    seconds for delaying replication
 "
 
   cat "$0" | universal_sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | universal_sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
@@ -756,6 +761,15 @@ function general_instance_command {
   print_details | filter_key | print_key
 }
 
+function delay_replication_command {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "seconds" "$seconds"
+  api "$path/$instance_hostport/$seconds"
+  print_details
+}
+
 function replication_analysis {
   api "replication-analysis"
   print_details | jq -r '.[] |
@@ -978,7 +992,7 @@ function run_command {
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
-
+    "delay-replication") delay_replication_command ;;           # Issue a CHANGE MASTER TO DELAY=seconds preserving the replication threads state
     "can-replicate-from") can_replicate_from ;;           # Check if an instance can potentially replicate from another, according to replication rules
     "can-replicate-from-gtid") can_replicate_from_gtid ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
     "is-replicating") is_replicating ;;                   # Check if an instance is replicating at this time (both SQL and IO threads running)
