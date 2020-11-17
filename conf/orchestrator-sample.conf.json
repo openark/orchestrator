@@ -27,7 +27,8 @@
   "InstancePollSeconds": 5,
   "DiscoveryIgnoreReplicaHostnameFilters": [
     "a_host_i_want_to_ignore[.]example[.]com",
-    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com"
+    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com",
+    "a_host_with_extra_port_i_want_to_ignore[.]example[.]com:3307"
   ],
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
@@ -56,7 +57,7 @@
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
-  "SlaveLagQuery": "",
+  "ReplicationLagQuery": "",
   "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
   "DetectClusterDomainQuery": "",
   "DetectInstanceAliasQuery": "",
@@ -97,6 +98,7 @@
   "SkipBinlogEventsContaining": [],
   "ReduceReplicationAnalysisCount": true,
   "FailureDetectionPeriodBlockMinutes": 60,
+  "FailMasterPromotionOnLagMinutes": 0,
   "RecoveryPeriodBlockSeconds": 3600,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
@@ -124,9 +126,6 @@
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
-  "PostTakeMasterProcesses": [
-    "echo 'Running PostTakeMasterProcesses Hook' >> /tmp/recovery.log"
-  ],
   "PostGracefulTakeoverProcesses": [
     "echo 'Planned takeover complete' >> /tmp/recovery.log"
   ],
@@ -135,9 +134,9 @@
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
-  "MasterFailoverDetachSlaveMasterHost": false,
+  "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
-  "PostponeSlaveRecoveryOnLagMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",

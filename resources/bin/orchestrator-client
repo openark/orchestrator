@@ -61,6 +61,7 @@ pool=
 hostname_flag=
 api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
+headers_auth="${ORCHESTRATOR_AUTH_USER_HEADER}"
 binlog=
 
 instance_hostport=
@@ -89,12 +90,13 @@ for arg in "$@"; do
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
+    "-headers-auth"|"--headers-auth")     set -- "$@" "-e" ;;
     "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:e:n:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -114,6 +116,7 @@ do
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
     b) basic_auth="$OPTARG" ;;
+    e) headers_auth="$OPTARG" ;;
     n) binlog="$OPTARG" ;;
     q) query="$OPTARG"
   esac
@@ -149,6 +152,10 @@ function get_curl_auth_params {
 
     curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
       requires_auth+=" --disallow-username-in-url"
+  fi
+
+  if [[ -n "${headers_auth}" ]]; then
+    requires_auth="-H "${headers_auth}""
   fi
 
   # Test API access
@@ -222,6 +229,15 @@ function detect_leader_api {
       return
     fi
   done
+  # Cannot find leader directly. Maybe our config is wrong. But, perhaps one of the nodes can route us?
+  for api in ${apis[@]} ; do
+    api=$(normalize_orchestrator_api $api)
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/routed-leader-check")
+    if [ "$leader_check" == "200" ] ; then
+      leader_api="$api"
+      return
+    fi
+  done
   fail "Cannot determine leader from $orchestrator_api"
 }
 
@@ -234,6 +250,7 @@ function api {
   local curl_auth_params="$(get_curl_auth_params)"
 
   path="$1"
+  raw_output="${2:-}"
 
   uri="$leader_api/$path"
   # echo $uri
@@ -265,8 +282,12 @@ function api {
   fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
-    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
-    [ "$api_details" != "null" ] && echo $api_details
+    if [ -n "$raw_output" ] ; then
+      echo $api_response
+    else
+      echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
+      [ "$api_details" != "null" ] && echo $api_details
+    fi
     exit 1
   fi
 }
@@ -292,11 +313,11 @@ function filter_keys {
 }
 
 function filter_broken_replicas {
-  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
+  cat - | jq '.[] | select((.ReplicationSQLThreadRuning == false or .ReplicationIOThreadRuning == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
 }
 
 function filter_running_replicas {
-  cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
+  cat - | jq '.[] | select(.ReplicationSQLThreadRuning == true and .ReplicationIOThreadRuning == true) | [.]'
 }
 
 function print_key {
@@ -313,7 +334,7 @@ function which_api {
 
 function api_call {
   assert_nonempty "path" "$api_path"
-  api "$api_path"
+  api "$api_path" "true"
   print_response
 }
 
@@ -343,6 +364,8 @@ function prompt_help {
     With '-c api', indicate the specific API path you wish to call
   -b <username:password>, --auth <username:password>
     Specify when orchestrator uses basic HTTP auth.
+  -e <header:user>, --headers-auth <header:user>
+    Specify when orchestrator uses headers auth.
   -q <query>, --query <query>
     Indicate query for 'restart-replica-statements' command
   -l <pool name>, --pool <pool name>
@@ -375,6 +398,12 @@ function ascii_topology {
 function ascii_topology_tabulated {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology-tabulated/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
+}
+
+function ascii_topology_tags {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tags/${alias:-$instance}"
   echo "$api_response" | jq -r '.Details'
 }
 
@@ -757,6 +786,18 @@ function graceful_master_takeover {
   print_details | jq '.SuccessorKey' | print_key
 }
 
+function graceful_master_takeover_auto {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  if [ -z "$destination_hostport" ] ; then
+    # No destination given.
+    api "graceful-master-takeover-auto/${alias:-$instance}"
+  else
+    # Explicit destination (designated master) given
+    api "graceful-master-takeover-auto/${alias:-$instance}/${destination_hostport}"
+  fi
+  print_details | jq '.SuccessorKey' | print_key
+}
+
 function force_master_failover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "force-master-failover/${alias:-$instance}"
@@ -857,6 +898,7 @@ function run_command {
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
+    "topology-tags") ascii_topology_tags ;;                     # Show an ascii-graph of a replication topology and instance tags, given a member of that topology
     "snapshot-topologies") snapshot_topologies ;;               # Trigger topology snapshot (recording host/master settings for all hosts)
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
@@ -950,6 +992,7 @@ function run_command {
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
+    "graceful-master-takeover-auto") graceful_master_takeover_auto ;; # Gracefully promote a new master. orchestrator will attempt to pick the promoted replica automatically
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
     "force-master-takeover") force_master_takeover ;;         # Forcibly discard master and promote another (direct child) instance instead, even if everything is running well
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries

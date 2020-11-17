@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron:  '13 */4 * * *'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go 1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+
+    - name: Test source code
+      run:  script/test-source
+
+    - name: Test build
+      run:  script/test-build
+
+    - name: Test unit
+      run:  script/test-unit
+
+    - name: Update packages
+      run:  sudo apt-get update
+
+    - name: Set up SQLite
+      run:  sudo apt-get install sqlite3
+
+    - name: Start local MySQL
+      run:  sudo /etc/init.d/mysql start
+
+    - name: Test integration
+      run:  script/test-integration
+
+    - name: Test documentation
+      run:  script/test-docs
+
+    - name: Upload orchestrator binary artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: orchestrator
+        path: bin/orchestrator

@@ -83,7 +83,7 @@ Master service discovery is largely the user's responsibility to implement. Comm
 `orchestrator` attempts to be a generic solution hence takes no stance on your service discovery method.
 
 
-### Automated recovery
+## Automated recovery
 
 Opt-in. Automated recovery may be applied to all (`"*"`) clusters or specific ones.
 
@@ -99,46 +99,65 @@ The analysis mechanism runs at all times, and checks periodically for failure/re
 - For an instance in a cluster that has not recently been recovered, unless such recent recoveries were acknowledged
 - Where global recoveries are enabled
 
-### Graceful master promotion
+## Graceful master promotion
 
-TL;DR use this for replacing a master in an orderly, planned operation.
+_a.k.a graceful master takeover_
 
-Typically for purposes of upgrade, host maintenance, etc., you may wish to replace an existing master with another one. This is a gracefull promotion (aka _graceful master takeover_).
+**TL;DR** use this for replacing a master in an orderly, planned operation.
+
+Typically for purposes of upgrade, host maintenance, etc., you may wish to replace an existing master with another one. This is a graceful promotion (aka _graceful master takeover_). It's essentially a rotation of roles: an existing replica turns into a new master, the old master turns into a replica.
 
 In a graceful takeover:
 
-- You indicate a server to promote.
-- `orchestrator` turns your master to be `read-only`.
+-  either the user or `orchestrator` choose an existing replica as the designated new master.
+- `orchestrator` ensures the designated replica takes over its siblings as intermediate master
+- `orchestrator` turns the master to be `read-only` (possibly also `super-read-only`)
 - `orchestrator` makes sure your designated server is caught up with replication.
 - `orchestrator` promotes your designated server as the new master.
 - `orchestrator` turns promoted server to be writable.
+- `orchestrator` demotes the old master and places it as a direct replica of the new master
+- if possible, `orchestrator` sets replication user/password for the demoted master
+- in the `graceful-master-takeover-auto` variant (see following), `orchestrator` starts replication on demoted master.
 
 The operation can take a few seconds, during which time your app is expected to complain, seeing that the master is `read-only`.
 
-In addition to standard hooks, `orchestrator` provides you with specialized hooks to run a graceful takeover:
+`orchestrator` provides you with specialized hooks to run a graceful takeover:
 
 - `PreGracefulTakeoverProcesses`
 - `PostGracefulTakeoverProcesses`
 
-For example, you may want to disable the pager for the duration of a planned failover. Advanced usage may include stalling traffic at proxy layer.
+These hooks run _in addition_ to the standard hooks. `orchestrator` will run `PreGracefulTakeoverProcesses`, then go through a `DeadMaster` flow, running the normal pre-, post- hooks for `DeadMaster`, and at last follows up with `PostGracefulTakeoverProcesses`.
 
-In a graceful promotion you must either:
+We find that some operations are similar between graceful-takeover and real failover, and some are different. The `PreGracefulTakeoverProcesses` and `PostGracefulTakeoverProcesses` hooks can be used, for example, to silence down alerts. You may want to disable the pager for the duration of a planned failover. Advanced usage may include stalling traffic at proxy layer.
 
-- Indicate the designated master (must be a direct replica of the existing master)
-- Set your topology such that there is exactly one direct replica under the master (at which case the identity of the designated replica is trivial and needs not be mentioned).
+From within the normal pre-, post- failover processes, you may use the `{command}` placeholder, or `ORC_COMMAND` environment variable to check whether this is a graceful takeover. You will see the value `graceful-master-takeover`.
+
+There are two variations of graceful takeover:
+
+- `graceful-master-takeover`:
+  - The user must indicate the designated replica to be promoted
+  - or, setup topology such that the master only has a single direct replica, which implicitly makes it the designated replica
+  - the demoted master is placed as replica to the new master, but `orchestrator` does not start replication on the server.
+- `graceful-master-takeover-auto`:
+  - The user _may_ indicate the designated replica to be promoted, which `orchestrator` must respect
+  - or, the user may omit the identity of designated replica, in which case `orchestrator` picks the best replica to promote
+  - the demoted master is placed as replica to the new master, and `orchestrator` starts replication on the server.
 
 Invoke graceful takeover via:
 
-* Command line: `orchestrator-client -c graceful-master-takeover -alias mycluster -s designated.master.to.promote:3306`
+- Command line; examples:
+  - `orchestrator-client -c graceful-master-takeover -alias mycluster -d designated.master.to.promote:3306`: indicate designated replica; `orchestrator` does not start replication on demoted master
+  - `orchestrator-client -c graceful-master-takeover-auto -alias mycluster -d designated.master.to.promote:3306`: indicate designated replica; `orchestrator` starts replication on demoted master
+  - `orchestrator-client -c graceful-master-takeover-auto -alias mycluster`: let `orchestrator` choose replica to promote; `orchestrator` starts replication on demoted master
 
-* Web API:
-
+- Web API; examples:
   - `/api/graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort`: gracefully promote a new master (planned failover), indicating the designated master to promote.
   - `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
+  - `/api/graceful-master-takeover-auto/:clusterHint`: gracefully promote a new master (planned failover). `orchestrator` picks replica to promote. `orchestrator` starts replication on demoted master:
 
-* Web interface: drag a direct master's replica onto the left half of the master's box.
+- Web interface: drag a direct master's replica onto the left half of the master's box. The web interface uses the `graceful-master-takeover` variation; the replication on demoted master will not kick in.
 
-### Manual recovery
+## Manual recovery
 
 TL;DR use this when an instance is recognized as failed but where auto-recovery is disabled or blocked.
 
@@ -152,7 +171,7 @@ Recover via:
 
 Manual recoveries don't block on `RecoveryPeriodBlockSeconds` (read more in next section). They also override `RecoverMasterClusterFilters` and `RecoverIntermediateMasterClusterFilters`. Thus, a human can always invoke a recovery by demand. A recovery may only block on yet another recovery running at that time on the same database instance.
 
-### Manual, forced failover
+## Manual, forced failover
 
 TL;DR force master failover _right now_ regardless of what `orchestrator` thinks.
 
@@ -166,7 +185,7 @@ Perhaps `orchestrator` doesn't see that the instance is failed, or you have some
   or `/api/force-master-failover/instance.in.that.cluster/3306`
 
 
-### Web, API, command line
+## Web, API, command line
 
 Recoveries are audited via:
 
@@ -202,7 +221,7 @@ Some corresponding command line invocations:
 - `orchestrator-client -c enable-global-recoveries`
 - `orchestrator-client -c check-global-recoveries`
 
-#### Blocking, acknowledgements, anti-flapping
+## Blocking, acknowledgements, anti-flapping
 
 `orchestrator` avoid flapping (cascading failures causing continuous outage and elimination of resources) by introducing a block period, where on any given cluster, `orchesrartor` will not kick in automated recovery on an interval smaller than said period, unless cleared to do so by a human.
 
@@ -215,7 +234,7 @@ Acknowledging a recovery is possible either via web API/interface (see audit/rec
 Note that manual recovery (e.g. `orchestrator-client -c recover` or `orchstrator-client -c force-master-failover`) ignores the blocking period.
 
 
-### Adding promotion rules
+## Adding promotion rules
 
 Some servers are better candidate for promotion in the event of failovers. Some servers aren't good picks. Examples:
 
@@ -228,7 +247,7 @@ Some servers are better candidate for promotion in the event of failovers. Some 
 You will announce your preference for a given server to `orchestrator` in the following way:
 
 ```
-orchestrator -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
+orchestrator-client -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
 ```
 
 Supported promotion rules are:
@@ -246,7 +265,7 @@ Promotion rules expire after an hour. That's the dynamic nature of `orchestrator
 
 This setup comes from production environments. The cron entries get updated by `puppet` to reflect the appropriate `promotion_rule`. A server may have `prefer` at this time, and `prefer_not` in 5 minutes from now. Integrate your own service discovery method, your own scripting, to provide with your up-to-date `promotion-rule`.
 
-### Downtime
+## Downtime
 
 All failure/recovery scenarios are analyzed. However also taken into consideration is the downtime status of
 an instance. An instance can be downtimed (via `orchestrator-client -c begin-downtime`) and this is noted in the analysis summary. When considering automated recovery, downtimed servers are skipped.
@@ -255,7 +274,7 @@ Downtime was, in fact, explicitly created for this very purpose, and allows the 
 
 Note that manual recovery (e.g. `orchestrator-client -c recover`) overrides downtime.
 
-### Recovery hooks
+## Recovery hooks
 
 `orchestrator` supports hooks -- external scripts invoked through the recovery process. These are arrays of commands invoked via shell, in particular `bash`. See hook configuration details in [recovery configuration](configuration-recovery.md#hooks)
 

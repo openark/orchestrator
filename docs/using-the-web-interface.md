@@ -6,7 +6,7 @@ the following welcome page:
 
 ![Orchestrator screenshot](images/orchestrator-about.png)
 
-If this is your first time using _orchstrator_, then you should begin by teaching it.
+If this is your first time using _orchestrator_, then you should begin by teaching it.
 `orchestrator` needs to know what replication topologies you have. The web interface
 provides this via the `discover` page.
 
@@ -101,6 +101,3 @@ The `Audit` page presents with all actions taken via `orchestrator`: replica mov
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
 ![Orchestrator screenshot](images/orchestrator-audit-small.png)
-
-`Queries` -> `Long queries` page list last met long running queries over the entire topology. these would be
-queries running over `60` seconds, non-replication, non-event-scheduler.

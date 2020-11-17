@@ -122,7 +122,7 @@ func (this *InstancesSorterByExec) Less(i, j int) bool {
 	}
 	if this.instances[i].ExecBinlogCoordinates.Equals(&this.instances[j].ExecBinlogCoordinates) {
 		// Secondary sorting: "smaller" if not logging replica updates
-		if this.instances[j].LogSlaveUpdatesEnabled && !this.instances[i].LogSlaveUpdatesEnabled {
+		if this.instances[j].LogReplicationUpdatesEnabled && !this.instances[i].LogReplicationUpdatesEnabled {
 			return true
 		}
 		// Next sorting: "smaller" if of higher version (this will be reversed eventually)
@@ -146,7 +146,7 @@ func (this *InstancesSorterByExec) Less(i, j int) bool {
 			return true
 		}
 		// Prefer candidates:
-		if this.instances[j].PromotionRule.SmallerThan(this.instances[i].PromotionRule) {
+		if this.instances[j].PromotionRule.BetterThan(this.instances[i].PromotionRule) {
 			return true
 		}
 	}

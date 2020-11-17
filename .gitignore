@@ -1,5 +1,6 @@
 *~
 conf/orchestrator.conf.json
+.vscode/
 .DS_Store
 .vagrant/
 vagrant/.sqlite

@@ -17,11 +17,13 @@
 package kv
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"sync"
 	"sync/atomic"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
 
 	consulapi "github.com/armon/consul-api"
 	"github.com/patrickmn/go-cache"
@@ -29,7 +31,7 @@ import (
 	"github.com/openark/golib/log"
 )
 
-// A Consul store based on config's `ConsulAddress` and `ConsulKVPrefix`
+// A Consul store based on config's `ConsulAddress`, `ConsulScheme`, and `ConsulKVPrefix`
 type consulStore struct {
 	client                        *consulapi.Client
 	kvCache                       *cache.Cache
@@ -47,6 +49,12 @@ func NewConsulStore() KVStore {
 	if config.Config.ConsulAddress != "" {
 		consulConfig := consulapi.DefaultConfig()
 		consulConfig.Address = config.Config.ConsulAddress
+		consulConfig.Scheme = config.Config.ConsulScheme
+		if config.Config.ConsulScheme == "https" {
+			consulConfig.HttpClient = &http.Client{
+				Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+			}
+		}
 		// ConsulAclToken defaults to ""
 		consulConfig.Token = config.Config.ConsulAclToken
 		if client, err := consulapi.NewClient(consulConfig); err != nil {

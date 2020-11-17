@@ -21,12 +21,31 @@ $(document).ready(function() {
     return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
   }
 
+  function sortByClusterName(cluster1, cluster2) {
+    return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+  }
+
+  function sortByClusterAlias(cluster1, cluster2) {
+    return cluster1.ClusterAlias.localeCompare(cluster2.ClusterAlias);
+  }
+
   function displayClusters(clusters, replicationAnalysis, problemInstances) {
     hideLoader();
 
     clusters = clusters || [];
 
-    clusters.sort(sortByCountInstances);
+    var dashboardSort = $.cookie("dashboard-sort") || "count"
+
+    refreshDashboardSortButton();
+    $("#li-dashboard-sort").appendTo("ul.navbar-nav").show();
+    $("#dashboard-sort a").click(function() {
+      $.cookie("dashboard-sort", $(this).attr("dashboard-sort"), {
+        path: '/',
+        expires: 3650
+      });
+      location.reload();
+    });
+
     var clustersProblems = {};
     clusters.forEach(function(cluster) {
       clustersProblems[cluster.ClusterName] = {};
@@ -47,6 +66,18 @@ $(document).ready(function() {
         clustersAnalysisProblems[analysisEntry.ClusterDetails.ClusterName].push(analysisEntry);
       });
     });
+
+    function refreshDashboardSortButton() {
+      if (dashboardSort == "name") {
+        clusters.sort(sortByClusterName);
+      } else if (dashboardSort == "alias") {
+        clusters.sort(sortByClusterAlias);
+      } else {
+        clusters.sort(sortByCountInstances);
+      }
+
+      $("#dashboard-sort-button").html("Sort by " + dashboardSort + ' <span class="caret"></span>')
+    }
 
     function addInstancesBadge(clusterName, count, badgeClass, title) {
       $("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge ' + badgeClass + '" title="' + title + '">' + count + '</span> ');

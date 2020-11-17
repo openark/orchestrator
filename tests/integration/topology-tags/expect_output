@@ -1,0 +1,5 @@
+testhost:22293     [unknown,unchecked,5.6.28-log,rw,STATEMENT,>>,P-GTID] [in_service,role=backup]
+- testhost:22294   [unknown,unchecked,5.6.28-log,rw,STATEMENT,>>,P-GTID] [role=delayed]
+  - testhost:22295 [unknown,unchecked,5.6.28-log,rw,STATEMENT,>>,P-GTID] [in_service]
+- testhost:22296   [unknown,unchecked,5.6.28,rw,nobinlog,P-GTID] []
+- testhost:22297   [unknown,unchecked,5.6.28-log,rw,STATEMENT,>>,P-GTID] []

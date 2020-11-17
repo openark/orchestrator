@@ -25,7 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/ssl"
 
 	"github.com/openark/golib/log"
 )
@@ -37,8 +38,30 @@ func setupHttpClient() error {
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: config.Config.SSLSkipVerify,
+	}
+	if config.Config.UseSSL {
+		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)
+		if err != nil {
+			return err
+		}
+		tlsConfig.RootCAs = caPool
+
+		if config.Config.UseMutualTLS {
+			var sslPEMPassword []byte
+			if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
+				sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+			}
+			if err := ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
+				return err
+			}
+		}
+	}
+
 	httpTransport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
+		TLSClientConfig:       tlsConfig,
 		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
@@ -54,7 +77,8 @@ func HttpGetLeader(path string) (response []byte, err error) {
 	}
 	leaderAPI := leaderURI
 	if config.Config.URLPrefix != "" {
-		leaderAPI = fmt.Sprintf("%s/%s", leaderAPI, config.Config.URLPrefix)
+		// We know URLPrefix begind with "/"
+		leaderAPI = fmt.Sprintf("%s%s", leaderAPI, config.Config.URLPrefix)
 	}
 	leaderAPI = fmt.Sprintf("%s/api", leaderAPI)
 
