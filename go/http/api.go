@@ -1589,7 +1589,7 @@ func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, re
 		return
 	}
 	seconds, err := strconv.Atoi(params["seconds"])
-	if err != nil || seconds < 0 {
+	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
 		return
 	}
@@ -1599,7 +1599,7 @@ func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, re
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replication delayed: %+v", instanceKey), Details: nil})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replication delayed: %+v", instanceKey), Details: seconds})
 }
 
 // SetReadOnly sets the global read_only variable

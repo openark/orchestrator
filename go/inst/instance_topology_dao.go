@@ -603,13 +603,17 @@ func DelayReplication(instanceKey *InstanceKey, seconds int) error {
 	if err != nil {
 		return err
 	}
+	if seconds < 0 {
+		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
+	}
 	for _, cmd := range statements {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
 			return log.Errorf("%+v: DelayReplication: '%q' failed: %+v", *instanceKey, cmd, err)
 		} else {
-			log.Infof("%s on %+v as part of DelayReplication", cmd, *instanceKey)
+			log.Infof("DelayReplication: %s on %+v", cmd, *instanceKey)
 		}
 	}
+	AuditOperation("delay-replication", instanceKey, fmt.Sprintf("set to %d", seconds))
 	return nil
 }
 
