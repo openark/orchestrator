@@ -93,7 +93,7 @@ for arg in "$@"; do
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
     "-headers-auth"|"--headers-auth")     set -- "$@" "-e" ;;
     "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
-    "-seconds"|"--seconds")               set -- "$@" "-s" ;;
+    "-seconds"|"--seconds")               set -- "$@" "-S" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
