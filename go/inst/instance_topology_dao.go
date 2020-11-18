@@ -598,13 +598,13 @@ func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
 // DelayReplication set the replication delay given seconds
 // keeping the current state of the replication threads.
 func DelayReplication(instanceKey *InstanceKey, seconds int) error {
+	if seconds < 0 {
+		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
+	}
 	query := fmt.Sprintf("change master to master_delay=%d", seconds)
 	statements, err := GetReplicationRestartPreserveStatements(instanceKey, query)
 	if err != nil {
 		return err
-	}
-	if seconds < 0 {
-		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
 	}
 	for _, cmd := range statements {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
