@@ -595,6 +595,28 @@ func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
 	return err
 }
 
+// DelayReplication set the replication delay given seconds
+// keeping the current state of the replication threads.
+func DelayReplication(instanceKey *InstanceKey, seconds int) error {
+	if seconds < 0 {
+		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
+	}
+	query := fmt.Sprintf("change master to master_delay=%d", seconds)
+	statements, err := GetReplicationRestartPreserveStatements(instanceKey, query)
+	if err != nil {
+		return err
+	}
+	for _, cmd := range statements {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return log.Errorf("%+v: DelayReplication: '%q' failed: %+v", *instanceKey, cmd, err)
+		} else {
+			log.Infof("DelayReplication: %s on %+v", cmd, *instanceKey)
+		}
+	}
+	AuditOperation("delay-replication", instanceKey, fmt.Sprintf("set to %d", seconds))
+	return nil
+}
+
 // ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
 func ChangeMasterCredentials(instanceKey *InstanceKey, creds *ReplicationCredentials) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
