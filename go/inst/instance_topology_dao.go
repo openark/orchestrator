@@ -49,6 +49,14 @@ const (
 	Error1201CouldnotInitializeMasterInfoStructure = "Error 1201:"
 )
 
+type ReplicationCredentials struct {
+	User      string
+	Password  string
+	SSLCert   string
+	SSLKey    string
+	SSLCaCert string
+}
+
 // ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -587,13 +595,35 @@ func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
 	return err
 }
 
+// DelayReplication set the replication delay given seconds
+// keeping the current state of the replication threads.
+func DelayReplication(instanceKey *InstanceKey, seconds int) error {
+	if seconds < 0 {
+		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
+	}
+	query := fmt.Sprintf("change master to master_delay=%d", seconds)
+	statements, err := GetReplicationRestartPreserveStatements(instanceKey, query)
+	if err != nil {
+		return err
+	}
+	for _, cmd := range statements {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return log.Errorf("%+v: DelayReplication: '%q' failed: %+v", *instanceKey, cmd, err)
+		} else {
+			log.Infof("DelayReplication: %s on %+v", cmd, *instanceKey)
+		}
+	}
+	AuditOperation("delay-replication", instanceKey, fmt.Sprintf("set to %d", seconds))
+	return nil
+}
+
 // ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
-func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, masterPassword string) (*Instance, error) {
+func ChangeMasterCredentials(instanceKey *InstanceKey, creds *ReplicationCredentials) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	if masterUser == "" {
+	if creds.User == "" {
 		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
 	}
 
@@ -605,8 +635,38 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	if *config.RuntimeCLIFlags.Noop {
 		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
-	_, err = ExecInstance(instanceKey, "change master to master_user=?, master_password=?",
-		masterUser, masterPassword)
+
+	var query_params []string
+	var query_params_args []interface{}
+
+	// User
+	query_params = append(query_params, "master_user = ?")
+	query_params_args = append(query_params_args, creds.User)
+	// Password
+	if creds.Password != "" {
+		query_params = append(query_params, "master_password = ?")
+		query_params_args = append(query_params_args, creds.Password)
+	}
+
+	// SSL CA cert
+	if creds.SSLCaCert != "" {
+		query_params = append(query_params, "master_ssl_ca = ?")
+		query_params_args = append(query_params_args, creds.SSLCaCert)
+	}
+	// SSL cert
+	if creds.SSLCert != "" {
+		query_params = append(query_params, "master_ssl_cert = ?")
+		query_params_args = append(query_params_args, creds.SSLCert)
+	}
+	// SSL key
+	if creds.SSLKey != "" {
+		query_params = append(query_params, "master_ssl = 1")
+		query_params = append(query_params, "master_ssl_key = ?")
+		query_params_args = append(query_params_args, creds.SSLKey)
+	}
+
+	query := fmt.Sprintf("change master to %s", strings.Join(query_params, ", "))
+	_, err = ExecInstance(instanceKey, query, query_params_args...)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -982,14 +1042,21 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 }
 
 // Attempt to read and return replication credentials from the mysql.slave_master_info system table
-func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser string, replicationPassword string, err error) {
+func ReadReplicationCredentials(instanceKey *InstanceKey) (creds *ReplicationCredentials, err error) {
+	creds = &ReplicationCredentials{}
 	if config.Config.ReplicationCredentialsQuery != "" {
-		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery, &replicationUser, &replicationPassword)
-		if err == nil && replicationUser == "" {
+		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery,
+			&creds.User,
+			&creds.Password,
+			&creds.SSLCaCert,
+			&creds.SSLCert,
+			&creds.SSLKey,
+		)
+		if err == nil && creds.User == "" {
 			err = fmt.Errorf("Empty username retrieved by ReplicationCredentialsQuery")
 		}
 		if err == nil {
-			return replicationUser, replicationPassword, nil
+			return creds, nil
 		}
 		log.Errore(err)
 	}
@@ -1003,12 +1070,12 @@ func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser strin
 			from
 				mysql.slave_master_info
 		`
-		err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
-		if err == nil && replicationUser == "" {
+		err = ScanInstanceRow(instanceKey, query, &creds.User, &creds.Password)
+		if err == nil && creds.User == "" {
 			err = fmt.Errorf("Empty username found in mysql.slave_master_info")
 		}
 	}
-	return replicationUser, replicationPassword, log.Errore(err)
+	return creds, log.Errore(err)
 }
 
 // SetReadOnly sets or clears the instance's global read_only variable
