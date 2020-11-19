@@ -254,7 +254,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 			Err:             err,
 		})
 		if util.ClearToLog("discoverInstance", instanceKey.StringCode()) {
-			log.Warningf(" DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			log.Warningf("DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 				instanceKey,
 				totalLatency.Seconds(),
 				backendLatency.Seconds(),
