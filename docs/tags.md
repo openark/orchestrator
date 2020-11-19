@@ -97,6 +97,26 @@ vttablet_alias=dc1-0123456789
 listed tags are sorted by name.
 Note that we added `old-hardware` tag without value. It exports as `old-hardware=`, with implicit empty value.
 
+
+### Listing instance tags for a cluster
+
+For a given instance or cluster alias `-c topology-tags` or `api/topology-tags` lists the cluster topology with all known tags for each instance.
+
+Example:
+```shell
+$ orchestrator-client -c tag -i db-host-01:3306 --tag vttablet_alias=dc1-0123456789
+$ orchestrator-client -c tag -i db-host-01:3306 --tag old-hardware
+
+$ orchestrator-client -c topology-tags -alias mycluster
+db-host-01:3306     [0s,ok,5.7.23-log,rw,ROW,>>,GTID,P-GTID] [vttablet_alias=dc1-0123456789, old-hardware]
++ db-host-02:3306   [0s,ok,5.7.23-log,ro,ROW,>>,GTID,P-GTID] []
+
+$ orchestrator-client -c topology-tags -i db-host-01:3306
+db-host-01:3306     [0s,ok,5.7.23-log,rw,ROW,>>,GTID,P-GTID] [vttablet_alias=dc1-0123456789, old-hardware]
++ db-host-02:3306   [0s,ok,5.7.23-log,ro,ROW,>>,GTID,P-GTID] []
+```
+
+
 ### Getting the value of a specific tag
 
 `-c tag-value` or `api/tag-value` return the value of a specific tag on an instance.
