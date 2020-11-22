@@ -442,14 +442,23 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
 	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
+	var kvPutKVPairs [](*kv.KVPair)
 	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand("put-key-value", kvPair)
+			if err == nil {
+				submittedCount++
+			} else {
+				selectedError = err
+			}
 		} else {
-			err = kv.PutKVPair(kvPair)
+			kvPutKVPairs = append(kvPutKVPairs, kvPair)
 		}
+	}
+	if len(kvPutKVPairs) > 0 {
+		err := kv.PutKVPairs(kvPutKVPairs)
 		if err == nil {
-			submittedCount++
+			submittedCount = submittedCount + len(kvPutKVPairs)
 		} else {
 			selectedError = err
 		}

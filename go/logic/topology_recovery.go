@@ -922,10 +922,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
-			for _, kvPair := range kvPairs {
-				err := kv.PutKVPair(kvPair)
-				log.Errore(err)
-			}
+			err := kv.PutKVPairs(kvPairs)
+			log.Errore(err)
 		}
 		{
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
