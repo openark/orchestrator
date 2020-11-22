@@ -2726,7 +2726,7 @@ func flushInstanceWriteBuffer() {
 
 	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
 	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
-	// this is why we want to flush all instances in the buffer untill a max of `InstanceWriteBufferSize`.
+	// this is why we want to flush all instances in the buffer until a max of `InstanceWriteBufferSize`.
 	// Otherwise we can flush way more instances than what's expected.
 	for i := 0; i < config.Config.InstanceWriteBufferSize && len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
