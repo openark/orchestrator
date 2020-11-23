@@ -85,13 +85,6 @@ func PutValue(key string, value string) (err error) {
 	return nil
 }
 
-func PutKVPair(kvPair *KVPair) (err error) {
-	if kvPair == nil {
-		return nil
-	}
-	return PutValue(kvPair.Key, kvPair.Value)
-}
-
 func PutKVPairs(kvPairs []*KVPair) (err error) {
 	if len(kvPairs) < 1 {
 		return nil
