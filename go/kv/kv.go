@@ -19,6 +19,8 @@ package kv
 import (
 	"fmt"
 	"sync"
+
+	"github.com/openark/orchestrator/go/config"
 )
 
 type KVPair struct {
@@ -54,8 +56,13 @@ func InitKVStores() {
 	kvInitOnce.Do(func() {
 		kvStores = []KVStore{
 			NewInternalKVStore(),
-			NewConsulStore(),
 			NewZkStore(),
+		}
+		switch config.Config.ConsulKVStoreProvider {
+		case "consul-txn", "consul_txn":
+			kvStores = append(kvStores, NewConsulTxnStore())
+		default:
+			kvStores = append(kvStores, NewConsulStore())
 		}
 	})
 }
