@@ -13,7 +13,7 @@
 			"revisionTime": "2020-10-30T22:48:31Z"
 		},
 		{
-			"checksumSHA1": "kKKGJdgLUikYy/MQr6i6RGaXWBU=",
+			"checksumSHA1": "VCKsz7001qwfA2bHLo/AOn0xos0=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "bf7f34fef176d890dfcc6e94319ac747291bc09a",
 			"revisionTime": "2017-07-03T06:14:36Z"
@@ -89,6 +89,18 @@
 			"path": "github.com/sjmudd/stopwatch",
 			"revision": "637ef30077b7a4d31e70e7a2b9e1e690333be7be",
 			"revisionTime": "2017-01-03T08:58:48Z"
+		},
+		{
+			"checksumSHA1": "8EcV1QnSvvRldiLpJbMDsd34ZXs=",
+			"path": "golang.org/x/sys/internal/unsafeheader",
+			"revision": "77190671981848ff71219ecfff38636c9add3b79",
+			"revisionTime": "2020-11-26T22:54:44Z"
+		},
+		{
+			"checksumSHA1": "aw4oFXUwYAwumxROq3nNNQc1Onw=",
+			"path": "golang.org/x/sys/unix",
+			"revision": "77190671981848ff71219ecfff38636c9add3b79",
+			"revisionTime": "2020-11-26T22:54:44Z"
 		}
 	],
 	"rootPath": "github.com/openark/orchestrator"
