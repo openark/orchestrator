@@ -86,6 +86,18 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
+func (this *consulStore) PutKVPairs(kvPairs []*KVPair) (err error) {
+	if this.client == nil {
+		return nil
+	}
+	for _, pair := range kvPairs {
+		if err := this.PutKeyValue(pair.Key, pair.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
 	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {

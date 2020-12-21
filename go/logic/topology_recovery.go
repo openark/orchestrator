@@ -922,10 +922,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
-			for _, kvPair := range kvPairs {
-				err := kv.PutKVPair(kvPair)
-				log.Errore(err)
-			}
+			err := kv.PutKVPairs(kvPairs)
+			log.Errore(err)
 		}
 		{
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
@@ -1525,7 +1523,23 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 		// Just recently attempted on this specific replica
 		return
 	}
+
 	go inst.ExecuteOnTopology(func() {
+		instance, _, err := inst.ReadInstance(instanceKey)
+		if err != nil {
+			return
+		}
+		if instance.UsingMariaDBGTID {
+			// In MariaDB GTID, stopping and starting IO thread actually deletes relay logs.
+			// This is counter productive to our objective.
+			// Specifically, in a situation where the primary is unreachable and where replicas are lagging,
+			// we want to restart IO thread to see if lag is actually caused by locked primary. If this results
+			// with losing relay logs, then we've lost data.
+			// So, unfortunately we avoid this step in MariaDB GTID.
+			// See https://github.com/openark/orchestrator/issues/1260
+			return
+		}
+
 		inst.RestartReplicationQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
 	})
@@ -2088,17 +2102,16 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 			err = credentialsErr
 		}
 	}
-	if auto {
-		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
-		if err == nil {
-			err = startReplicationErr
-		}
-	}
-
 	if designatedInstance.AllowTLS {
 		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
 		if err == nil {
 			err = enableSSLErr
+		}
+	}
+	if auto {
+		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
+		if err == nil {
+			err = startReplicationErr
 		}
 	}
 	executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)

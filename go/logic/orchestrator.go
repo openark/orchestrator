@@ -254,7 +254,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 			Err:             err,
 		})
 		if util.ClearToLog("discoverInstance", instanceKey.StringCode()) {
-			log.Warningf(" DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			log.Warningf("DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 				instanceKey,
 				totalLatency.Seconds(),
 				backendLatency.Seconds(),
@@ -442,14 +442,19 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
 	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
-	for _, kvPair := range submitKvPairs {
-		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand("put-key-value", kvPair)
-		} else {
-			err = kv.PutKVPair(kvPair)
+	if orcraft.IsRaftEnabled() {
+		for _, kvPair := range submitKvPairs {
+			_, err := orcraft.PublishCommand("put-key-value", kvPair)
+			if err == nil {
+				submittedCount++
+			} else {
+				selectedError = err
+			}
 		}
+	} else {
+		err := kv.PutKVPairs(submitKvPairs)
 		if err == nil {
-			submittedCount++
+			submittedCount += len(submitKvPairs)
 		} else {
 			selectedError = err
 		}

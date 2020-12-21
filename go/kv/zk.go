@@ -75,6 +75,18 @@ func (this *zkStore) GetKeyValue(key string) (value string, found bool, err erro
 	return string(result), true, nil
 }
 
+func (this *zkStore) PutKVPairs(kvPairs []*KVPair) (err error) {
+	if this.zook == nil {
+		return nil
+	}
+	for _, pair := range kvPairs {
+		if err := this.PutKeyValue(pair.Key, pair.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (this *zkStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }
