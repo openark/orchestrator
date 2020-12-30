@@ -16,7 +16,7 @@ See also: [orchestrator/raft vs. synchronous replication setup](raft-vs-sync-rep
 You may choose different availability types, based on your requirements.
 
 - No high availability: easiest, simplest setup, good for testing or dev setups. Can use `MySQL` or `sqlite`
-- Semi HA: backend is based on normal MySQL replication. `orchestrator` does not eat its own dog food and cannot failover its on backend.
+- Semi HA: backend is based on normal MySQL replication. `orchestrator` does not eat its own dog food and cannot failover its own backend.
 - HA: as depicted above; support for no single point of failure. Different solutions have different tradeoff in terms of resource utilization, supported software, type of client access.
 
 Discussed below are all options.
