@@ -2,14 +2,14 @@
 
 `orchestrator` uses a holistic approach to detect master and intermediate master failures.
 
-In a naive approach, a monitoring tool would probe the master, for example, and alert when is cannot contact or query the master server. Such approach is susceptible to false positives caused by network glitches. The naive approach further mitigates false positives by running `n` tests spaced by `t`-long intervals. This reduces, on some cases, the chance for false positive, and then increases the response time on real failure.
+In a naive approach, a monitoring tool would probe the master, for example, and alert when it cannot contact or query the master server. Such approach is susceptible to false positives caused by network glitches. The naive approach further mitigates false positives by running `n` tests spaced by `t`-long intervals. This reduces, in some cases, the chances of false positives, and then increases the response time in the event of real failure.
 
 `orchestrator` harnesses the replication topology. It observes not only the server itself, but also its replicas. For example, to diagnose a dead master scenario, `orchestrator` must both:
 
 - Fail to contact said master
 - Be able to contact master's replicas, and confirm they, too, cannot see the master.
 
-Instead of triaging the error by time, `orchestrator` triages by multiple observers, the replication topology servers themselves. In fact, when all master's replicas agree that they cannot contact their master, the replication topology is broken _de-facto_, and a failover is justified.
+Instead of triaging the error by time, `orchestrator` triages by multiple observers, the replication topology servers themselves. In fact, when all of a master's replicas agree that they cannot contact their master, the replication topology is broken _de-facto_, and a failover is justified.
 
 `orchestrator`'s holistic failure detection approach is known to be very reliable in production.
 
@@ -23,7 +23,7 @@ Detection does not always lead to [recovery](topology-recovery.md). There are sc
 - A previous recovery on same cluster completed shortly before, and anti-flapping takes place.
 - The failure type is not deemed worthy of recovery.
 
-On desired scenarios, recovery immediately follows detection. On others, such as blocked recoveries, a recovery may follow a detection after long minutes.
+On desired scenarios, recovery immediately follows detection. On others, such as blocked recoveries, a recovery may follow a detection after many minutes.
 
 Detection is independent of recovery, and is always enabled. `OnFailureDetectionProcesses` hooks are executed per detection, see [failure detection configuration](configuration-failure-detection.md).
 
