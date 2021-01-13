@@ -311,11 +311,11 @@ func onHealthTick() {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
 		if process.SinceLastGoodHealthCheck() > yieldAfterUnhealthyDuration {
-			log.Errorf("Heath test is failing for over %+v seconds. raft yielding", yieldAfterUnhealthyDuration.Seconds())
+			log.Errorf("Health test is failing for over %+v seconds. raft yielding", yieldAfterUnhealthyDuration.Seconds())
 			orcraft.Yield()
 		}
 		if process.SinceLastGoodHealthCheck() > fatalAfterUnhealthyDuration {
-			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity."))
+			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity and/or time synchronisation."))
 		}
 	}
 	if !orcraft.IsRaftEnabled() {
