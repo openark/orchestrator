@@ -441,6 +441,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerWebRequest(m, "seeds", this.Seeds)
 
 	this.RegisterDebug(m)
+	m.Get(this.URLPrefix+"/-/metrics", RegisterMetrics())
 }
 
 // RegisterDebug adds handlers for /debug/vars (expvar) and /debug/pprof (net/http/pprof) support
