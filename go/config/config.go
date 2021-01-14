@@ -265,8 +265,9 @@ type Configuration struct {
 	ConsulScheme                               string            // Scheme (http or https) for Consul
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
-	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
+	ZkAddress                                  string            // UNSUPPORTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
+	KVWipeValuesPreFailover                    bool              // Wipe the master hostname/address at the beginning of a recovery (fencing)
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
 }
@@ -434,6 +435,7 @@ func newConfiguration() *Configuration {
 		ConsulCrossDataCenterDistribution:          false,
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
+		KVWipeValuesPreFailover:                    false,
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
 	}

@@ -497,6 +497,28 @@ func GetMasterRecoveryType(analysisEntry *inst.ReplicationAnalysis) (masterRecov
 	return masterRecoveryType
 }
 
+func putAndDistributeKvPairs(analysisEntry *inst.ReplicationAnalysis, topologyRecovery *TopologyRecovery, masterKey *inst.InstanceKey) {
+	kvPairs := inst.GetClusterMasterKVPairs(analysisEntry.ClusterDetails.ClusterAlias, masterKey)
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPairs))
+	if orcraft.IsRaftEnabled() {
+		for _, kvPair := range kvPairs {
+			_, err := orcraft.PublishCommand("put-key-value", kvPair)
+			log.Errore(err)
+		}
+		// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
+		// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
+		go orcraft.PublishCommand("async-snapshot", "")
+	} else {
+		err := kv.PutKVPairs(kvPairs)
+		log.Errore(err)
+	}
+	{
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
+		err := kv.DistributePairs(kvPairs)
+		log.Errore(err)
+	}
+}
+
 // recoverDeadMaster recovers a dead master, complete logic inside
 func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
 	topologyRecovery.Type = MasterRecovery
@@ -510,6 +532,9 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
 			return false, nil, lostReplicas, topologyRecovery.AddError(err)
 		}
+	}
+	if config.Config.KVWipeValuesPreFailover {
+		putAndDistributeKvPairs(analysisEntry, topologyRecovery, nil) // wipe out master keys in KV store
 	}
 
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: will recover %+v", *failedInstanceKey))
@@ -911,25 +936,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}()
 		}
 
-		kvPairs := inst.GetClusterMasterKVPairs(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPairs))
-		if orcraft.IsRaftEnabled() {
-			for _, kvPair := range kvPairs {
-				_, err := orcraft.PublishCommand("put-key-value", kvPair)
-				log.Errore(err)
-			}
-			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
-			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
-			go orcraft.PublishCommand("async-snapshot", "")
-		} else {
-			err := kv.PutKVPairs(kvPairs)
-			log.Errore(err)
-		}
-		{
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
-			err := kv.DistributePairs(kvPairs)
-			log.Errore(err)
-		}
+		putAndDistributeKvPairs(&analysisEntry, topologyRecovery, &promotedReplica.Key)
+
 		if config.Config.MasterFailoverDetachReplicaMasterHost {
 			postponedFunction := func() error {
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: detaching master host on promoted master"))
