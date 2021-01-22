@@ -31,6 +31,11 @@ import (
 	"github.com/openark/golib/log"
 )
 
+// getConsulKVCacheKey returns a Consul KV cache key for a given datacenter
+func getConsulKVCacheKey(dc, key string) string {
+	return fmt.Sprintf("%s;%s", dc, key)
+}
+
 // A Consul store based on config's `ConsulAddress`, `ConsulScheme`, and `ConsulKVPrefix`
 type consulStore struct {
 	client                        *consulapi.Client
@@ -135,7 +140,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 
 			for _, consulPair := range consulPairs {
 				val := string(consulPair.Value)
-				kcCacheKey := fmt.Sprintf("%s;%s", datacenter, consulPair.Key)
+				kcCacheKey := getConsulKVCacheKey(datacenter, consulPair.Key)
 
 				if value, found := this.kvCache.Get(kcCacheKey); found && val == value {
 					skipped++

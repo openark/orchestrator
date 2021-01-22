@@ -142,5 +142,6 @@
   "GraphitePath": "",
   "GraphiteConvertHostnameDotsToUnderscores": true,
   "ConsulAddress": "",
-  "ConsulAclToken": ""
+  "ConsulAclToken": "",
+  "ConsulKVStoreProvider": "consul"
 }
