@@ -3,7 +3,9 @@
 Orchestrator supports SSL/TLS for the web interface as HTTPS.  This can be standard server side certificates
 or you can configure Orchestrator to validate and filter client provided certificates with Mutual TLS.
 
-Orchestrator also allows for the use of certificates to authenticate with MySQL
+Orchestrator also allows for the use of certificates to authenticate with MySQL.
+
+If MySQL is using SSL encryption for replication, Orchestrator will attempt to configure replication with SSL during recovery.
 
 #### HTTPS for the Web/API interface
 You can set up SSL/TLS protection like so:
@@ -85,3 +87,8 @@ Similarly the connections to the topology databases can be encrypted with:
 
 In this case all of your topology servers must respond to the certificates provided.  There's no current
 method to have TLS enabled only for some servers.
+
+#### MySQL SSL Replication
+If Orchestrator is able to configure the failed Source to replicate to the newly promoted Source during recovery, it will attempt to configure `Master_SSL=1` if the newly promoted Source was configured that way.
+
+Orchestrator currently does not handle configuring Source SSL certificates for replication during recovery. 

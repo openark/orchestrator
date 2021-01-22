@@ -2102,17 +2102,16 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 			err = credentialsErr
 		}
 	}
-	if auto {
-		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
-		if err == nil {
-			err = startReplicationErr
-		}
-	}
-
 	if designatedInstance.AllowTLS {
 		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
 		if err == nil {
 			err = enableSSLErr
+		}
+	}
+	if auto {
+		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
+		if err == nil {
+			err = startReplicationErr
 		}
 	}
 	executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)
