@@ -90,7 +90,9 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	kcCacheKeys := make([]string, 0)
 
 	// get the current key-values in a single transaction
+	var terr error
 	var getTxnOps consulapi.TxnOps
+	var getTxnResp *consulapi.TxnResponse
 	var possibleSetKVPairs []*consulapi.KVPair
 	for _, kvPair := range kvPairs {
 		val := string(kvPair.Value)
@@ -108,21 +110,25 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 		})
 		possibleSetKVPairs = append(possibleSetKVPairs, kvPair)
 	}
-	_, getTxnResp, _, e := this.client.Txn().Txn(getTxnOps, queryOptions)
-	if err != nil {
-		err = e
+	if len(getTxnOps) > 0 {
+		_, getTxnResp, _, terr = this.client.Txn().Txn(getTxnOps, queryOptions)
+		if terr != nil {
+			err = terr
+		}
 	}
 
 	// find key-value pairs that need updating, add pairs that need updating to set transaction
 	var setTxnOps consulapi.TxnOps
 	for _, pair := range possibleSetKVPairs {
 		var kvExists bool
-		for _, result := range getTxnResp.Results {
-			if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
-				existing++
-				kvExists = true
-				this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
-				break
+		if getTxnResp != nil && len(getTxnResp.Errors) == 0 {
+			for _, result := range getTxnResp.Results {
+				if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
+					existing++
+					kvExists = true
+					this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
+					break
+				}
 			}
 		}
 		if !kvExists {
@@ -138,10 +144,10 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 
 	// update key-value pairs in a single Consul Transaction
 	if len(setTxnOps) > 0 {
-		if e := this.doWriteTxn(setTxnOps, queryOptions); e != nil {
+		if terr = this.doWriteTxn(setTxnOps, queryOptions); terr != nil {
 			log.Errorf("consulTxnStore.DistributePairs(): failed %v", kcCacheKeys)
 			failed = len(setTxnOps)
-			err = e
+			err = terr
 		} else {
 			for _, txnOp := range setTxnOps {
 				this.kvCache.SetDefault(getConsulKVCacheKey(dc, txnOp.KV.Key), string(txnOp.KV.Value))
