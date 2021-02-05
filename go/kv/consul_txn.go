@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -75,7 +76,8 @@ func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *co
 		return err
 	} else if !ok {
 		for _, terr := range resp.Errors {
-			log.Errorf("consulTxnStore.doWriteTxn(): transaction error %v", terr.What)
+			txnOp := txnOps[terr.OpIndex]
+			log.Errorf("consulTxnStore.doWriteTxn(): transaction error %q for KV %s on %s", terr.What, txnOp.KV.Verb, txnOp.KV.Key)
 			err = fmt.Errorf("%v", terr.What)
 		}
 	}
@@ -119,18 +121,24 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	// find key-value pairs that need updating, add pairs that need updating to set transaction
 	var setTxnOps consulapi.TxnOps
 	for _, pair := range possibleSetKVPairs {
-		var kvExists bool
-		if getTxnResp != nil && len(getTxnResp.Errors) == 0 {
+		var kvExistsAndEqual bool
+		if len(getTxnResp.Errors) > 0 {
+			for _, terr := range getTxnResp.Errors {
+				if !strings.HasSuffix(terr.What, "doesn't exist") {
+					log.Errorf("consulTxnStore.DistributePairs(): get transaction error %v", terr.What)
+				}
+			}
+		} else if getTxnResp != nil {
 			for _, result := range getTxnResp.Results {
 				if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
-					existing++
-					kvExists = true
 					this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
+					kvExistsAndEqual = true
+					existing++
 					break
 				}
 			}
 		}
-		if !kvExists {
+		if !kvExistsAndEqual {
 			setTxnOps = append(setTxnOps, &consulapi.TxnOp{
 				KV: &consulapi.KVTxnOp{
 					Verb:  consulapi.KVSet,
@@ -143,10 +151,9 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 
 	// update key-value pairs in a single Consul Transaction
 	if len(setTxnOps) > 0 {
-		if terr = this.doWriteTxn(setTxnOps, queryOptions); terr != nil {
+		if err = this.doWriteTxn(setTxnOps, queryOptions); err != nil {
 			log.Errorf("consulTxnStore.DistributePairs(): failed %v", kcCacheKeys)
 			failed = len(setTxnOps)
-			err = terr
 		} else {
 			for _, txnOp := range setTxnOps {
 				this.kvCache.SetDefault(getConsulKVCacheKey(dc, txnOp.KV.Key), string(txnOp.KV.Value))
