@@ -85,8 +85,8 @@ func TestConsulTxnStorePutKVPairs(t *testing.T) {
 		if err := store.PutKVPairs([]*KVPair{
 			{Key: "fail1", Value: "test"},
 			{Key: "fail2", Value: "test2"},
-		}); err == nil || err.Error() != "consul txn error: test error" {
-			t.Fatalf("Expected %q error from .PutKVPairs(), got: %q", "consul txn error: test error", err.Error())
+		}); err == nil || err.Error() != "test error" {
+			t.Fatalf("Expected %q error from .PutKVPairs(), got: %q", "test error", err.Error())
 		}
 	})
 }

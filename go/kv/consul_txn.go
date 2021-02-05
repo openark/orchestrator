@@ -71,13 +71,12 @@ func NewConsulTxnStore() KVStore {
 func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *consulapi.QueryOptions) (err error) {
 	ok, resp, _, err := this.client.Txn().Txn(txnOps, queryOptions)
 	if err != nil {
+		log.Errorf("consulTxnStore.doWriteTxn(): failed %v", err)
 		return err
 	} else if !ok {
-		// return the first transaction error found
-		for _, txnErr := range resp.Errors {
-			if txnErr.What != "" {
-				return fmt.Errorf("consul txn error: %v", txnErr.What)
-			}
+		for _, terr := range resp.Errors {
+			log.Errorf("consulTxnStore.doWriteTxn(): transaction error %v", terr.What)
+			err = fmt.Errorf("%v", terr.What)
 		}
 	}
 	return err
