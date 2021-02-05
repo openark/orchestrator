@@ -114,6 +114,7 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	if len(getTxnOps) > 0 {
 		_, getTxnResp, _, terr = this.client.Txn().Txn(getTxnOps, queryOptions)
 		if terr != nil {
+			log.Errorf("consulTxnStore.DistributePairs(): get transaction failed %v", terr)
 			err = terr
 		}
 	}
@@ -122,13 +123,12 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	var setTxnOps consulapi.TxnOps
 	for _, pair := range possibleSetKVPairs {
 		var kvExistsAndEqual bool
-		if len(getTxnResp.Errors) > 0 {
+		if getTxnResp != nil {
 			for _, terr := range getTxnResp.Errors {
 				if !strings.HasSuffix(terr.What, "doesn't exist") {
 					log.Errorf("consulTxnStore.DistributePairs(): get transaction error %v", terr.What)
 				}
 			}
-		} else if getTxnResp != nil {
 			for _, result := range getTxnResp.Results {
 				if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
 					this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
