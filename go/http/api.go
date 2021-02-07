@@ -1577,6 +1577,31 @@ func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Rend
 	this.setSemiSyncReplica(params, r, req, user, false)
 }
 
+// DelayReplication delays replication on given instance with given seconds
+func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	seconds, err := strconv.Atoi(params["seconds"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
+		return
+	}
+	err = inst.DelayReplication(&instanceKey, seconds)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replication delayed: %+v", instanceKey), Details: seconds})
+}
+
 // SetReadOnly sets the global read_only variable
 func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2847,6 +2872,46 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Set re-elections")})
 }
 
+// RaftAddPeer adds a new node to the raft cluster
+func (this *HttpAPI) RaftAddPeer(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-add-peer: not running with raft setup"})
+		return
+	}
+	addr, err := orcraft.AddPeer(params["addr"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot add raft peer: %+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, addr)
+}
+
+// RaftAddPeer removes a node fro the raft cluster
+func (this *HttpAPI) RaftRemovePeer(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-remove-peer: not running with raft setup"})
+		return
+	}
+	addr, err := orcraft.RemovePeer(params["addr"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot remove raft peer: %+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, addr)
+}
+
 // RaftYield yields to a specified host
 func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2925,6 +2990,40 @@ func (this *HttpAPI) RaftHealth(params martini.Params, r render.Render, req *htt
 		return
 	}
 	r.JSON(http.StatusOK, "healthy")
+}
+
+// RaftStatus exports a status summary for a raft node
+func (this *HttpAPI) RaftStatus(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-state: not running with raft setup"})
+		return
+	}
+	peers, err := orcraft.GetPeers()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get raft peers: %+v", err)})
+		return
+	}
+
+	status := struct {
+		RaftBind       string
+		RaftAdvertise  string
+		State          string
+		Healthy        bool
+		IsPartOfQuorum bool
+		Leader         string
+		LeaderURI      string
+		Peers          []string
+	}{
+		RaftBind:       orcraft.GetRaftBind(),
+		RaftAdvertise:  orcraft.GetRaftAdvertise(),
+		State:          orcraft.GetState().String(),
+		Healthy:        orcraft.IsHealthy(),
+		IsPartOfQuorum: orcraft.IsPartOfQuorum(),
+		Leader:         orcraft.GetLeader(),
+		LeaderURI:      orcraft.LeaderURI.Get(),
+		Peers:          peers,
+	}
+	r.JSON(http.StatusOK, status)
 }
 
 // RaftFollowerHealthReport is initiated by followers to report their identity and health to the raft leader.
@@ -3203,7 +3302,7 @@ func (this *HttpAPI) AutomatedRecoveryFilters(params martini.Params, r render.Re
 // AuditFailureDetection provides list of topology_failure_detection entries
 func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request) {
 
-	var audits []logic.TopologyRecovery
+	var audits []*logic.TopologyRecovery
 	var err error
 
 	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
@@ -3251,7 +3350,7 @@ func (this *HttpAPI) ReadReplicationAnalysisChangelog(params martini.Params, r r
 
 // AuditRecovery provides list of topology-recovery entries
 func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *http.Request) {
-	var audits []logic.TopologyRecovery
+	var audits []*logic.TopologyRecovery
 	var err error
 
 	if recoveryUID := params["uid"]; recoveryUID != "" {
@@ -3650,6 +3749,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "disable-semi-sync-master/:host/:port", this.DisableSemiSyncMaster)
 	this.registerAPIRequest(m, "enable-semi-sync-replica/:host/:port", this.EnableSemiSyncReplica)
 	this.registerAPIRequest(m, "disable-semi-sync-replica/:host/:port", this.DisableSemiSyncReplica)
+	this.registerAPIRequest(m, "delay-replication/:host/:port/:seconds", this.DelayReplication)
 
 	// Replication information:
 	this.registerAPIRequest(m, "can-replicate-from/:host/:port/:belowHost/:belowPort", this.CanReplicateFrom)
@@ -3802,12 +3902,15 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequestNoProxy(m, "leader-check", this.LeaderCheck)
 	this.registerAPIRequestNoProxy(m, "leader-check/:errorStatusCode", this.LeaderCheck)
 	this.registerAPIRequestNoProxy(m, "grab-election", this.GrabElection)
+	this.registerAPIRequest(m, "raft-add-peer/:addr", this.RaftAddPeer)       // delegated to the raft leader
+	this.registerAPIRequest(m, "raft-remove-peer/:addr", this.RaftRemovePeer) // delegated to the raft leader
 	this.registerAPIRequestNoProxy(m, "raft-yield/:node", this.RaftYield)
 	this.registerAPIRequestNoProxy(m, "raft-yield-hint/:hint", this.RaftYieldHint)
 	this.registerAPIRequestNoProxy(m, "raft-peers", this.RaftPeers)
 	this.registerAPIRequestNoProxy(m, "raft-state", this.RaftState)
 	this.registerAPIRequestNoProxy(m, "raft-leader", this.RaftLeader)
 	this.registerAPIRequestNoProxy(m, "raft-health", this.RaftHealth)
+	this.registerAPIRequestNoProxy(m, "raft-status", this.RaftStatus)
 	this.registerAPIRequestNoProxy(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerAPIRequestNoProxy(m, "raft-follower-health-report/:authenticationToken/:raftBind/:raftAdvertise", this.RaftFollowerHealthReport)
 	this.registerAPIRequestNoProxy(m, "reload-configuration", this.ReloadConfiguration)

@@ -59,13 +59,21 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(fillerCharacter, (depth-1)*2)
-		if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
-			prefix += "+" + fillerCharacter
+		if instance.IsReplicationGroupSecondary() {
+			prefix += "‡" + fillerCharacter
 		} else {
-			prefix += "-" + fillerCharacter
+			if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
+				prefix += "+" + fillerCharacter
+			} else {
+				prefix += "-" + fillerCharacter
+			}
 		}
 	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	entryAlias := ""
+	if instance.InstanceAlias != "" {
+		entryAlias = fmt.Sprintf(" (%s)", instance.InstanceAlias)
+	}
+	entry := fmt.Sprintf("%s%s%s", prefix, instance.Key.DisplayString(), entryAlias)
 	if extendedOutput {
 		if tabulated {
 			entry = fmt.Sprintf("%s%s%s", entry, tabulatorScharacter, instance.TabulatedDescription(tabulatorScharacter))
@@ -112,12 +120,22 @@ func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated
 	var masterInstance *Instance
 	// Investigate replicas:
 	for _, instance := range instances {
-		master, ok := instancesMap[instance.MasterKey]
+		var masterOrGroupPrimary *Instance
+		var ok bool
+		// If the current instance is a a group member, get the group's primary instead of the classical replication
+		// source.
+		if instance.IsReplicationGroupMember() && instance.IsReplicationGroupSecondary() {
+			masterOrGroupPrimary, ok = instancesMap[instance.ReplicationGroupPrimaryInstanceKey]
+		} else {
+			masterOrGroupPrimary, ok = instancesMap[instance.MasterKey]
+		}
 		if ok {
-			if _, ok := replicationMap[master]; !ok {
-				replicationMap[master] = [](*Instance){}
+			if _, ok := replicationMap[masterOrGroupPrimary]; !ok {
+				replicationMap[masterOrGroupPrimary] = [](*Instance){}
 			}
-			replicationMap[master] = append(replicationMap[master], instance)
+			if !instance.IsReplicationGroupPrimary() || (instance.IsReplicationGroupPrimary() && instance.IsReplica()) {
+				replicationMap[masterOrGroupPrimary] = append(replicationMap[masterOrGroupPrimary], instance)
+			}
 		} else {
 			masterInstance = instance
 		}
@@ -485,6 +503,11 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("MoveBelow: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 
 	if sibling.IsBinlogServer() {
 		// Binlog server has same coordinates as master
@@ -656,6 +679,11 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("MoveBelowGTID: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	return moveInstanceBelowViaGTID(instance, other)
 }
 
@@ -766,7 +794,11 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
-
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("repoint: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	if masterKey == nil {
 		masterKey = &instance.MasterKey
 	}
@@ -926,6 +958,11 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("MakeCoMaster: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	log.Debugf("Will check whether %+v's master (%+v) can become its co-master", instance.Key, master.Key)
 	if canMove, merr := master.CanMoveAsCoMaster(); !canMove {
 		return instance, merr
@@ -986,9 +1023,9 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	if !master.HasReplicationCredentials {
 		// Let's try , if possible, to get credentials from replica. Best effort.
-		if replicationUser, replicationPassword, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
+		if credentials, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
 			log.Debugf("Got credentials from a replica. will now apply")
-			_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+			_, err = ChangeMasterCredentials(&master.Key, credentials)
 			if err != nil {
 				goto Cleanup
 			}
@@ -1522,6 +1559,11 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		return instance, nil, err
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, nil, fmt.Errorf("MatchBelow: %+v is a secondary replication group member, hence, it cannot be relocated", *instanceKey)
+	}
 	if config.Config.PseudoGTIDPattern == "" {
 		return instance, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
@@ -1730,6 +1772,11 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
+	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, fmt.Errorf("takeMaster: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
 	}
 	masterInstance, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
@@ -2026,6 +2073,11 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	if !instance.IsReplica() {
 		return instance, nil, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, nil, fmt.Errorf("MatchUp: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	master, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
 		return instance, nil, log.Errorf("Cannot get master for %+v. error=%+v", instance.Key, err)
@@ -2284,7 +2336,7 @@ func RegroupReplicasPseudoGTID(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2350,7 +2402,7 @@ func RegroupReplicasPseudoGTID(
 		AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 		return err
 	}
-	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica, false) {
 		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
 	} else {
 		err = allMatchingFunc()
@@ -2385,7 +2437,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2465,7 +2517,7 @@ func RegroupReplicasGTID(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatchOperations func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance, bool) bool,
 ) (
 	lostReplicas [](*Instance),
 	movedReplicas [](*Instance),
@@ -2486,15 +2538,23 @@ func RegroupReplicasGTID(
 	if onCandidateReplicaChosen != nil {
 		onCandidateReplicaChosen(candidateReplica)
 	}
+	replicasToMove := append(equalReplicas, laterReplicas...)
+	hasBestPromotionRule := true
+	if candidateReplica != nil {
+		for _, replica := range replicasToMove {
+			if replica.PromotionRule.BetterThan(candidateReplica.PromotionRule) {
+				hasBestPromotionRule = false
+			}
+		}
+	}
 	moveGTIDFunc := func() error {
-		replicasToMove := append(equalReplicas, laterReplicas...)
 		log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
 
 		movedReplicas, unmovedReplicas, err, _ = moveReplicasViaGTID(replicasToMove, candidateReplica, postponedFunctionsContainer)
 		unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
 		return log.Errore(err)
 	}
-	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica, hasBestPromotionRule) {
 		postponedFunctionsContainer.AddPostponedFunction(moveGTIDFunc, fmt.Sprintf("regroup-replicas-gtid %+v", candidateReplica.Key))
 	} else {
 		err = moveGTIDFunc()
@@ -2695,9 +2755,18 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *instanceKey)
 	}
+	// Relocation of group secondaries makes no sense, group secondaries, by definition, always replicate from the group
+	// primary
+	if instance.IsReplicationGroupSecondary() {
+		return instance, log.Errorf("relocate: %+v is a secondary replication group member, hence, it cannot be relocated", instance.Key)
+	}
 	other, found, err := ReadInstance(otherKey)
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
+	}
+	// Disallow setting up a group primary to replicate from a group secondary
+	if instance.IsReplicationGroupPrimary() && other.ReplicationGroupName == instance.ReplicationGroupName {
+		return instance, log.Errorf("relocate: Setting a group primary to replicate from another member of its group is disallowed")
 	}
 	if other.IsDescendantOf(instance) {
 		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)

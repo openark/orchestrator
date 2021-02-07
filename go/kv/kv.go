@@ -19,6 +19,8 @@ package kv
 import (
 	"fmt"
 	"sync"
+
+	"github.com/openark/orchestrator/go/config"
 )
 
 type KVPair struct {
@@ -36,6 +38,7 @@ func (this *KVPair) String() string {
 
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
+	PutKVPairs(kvPairs []*KVPair) (err error)
 	GetKeyValue(key string) (value string, found bool, err error)
 	DistributePairs(kvPairs [](*KVPair)) (err error)
 }
@@ -53,8 +56,13 @@ func InitKVStores() {
 	kvInitOnce.Do(func() {
 		kvStores = []KVStore{
 			NewInternalKVStore(),
-			NewConsulStore(),
 			NewZkStore(),
+		}
+		switch config.Config.ConsulKVStoreProvider {
+		case "consul-txn", "consul_txn":
+			kvStores = append(kvStores, NewConsulTxnStore())
+		default:
+			kvStores = append(kvStores, NewConsulStore())
 		}
 	})
 }
@@ -84,11 +92,16 @@ func PutValue(key string, value string) (err error) {
 	return nil
 }
 
-func PutKVPair(kvPair *KVPair) (err error) {
-	if kvPair == nil {
+func PutKVPairs(kvPairs []*KVPair) (err error) {
+	if len(kvPairs) < 1 {
 		return nil
 	}
-	return PutValue(kvPair.Key, kvPair.Value)
+	for _, store := range getKVStores() {
+		if err := store.PutKVPairs(kvPairs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func DistributePairs(kvPairs [](*KVPair)) (err error) {

@@ -46,5 +46,9 @@ var errorMapping = {
 	"errant_gtid": {
 		"badge": "label-errant",
 		"description": "Errant GTID"
+	},
+	"group_replication_member_not_online": {
+		"badge": "label-danger",
+		"description": "Replication group member is not ONLINE"
 	}
 };

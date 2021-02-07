@@ -78,3 +78,15 @@ With `ConsulCrossDataCenterDistribution`, `orchestrator` runs an additional, per
 Once per minute, `orchestrator` leader node queries its configured Consul server for the list of [known datacenters](https://www.consul.io/api/catalog.html#list-datacenters). It then iterates throught those data center clusters, and updates each and every one with the current identities of masters.
 
 This functionality is required in case one has more Consul datacenters than just one-local-consul-per-orchestrator-node. We illustrated above how in a `orchestrator/raft` setup, each node updates its local Consul cluster. However, Consul clusters that are not local to any `orchestrator` node are unaffected by that approach. `ConsulCrossDataCenterDistribution` is the way to include all those other DCs.
+
+#### Consul Transaction support
+
+Atomic [Consul Transaction](https://www.consul.io/api-docs/txn) support is enabled by configuring:
+
+```json
+  "ConsulKVStoreProvider": "consul-txn",
+```
+
+_Note: this feature requires Consul version 0.7 or greater._
+
+This will cause Orchestrator to use a [Consul Transaction](https://www.consul.io/api-docs/txn) when distributing one or more Consul KVs. The use of transactions reduces the number of requests to the Consul server while ensuring updates of several KVs are atomic.

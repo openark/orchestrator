@@ -1556,7 +1556,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+			fmt.Println(fmt.Sprintf("%d recoveries acknowledged", countRecoveries))
 		}
 	case registerCliCommand("ack-cluster-recoveries", "Recovery", `Acknowledge recoveries for a given cluster; this unblocks pending future recoveries`):
 		{
@@ -1568,7 +1568,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+			fmt.Println(fmt.Sprintf("%d recoveries acknowledged", countRecoveries))
 		}
 	case registerCliCommand("ack-instance-recoveries", "Recovery", `Acknowledge recoveries for a given instance; this unblocks pending future recoveries`):
 		{
@@ -1581,7 +1581,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+			fmt.Println(fmt.Sprintf("%d recoveries acknowledged", countRecoveries))
 		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):

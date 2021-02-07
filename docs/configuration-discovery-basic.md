@@ -12,6 +12,14 @@ Let orchestrator know how to query the MySQL topologies, what information to ext
 
 `MySQLTopologyCredentialsConfigFile` follows similar rules as `MySQLOrchestratorCredentialsConfigFile`. You may choose to use plaintext credentials:
 
+```
+[client]
+user=orchestrator
+password=orc_topology_password
+```
+
+Or, you may choose to use plaintext credentials:
+
 ```json
 {
   "MySQLTopologyUser": "orchestrator",
@@ -28,4 +36,5 @@ CREATE USER 'orchestrator'@'orc_host' IDENTIFIED BY 'orc_topology_password';
 GRANT SUPER, PROCESS, REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'orchestrator'@'orc_host';
 GRANT SELECT ON meta.* TO 'orchestrator'@'orc_host';
 GRANT SELECT ON ndbinfo.processes TO 'orchestrator'@'orc_host'; -- Only for NDB Cluster
+GRANT SELECT ON performance_schema.replication_group_members TO 'orchestrator'@'orc_host'; -- Only for Group Replication / InnoDB cluster
 ```
