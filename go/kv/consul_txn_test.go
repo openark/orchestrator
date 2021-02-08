@@ -2,12 +2,50 @@ package kv
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/openark/orchestrator/go/config"
 )
+
+func TestGroupKVPairsByPrefix(t *testing.T) {
+	grouped := groupKVPairsByPrefix(consulapi.KVPairs{
+		{Key: "mysql/master/cluster1/hostname", Value: []byte("test")},
+		{Key: "mysql/master/cluster1/ipv4", Value: []byte("test")},
+		{Key: "mysql/master/cluster1/port", Value: []byte("test")},
+		{Key: "mysql/master/cluster2/hostname", Value: []byte("test")},
+		{Key: "mysql/master/cluster2/ipv4", Value: []byte("test")},
+		{Key: "mysql/master/cluster2/port", Value: []byte("test")},
+		{Key: "mysql/master/cluster3/hostname", Value: []byte("test")},
+		{Key: "mysql/master/cluster3/ipv4", Value: []byte("test")},
+		{Key: "mysql/master/cluster3/port", Value: []byte("test")},
+	}, 6)
+	if len(grouped) != 2 {
+		t.Fatalf("expected 2 groups, got %d: %v", len(grouped), grouped)
+	}
+	if len(grouped[0]) != 6 {
+		t.Fatalf("expected 6 KVPairs in first group, got %d: %v", len(grouped[0]), grouped[0])
+	}
+	if len(grouped[1]) != 3 {
+		t.Fatalf("expected 3 KVPairs in second group, got %d: %v", len(grouped[1]), grouped[1])
+	}
+
+	// check KVs for a cluster are in a single group
+	for _, group := range grouped {
+		clusterCount := map[string]int{}
+		for _, kvPair := range group {
+			s := strings.Split(kvPair.Key, "/")
+			clusterCount[s[2]]++
+		}
+		for cluster, count := range clusterCount {
+			if count != 3 {
+				t.Fatalf("expected 3 KVPairs for %s to be in a single group, got %d", cluster, count)
+			}
+		}
+	}
+}
 
 func TestConsulTxnStorePutKVPairs(t *testing.T) {
 	server := buildConsulTestServer(t, []consulTestServerOp{

@@ -266,6 +266,7 @@ type Configuration struct {
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ConsulKVStoreProvider                      string            // Consul KV store provider (consul or consul-txn), default: "consul"
+	ConsulMaxOpsPerTransaction                 int               // Maximum number of operations to perform in a single Consul Transaction. Requires the "consul-txn" ConsulKVStoreProvider
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
@@ -434,6 +435,7 @@ func newConfiguration() *Configuration {
 		ConsulAclToken:                             "",
 		ConsulCrossDataCenterDistribution:          false,
 		ConsulKVStoreProvider:                      "consul",
+		ConsulMaxOpsPerTransaction:                 12,
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",

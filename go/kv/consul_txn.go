@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -30,6 +31,37 @@ import (
 
 	"github.com/openark/golib/log"
 )
+
+// groupKVPairsByPrefix groups Consul Transaction operations by KV key prefix. This ensures KVs
+// for a single cluster are grouped into a single transaction as they have a common key prefix
+func groupKVPairsByPrefix(kvPairs consulapi.KVPairs, maxPairsPerGroup int) (groups []consulapi.KVPairs) {
+	groupsMap := map[string]consulapi.KVPairs{}
+	for _, pair := range kvPairs {
+		s := strings.Split(pair.Key, "/")
+		prefix := strings.Join(s[:len(s)-1], "/")
+		if _, found := groupsMap[prefix]; found {
+			groupsMap[prefix] = append(groupsMap[prefix], pair)
+		} else {
+			groupsMap[prefix] = consulapi.KVPairs{pair}
+		}
+	}
+
+	pairs := consulapi.KVPairs{}
+	for _, group := range groupsMap {
+		groupLen := len(group)
+		pairsLen := len(pairs)
+		if (pairsLen + groupLen) > maxPairsPerGroup {
+			groups = append(groups, pairs)
+			pairs = consulapi.KVPairs{}
+		}
+		pairs = append(pairs, group...)
+	}
+	if len(pairs) > 0 {
+		groups = append(groups, pairs)
+	}
+
+	return groups
+}
 
 // A Consul store based on config's `ConsulAddress`, `ConsulScheme`, and `ConsulKVPrefix`
 type consulTxnStore struct {
@@ -211,6 +243,13 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 		return nil
 	}
 
+	// Consul Transaction API is limited to 64 ops per transaction
+	// and we need to perform at least 3 KV operations
+	maxOpsPerTxn := config.Config.ConsulMaxOpsPerTransaction
+	if maxOpsPerTxn > 64 || maxOpsPerTxn < 3 {
+		return fmt.Errorf("ConsulMaxOpsPerTransaction must be > 3 and < 64")
+	}
+
 	datacenters, err := this.client.Catalog().Datacenters()
 	if err != nil {
 		return err
@@ -220,14 +259,21 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	for _, kvPair := range kvPairs {
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
+
 	var wg sync.WaitGroup
 	for _, datacenter := range datacenters {
-		var skipped, existing, written, failed int
 		datacenter := datacenter
-
 		wg.Add(1)
-		skipped, existing, written, failed, err = this.updateDatacenterKVPairs(&wg, datacenter, consulPairs)
-		log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; skipped: %d, existing: %d, written: %d, failed: %d", datacenter, skipped, existing, written, failed)
+		go func() {
+			defer wg.Done()
+			for groupNum, consulPairGroup := range groupKVPairsByPrefix(consulPairs, maxOpsPerTxn) {
+				wg.Add(1)
+				skipped, existing, written, failed, _ := this.updateDatacenterKVPairs(&wg, datacenter, consulPairGroup)
+				log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; txnGroup: %d, skipped: %d, existing: %d, written: %d, failed: %d",
+					datacenter, groupNum, skipped, existing, written, failed,
+				)
+			}
+		}()
 	}
 	wg.Wait()
 	return err
