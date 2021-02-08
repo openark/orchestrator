@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"sync/atomic"
 
