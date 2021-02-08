@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 Shlomi Noach, GitHub Inc.
+   Copyright 2021 Shlomi Noach, GitHub Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	if len(getTxnOps) > 0 {
 		_, getTxnResp, _, terr = this.client.Txn().Txn(getTxnOps, queryOptions)
 		if terr != nil {
-			log.Errorf("consulTxnStore.DistributePairs(): get transaction failed %v", terr)
+			log.Errorf("consulTxnStore.DistributePairs(): %v", terr)
 			err = terr
 		}
 	}
@@ -124,11 +124,6 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	for _, pair := range possibleSetKVPairs {
 		var kvExistsAndEqual bool
 		if getTxnResp != nil {
-			for _, terr := range getTxnResp.Errors {
-				if !strings.HasSuffix(terr.What, "doesn't exist") {
-					log.Errorf("consulTxnStore.DistributePairs(): get transaction error %v", terr.What)
-				}
-			}
 			for _, result := range getTxnResp.Results {
 				if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
 					this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
