@@ -107,10 +107,10 @@ func TestConsulTxnStoreUpdateDatacenterKVPairs(t *testing.T) {
 			Response: &consulapi.TxnResponse{
 				Results: consulapi.TxnResults{
 					{
-						KV: &consulapi.KVPair{Key: "test", Value: []byte("test"), ModifyIndex: 123},
+						KV: &consulapi.KVPair{Key: "test", Value: []byte("test")},
 					},
 					{
-						KV: &consulapi.KVPair{Key: "test2", Value: []byte("not-equal"), ModifyIndex: 123},
+						KV: &consulapi.KVPair{Key: "test2", Value: []byte("not-equal")},
 					},
 				},
 			},
