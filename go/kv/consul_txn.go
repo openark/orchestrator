@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 Shlomi Noach, GitHub Inc.
+   Copyright 2021 Shlomi Noach, GitHub Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -104,13 +104,13 @@ func NewConsulTxnStore() KVStore {
 func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *consulapi.QueryOptions) (err error) {
 	ok, resp, _, err := this.client.Txn().Txn(txnOps, queryOptions)
 	if err != nil {
+		log.Errorf("consulTxnStore.doWriteTxn(): failed %v", err)
 		return err
 	} else if !ok {
-		// return the first transaction error found
-		for _, txnErr := range resp.Errors {
-			if txnErr.What != "" {
-				return fmt.Errorf("consul txn error: %v", txnErr.What)
-			}
+		for _, terr := range resp.Errors {
+			txnOp := txnOps[terr.OpIndex]
+			log.Errorf("consulTxnStore.doWriteTxn(): transaction error %q for KV %s on %s", terr.What, txnOp.KV.Verb, txnOp.KV.Key)
+			err = fmt.Errorf("%v", terr.What)
 		}
 	}
 	return err
@@ -132,7 +132,9 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 	kcCacheKeys := make([]string, 0)
 
 	// get the current key-values in a single transaction
+	var terr error
 	var getTxnOps consulapi.TxnOps
+	var getTxnResp *consulapi.TxnResponse
 	var possibleSetKVPairs []*consulapi.KVPair
 	for _, kvPair := range kvPairs {
 		val := string(kvPair.Value)
@@ -150,24 +152,29 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 		})
 		possibleSetKVPairs = append(possibleSetKVPairs, kvPair)
 	}
-	_, getTxnResp, _, e := this.client.Txn().Txn(getTxnOps, queryOptions)
-	if err != nil {
-		err = e
+	if len(getTxnOps) > 0 {
+		_, getTxnResp, _, terr = this.client.Txn().Txn(getTxnOps, queryOptions)
+		if terr != nil {
+			log.Errorf("consulTxnStore.DistributePairs(): %v", terr)
+			err = terr
+		}
 	}
 
 	// find key-value pairs that need updating, add pairs that need updating to set transaction
 	var setTxnOps consulapi.TxnOps
 	for _, pair := range possibleSetKVPairs {
-		var kvExists bool
-		for _, result := range getTxnResp.Results {
-			if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
-				existing++
-				kvExists = true
-				this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
-				break
+		var kvExistsAndEqual bool
+		if getTxnResp != nil {
+			for _, result := range getTxnResp.Results {
+				if pair.Key == result.KV.Key && string(pair.Value) == string(result.KV.Value) {
+					this.kvCache.SetDefault(getConsulKVCacheKey(dc, pair.Key), string(pair.Value))
+					kvExistsAndEqual = true
+					existing++
+					break
+				}
 			}
 		}
-		if !kvExists {
+		if !kvExistsAndEqual {
 			setTxnOps = append(setTxnOps, &consulapi.TxnOp{
 				KV: &consulapi.KVTxnOp{
 					Verb:  consulapi.KVSet,
@@ -180,10 +187,9 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 
 	// update key-value pairs in a single Consul Transaction
 	if len(setTxnOps) > 0 {
-		if e := this.doWriteTxn(setTxnOps, queryOptions); e != nil {
+		if err = this.doWriteTxn(setTxnOps, queryOptions); err != nil {
 			log.Errorf("consulTxnStore.DistributePairs(): failed %v", kcCacheKeys)
 			failed = len(setTxnOps)
-			err = e
 		} else {
 			for _, txnOp := range setTxnOps {
 				this.kvCache.SetDefault(getConsulKVCacheKey(dc, txnOp.KV.Key), string(txnOp.KV.Value))
