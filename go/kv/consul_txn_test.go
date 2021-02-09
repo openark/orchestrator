@@ -11,6 +11,8 @@ import (
 )
 
 func TestGroupKVPairsByPrefix(t *testing.T) {
+	// batch 9 x KVPairs into 2 x transactions
+	config.Config.ConsulMaxKVsPerTransaction = 6
 	grouped := groupKVPairsByPrefix(consulapi.KVPairs{
 		{Key: "mysql/master/cluster1/hostname", Value: []byte("test")},
 		{Key: "mysql/master/cluster1/ipv4", Value: []byte("test")},
@@ -21,7 +23,7 @@ func TestGroupKVPairsByPrefix(t *testing.T) {
 		{Key: "mysql/master/cluster3/hostname", Value: []byte("test")},
 		{Key: "mysql/master/cluster3/ipv4", Value: []byte("test")},
 		{Key: "mysql/master/cluster3/port", Value: []byte("test")},
-	}, 6)
+	})
 	if len(grouped) != 2 {
 		t.Fatalf("expected 2 groups, got %d: %v", len(grouped), grouped)
 	}
@@ -33,15 +35,25 @@ func TestGroupKVPairsByPrefix(t *testing.T) {
 	}
 
 	// check KVs for a cluster are in a single group
-	for _, group := range grouped {
-		clusterCount := map[string]int{}
+	clusterCounts := map[string]map[int]int{}
+	for i, group := range grouped {
 		for _, kvPair := range group {
 			s := strings.Split(kvPair.Key, "/")
-			clusterCount[s[2]]++
+			clusterName := s[2]
+			if _, ok := clusterCounts[clusterName]; ok {
+				clusterCounts[clusterName][i]++
+			} else {
+				clusterCounts[clusterName] = map[int]int{i: 1}
+			}
 		}
-		for cluster, count := range clusterCount {
+	}
+	for cluster, groups := range clusterCounts {
+		if len(groups) != 1 {
+			t.Fatalf("expected %s to be in a single group, found it in %d group(s): %v", cluster, len(groups), groups)
+		}
+		for _, count := range groups {
 			if count != 3 {
-				t.Fatalf("expected 3 KVPairs for %s to be in a single group, got %d", cluster, count)
+				t.Fatalf("expected group to contain 3 x %s keys, found: %d", cluster, count)
 			}
 		}
 	}

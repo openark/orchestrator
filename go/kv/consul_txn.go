@@ -34,7 +34,8 @@ import (
 
 // groupKVPairsByPrefix groups Consul Transaction operations by KV key prefix. This ensures KVs
 // for a single cluster are grouped into a single transaction as they have a common key prefix
-func groupKVPairsByPrefix(kvPairs consulapi.KVPairs, maxPairsPerGroup int) (groups []consulapi.KVPairs) {
+func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs) {
+	maxOpsPerTxn := config.Config.ConsulMaxKVsPerTransaction
 	groupsMap := map[string]consulapi.KVPairs{}
 	for _, pair := range kvPairs {
 		s := strings.Split(pair.Key, "/")
@@ -50,7 +51,7 @@ func groupKVPairsByPrefix(kvPairs consulapi.KVPairs, maxPairsPerGroup int) (grou
 	for _, group := range groupsMap {
 		groupLen := len(group)
 		pairsLen := len(pairs)
-		if (pairsLen + groupLen) > maxPairsPerGroup {
+		if (pairsLen + groupLen) > maxOpsPerTxn {
 			groups = append(groups, pairs)
 			pairs = consulapi.KVPairs{}
 		}
@@ -115,7 +116,16 @@ func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *co
 	return err
 }
 
-func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc string, kvPairs []*consulapi.KVPair) (skipped, existing, written, failed int, err error) {
+type updateDatacenterKVPairsResp struct {
+	datacenter string
+	skipped    int
+	existing   int
+	written    int
+	failed     int
+	err        error
+}
+
+func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc string, kvPairs []*consulapi.KVPair) *updateDatacenterKVPairsResp {
 	defer wg.Done()
 
 	queryOptions := &consulapi.QueryOptions{Datacenter: dc}
@@ -182,7 +192,14 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 		}
 	}
 
-	return skipped, existing, written, failed, err
+	respChan <- updateDatacenterKVPairsResp{
+		datacenter: dc,
+		skipped:    skipped,
+		existing:   existing,
+		written:    written,
+		failed:     failed,
+		err:        err,
+	}
 }
 
 // GetKeyValue returns the value of a Consul KV if it exists
@@ -230,6 +247,14 @@ func (this *consulTxnStore) PutKVPairs(kvPairs []*KVPair) (err error) {
 	return this.doWriteTxn(txnOps, nil)
 }
 
+type updateDatacenterKVPairsResp struct {
+	datacenter string
+	skipped    int
+	existing   int
+	written    int
+	failed     int
+}
+
 // DistributePairs updates all known Consul Datacenters with one or more KV pairs
 func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
@@ -241,13 +266,6 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 
 	if !config.Config.ConsulCrossDataCenterDistribution {
 		return nil
-	}
-
-	// Consul Transaction API is limited to 64 ops per transaction
-	// and we need to perform at least 3 KV operations
-	maxOpsPerTxn := config.Config.ConsulMaxOpsPerTransaction
-	if maxOpsPerTxn > 64 || maxOpsPerTxn < 3 {
-		return fmt.Errorf("ConsulMaxOpsPerTransaction must be > 3 and < 64")
 	}
 
 	datacenters, err := this.client.Catalog().Datacenters()
@@ -266,11 +284,11 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for groupNum, consulPairGroup := range groupKVPairsByPrefix(consulPairs, maxOpsPerTxn) {
+			for groupNum, consulPairGroup := range groupKVPairsByPrefix(consulPairs) {
 				wg.Add(1)
-				skipped, existing, written, failed, _ := this.updateDatacenterKVPairs(&wg, datacenter, consulPairGroup)
+				resp := this.updateDatacenterKVPairs(&wg, datacenter, consulPairGroup)
 				log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; txnGroup: %d, skipped: %d, existing: %d, written: %d, failed: %d",
-					datacenter, groupNum, skipped, existing, written, failed,
+					resp.datacenter, groupNum, resp.skipped, resp.existing, resp.written, resp.failed,
 				)
 			}
 		}()
