@@ -290,6 +290,56 @@ func TestConsulTxnStoreDistributePairs(t *testing.T) {
 			URL:      "/v1/catalog/datacenters",
 			Response: []string{"dc1"},
 		},
+		{
+			Method: "PUT",
+			URL:    "/v1/txn?dc=dc1",
+			Request: consulapi.TxnOps{
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/hostname"},
+				},
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/ipv4"},
+				},
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/ipv6"},
+				},
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/port"},
+				},
+			},
+			Response: &consulapi.TxnResponse{
+				Results: consulapi.TxnResults{
+					{
+						KV: &consulapi.KVPair{Key: "test/hostname", Value: []byte("not-equal")},
+					},
+					{
+						KV: &consulapi.KVPair{Key: "test/ipv4", Value: []byte("test")},
+					},
+					{
+						KV: &consulapi.KVPair{Key: "test/ipv6", Value: []byte("test")},
+					},
+					{
+						KV: &consulapi.KVPair{Key: "test/port", Value: []byte("test")},
+					},
+				},
+			},
+		},
+		{
+			Method: "PUT",
+			URL:    "/v1/txn?dc=dc1",
+			Request: consulapi.TxnOps{
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVSet, Key: "test/hostname", Value: []byte("test")},
+				},
+			},
+			Response: &consulapi.TxnResponse{
+				Results: consulapi.TxnResults{
+					{
+						KV: &consulapi.KVPair{Key: "test/hostname", Value: []byte("test")},
+					},
+				},
+			},
+		},
 	})
 	defer server.Close()
 	config.Config.ConsulAddress = server.URL
