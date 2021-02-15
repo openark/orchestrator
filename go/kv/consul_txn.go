@@ -59,7 +59,7 @@ func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs
 		groupLen := len(group)
 		pairsLen := len(pairs)
 		if (pairsLen + groupLen) > maxOpsPerTxn {
-			groups = append(groups, groupKVPairsByPrefix(pairs)...)
+			groups = append(groups, pairs)
 			pairs = consulapi.KVPairs{}
 		}
 		pairs = append(pairs, group...)
