@@ -35,13 +35,17 @@ import (
 // groupKVPairsByPrefix groups Consul Transaction operations by KV key prefix. This ensures KVs
 // for a single cluster are grouped into a single transaction as they have a common key prefix
 func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs) {
+	clusterMasterPrefix := config.Config.KVClusterMasterPrefix
 	maxOpsPerTxn := config.Config.ConsulMaxKVsPerTransaction
 	groupsMap := map[string]consulapi.KVPairs{}
 	for _, pair := range kvPairs {
-		s := strings.Split(pair.Key, "/")
-		var prefix string
-		if len(s) > 1 {
-			prefix = strings.Join(s[:len(s)-1], "/")
+		prefix := pair.Key
+		if strings.HasPrefix(prefix, clusterMasterPrefix) {
+			prefix = strings.Replace(prefix, clusterMasterPrefix, "", 1)
+			path := strings.Split(prefix, "/")
+			if len(path) > 1 {
+				prefix = path[1]
+			}
 		}
 		if _, found := groupsMap[prefix]; found {
 			groupsMap[prefix] = append(groupsMap[prefix], pair)
@@ -55,7 +59,7 @@ func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs
 		groupLen := len(group)
 		pairsLen := len(pairs)
 		if (pairsLen + groupLen) > maxOpsPerTxn {
-			groups = append(groups, pairs)
+			groups = append(groups, groupKVPairsByPrefix(pairs)...)
 			pairs = consulapi.KVPairs{}
 		}
 		pairs = append(pairs, group...)

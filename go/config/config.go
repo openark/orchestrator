@@ -60,7 +60,7 @@ const (
 	StaleInstanceCoordinatesExpireSeconds        = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
-	ConsulKVsPerCluster                          = 4 // kvs: "/hostname", "/ipv4", "/ipv6", "/port"
+	ConsulKVsPerCluster                          = 5 // KVs: "/", "/hostname", "/ipv4", "/ipv6" and "/port"
 	ConsulMaxTransactionOps                      = 64
 )
 

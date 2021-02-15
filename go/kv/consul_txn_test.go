@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -11,27 +12,44 @@ import (
 )
 
 func TestGroupKVPairsByPrefix(t *testing.T) {
-	// batch 9 x KVPairs into 2 x transactions
-	config.Config.ConsulMaxKVsPerTransaction = 6
-	grouped := groupKVPairsByPrefix(consulapi.KVPairs{
-		{Key: "mysql/master/cluster1/hostname", Value: []byte("test")},
-		{Key: "mysql/master/cluster1/ipv4", Value: []byte("test")},
-		{Key: "mysql/master/cluster1/port", Value: []byte("test")},
-		{Key: "mysql/master/cluster2/hostname", Value: []byte("test")},
-		{Key: "mysql/master/cluster2/ipv4", Value: []byte("test")},
-		{Key: "mysql/master/cluster2/port", Value: []byte("test")},
-		{Key: "mysql/master/cluster3/hostname", Value: []byte("test")},
-		{Key: "mysql/master/cluster3/ipv4", Value: []byte("test")},
-		{Key: "mysql/master/cluster3/port", Value: []byte("test")},
-	})
-	if len(grouped) != 2 {
-		t.Fatalf("expected 2 groups, got %d: %v", len(grouped), grouped)
+	config.Config.ConsulMaxKVsPerTransaction = 10
+	config.Config.KVClusterMasterPrefix = "mysql/master"
+
+	// make 100 KVs for 20 clusters
+	kvPairs := consulapi.KVPairs{}
+	var kvs int
+	for kvs < 100 {
+		kvPairs = append(kvPairs,
+			&consulapi.KVPair{
+				Key:   fmt.Sprintf("%s/cluster%d", config.Config.KVClusterMasterPrefix, kvs),
+				Value: []byte("mysql.example.com:3306"),
+			},
+			&consulapi.KVPair{
+				Key:   fmt.Sprintf("%s/cluster%d/hostname", config.Config.KVClusterMasterPrefix, kvs),
+				Value: []byte("mysql.example.com"),
+			},
+			&consulapi.KVPair{
+				Key:   fmt.Sprintf("%s/cluster%d/ipv4", config.Config.KVClusterMasterPrefix, kvs),
+				Value: []byte("10.20.30.40"),
+			},
+			&consulapi.KVPair{
+				Key:   fmt.Sprintf("%s/cluster%d/ipv6", config.Config.KVClusterMasterPrefix, kvs),
+				Value: []byte("fdf0:7a53:0b88:d147:xxxx:xxxx:xxxx:xxxx"),
+			},
+			&consulapi.KVPair{
+				Key:   fmt.Sprintf("%s/cluster%d/port", config.Config.KVClusterMasterPrefix, kvs),
+				Value: []byte("3306"),
+			},
+		)
+		kvs += 5
 	}
-	if len(grouped[0]) != 6 {
-		t.Fatalf("expected 6 KVPairs in first group, got %d: %v", len(grouped[0]), grouped[0])
+
+	grouped := groupKVPairsByPrefix(kvPairs)
+	if len(grouped) != 10 {
+		t.Fatalf("expected 10 groups, got %d: %v", len(grouped), grouped)
 	}
-	if len(grouped[1]) != 3 {
-		t.Fatalf("expected 3 KVPairs in second group, got %d: %v", len(grouped[1]), grouped[1])
+	if len(grouped[0]) != config.Config.ConsulMaxKVsPerTransaction {
+		t.Fatalf("expected %d KVPairs in first group, got %d: %v", config.Config.ConsulMaxKVsPerTransaction, len(grouped[0]), grouped[0])
 	}
 
 	// check KVs for a cluster are in a single group
@@ -52,8 +70,8 @@ func TestGroupKVPairsByPrefix(t *testing.T) {
 			t.Fatalf("expected %s to be in a single group, found it in %d group(s): %v", cluster, len(groups), groups)
 		}
 		for _, count := range groups {
-			if count != 3 {
-				t.Fatalf("expected group to contain 3 x %s keys, found: %d", cluster, count)
+			if count != config.ConsulKVsPerCluster {
+				t.Fatalf("expected group to contain %d x %s keys, found: %d", config.ConsulKVsPerCluster, cluster, count)
 			}
 		}
 	}
@@ -295,31 +313,37 @@ func TestConsulTxnStoreDistributePairs(t *testing.T) {
 			URL:    "/v1/txn?dc=dc1",
 			Request: consulapi.TxnOps{
 				{
-					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/hostname"},
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/cluster1"},
 				},
 				{
-					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/ipv4"},
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/cluster1/hostname"},
 				},
 				{
-					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/ipv6"},
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/cluster1/ipv4"},
 				},
 				{
-					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/port"},
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/cluster1/ipv6"},
+				},
+				{
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVGet, Key: "test/cluster1/port"},
 				},
 			},
 			Response: &consulapi.TxnResponse{
 				Results: consulapi.TxnResults{
 					{
-						KV: &consulapi.KVPair{Key: "test/hostname", Value: []byte("not-equal")},
+						KV: &consulapi.KVPair{Key: "test/cluster1", Value: []byte("not-equal")},
 					},
 					{
-						KV: &consulapi.KVPair{Key: "test/ipv4", Value: []byte("test")},
+						KV: &consulapi.KVPair{Key: "test/cluster1/hostname", Value: []byte("mysql.example.com")},
 					},
 					{
-						KV: &consulapi.KVPair{Key: "test/ipv6", Value: []byte("test")},
+						KV: &consulapi.KVPair{Key: "test/cluster1/ipv4", Value: []byte("10.20.30.40")},
 					},
 					{
-						KV: &consulapi.KVPair{Key: "test/port", Value: []byte("test")},
+						KV: &consulapi.KVPair{Key: "test/cluster1/ipv6", Value: []byte("fdf0:7a53:0b88:d147:xxxx:xxxx:xxxx:xxxx")},
+					},
+					{
+						KV: &consulapi.KVPair{Key: "test/cluster1/port", Value: []byte("3306")},
 					},
 				},
 			},
@@ -329,13 +353,13 @@ func TestConsulTxnStoreDistributePairs(t *testing.T) {
 			URL:    "/v1/txn?dc=dc1",
 			Request: consulapi.TxnOps{
 				{
-					KV: &consulapi.KVTxnOp{Verb: consulapi.KVSet, Key: "test/hostname", Value: []byte("test")},
+					KV: &consulapi.KVTxnOp{Verb: consulapi.KVSet, Key: "test/cluster1", Value: []byte("mysql.example.com:3306")},
 				},
 			},
 			Response: &consulapi.TxnResponse{
 				Results: consulapi.TxnResults{
 					{
-						KV: &consulapi.KVPair{Key: "test/hostname", Value: []byte("test")},
+						KV: &consulapi.KVPair{Key: "test/cluster1", Value: []byte("mysql.example.com:3306")},
 					},
 				},
 			},
@@ -344,13 +368,15 @@ func TestConsulTxnStoreDistributePairs(t *testing.T) {
 	defer server.Close()
 	config.Config.ConsulAddress = server.URL
 	config.Config.ConsulCrossDataCenterDistribution = true
+	config.Config.KVClusterMasterPrefix = "test"
 
 	store := NewConsulTxnStore()
 	if err := store.DistributePairs([]*KVPair{
-		{Key: "test/hostname", Value: "test"},
-		{Key: "test/ipv4", Value: "test"},
-		{Key: "test/ipv6", Value: "test"},
-		{Key: "test/port", Value: "test"},
+		{Key: "test/cluster1", Value: "mysql.example.com:3306"},
+		{Key: "test/cluster1/hostname", Value: "mysql.example.com"},
+		{Key: "test/cluster1/ipv4", Value: "10.20.30.40"},
+		{Key: "test/cluster1/ipv6", Value: "fdf0:7a53:0b88:d147:xxxx:xxxx:xxxx:xxxx"},
+		{Key: "test/cluster1/port", Value: "3306"},
 	}); err != nil {
 		t.Fatal(err)
 	}
