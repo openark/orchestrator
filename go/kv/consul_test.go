@@ -44,7 +44,11 @@ func buildConsulTestServer(t *testing.T, testOps []consulTestServerOp) *httptest
 			if testOp.ResponseCode == 0 {
 				testOp.ResponseCode = http.StatusOK
 			}
-			if strings.HasPrefix(r.URL.String(), "/v1/kv") && testOp.Response != nil {
+			if strings.HasPrefix(r.URL.String(), "/v1/catalog/datacenters") {
+				w.WriteHeader(testOp.ResponseCode)
+				json.NewEncoder(w).Encode(testOp.Response)
+				return
+			} else if strings.HasPrefix(r.URL.String(), "/v1/kv") && testOp.Response != nil {
 				w.WriteHeader(testOp.ResponseCode)
 				json.NewEncoder(w).Encode(testOp.Response)
 				return

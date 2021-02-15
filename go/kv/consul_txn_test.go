@@ -230,6 +230,7 @@ func TestConsulTxnStoreUpdateDatacenterKVPairs(t *testing.T) {
 	var wg sync.WaitGroup
 	config.Config.ConsulAddress = server.URL
 	store := NewConsulTxnStore().(*consulTxnStore)
+	respChan := make(chan updateDatacenterKVPairsResponse)
 
 	t.Run("success-cached", func(t *testing.T) {
 		wg.Add(1)
@@ -242,13 +243,15 @@ func TestConsulTxnStoreUpdateDatacenterKVPairs(t *testing.T) {
 			{Key: "test", Value: []byte("test")},     // already correct on consul server
 			{Key: "test2", Value: []byte("test")},    // not equal on consul server
 		}
-		skipped, existing, written, failed, err := store.updateDatacenterKVPairs(&wg, consulTestDefaultDatacenter, kvPairs)
-		if err != nil {
-			t.Fatalf(".updateDatacenterKVPairs() should not return an error, got: %v", err)
+
+		go store.updateDatacenterKVPairs(&wg, consulTestDefaultDatacenter, kvPairs, respChan)
+		resp := <-respChan
+		if resp.err != nil {
+			t.Fatalf(".updateDatacenterKVPairs() should not return an error, got: %v", resp.err)
 		}
-		if skipped != 1 || existing != 1 || written != 1 || failed != 0 {
+		if resp.skipped != 1 || resp.existing != 1 || resp.written != 1 || resp.failed != 0 {
 			t.Fatalf("expected: existing/skipped/written=1 and failed=0, got: skipped=%d, existing=%d, written=%d, failed=%d",
-				skipped, existing, written, failed,
+				resp.skipped, resp.existing, resp.written, resp.failed,
 			)
 		}
 
@@ -266,14 +269,39 @@ func TestConsulTxnStoreUpdateDatacenterKVPairs(t *testing.T) {
 			{Key: "test", Value: []byte("test")},         // already correct on consul server
 			{Key: "doesnt-exist", Value: []byte("test")}, // does not exist on consul server
 		}
-		skipped, existing, written, failed, err := store.updateDatacenterKVPairs(&wg, consulTestDefaultDatacenter, kvPairs)
-		if err != nil {
-			t.Fatalf(".updateDatacenterKVPairs() should not return an error, got: %v", err)
+		go store.updateDatacenterKVPairs(&wg, consulTestDefaultDatacenter, kvPairs, respChan)
+		resp := <-respChan
+
+		if resp.err != nil {
+			t.Fatalf(".updateDatacenterKVPairs() should not return an error, got: %v", resp.err)
 		}
-		if skipped != 0 || existing != 0 || written != 2 || failed != 0 { // confirm all KVs are updated if one does not exist
+		if resp.skipped != 0 || resp.existing != 0 || resp.written != 2 || resp.failed != 0 { // confirm all KVs are updated if one does not exist
 			t.Fatalf("expected: existing/skipped/failed=0 and written=2, got: skipped=%d, existing=%d, written=%d, failed=%d",
-				skipped, existing, written, failed,
+				resp.skipped, resp.existing, resp.written, resp.failed,
 			)
 		}
 	})
+}
+
+func TestConsulTxnStoreDistributePairs(t *testing.T) {
+	server := buildConsulTestServer(t, []consulTestServerOp{
+		{
+			Method:   "GET",
+			URL:      "/v1/catalog/datacenters",
+			Response: []string{"dc1"},
+		},
+	})
+	defer server.Close()
+	config.Config.ConsulAddress = server.URL
+	config.Config.ConsulCrossDataCenterDistribution = true
+
+	store := NewConsulTxnStore()
+	if err := store.DistributePairs([]*KVPair{
+		{Key: "test/hostname", Value: "test"},
+		{Key: "test/ipv4", Value: "test"},
+		{Key: "test/ipv6", Value: "test"},
+		{Key: "test/port", Value: "test"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
