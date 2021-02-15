@@ -90,4 +90,4 @@ _Note: this feature requires Consul version 0.7 or greater._
 
 This will cause Orchestrator to use a [Consul Transaction](https://www.consul.io/api-docs/txn) when distributing one or more Consul KVs. The use of transactions reduces the number of requests to the Consul server while ensuring updates are atomic. KVs are read from the server in a transaction and any necessary updates are performed in a second transaction.
 
-Orchestrator will group KV updates with the same key-prefix into a single [Consul Transaction](https://www.consul.io/api-docs/txn). Increasing the `ConsulMaxKVsPerTransaction` configuration setting from `3` _(default)_ to a max of `64` _(Consul Transaction API limit)_ allows more operations to be grouped into fewer transactions.
+Orchestrator will group KV updates with the same key-prefix into a single [Consul Transaction](https://www.consul.io/api-docs/txn). Increasing the `ConsulMaxKVsPerTransaction` configuration setting from `4` _(default)_ to a max of `64` _(Consul Transaction API limit)_ allows more operations to be grouped into fewer transactions.
