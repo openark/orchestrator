@@ -121,6 +121,7 @@ func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *co
 	return err
 }
 
+// updateDatacenterKVPairsResponse contains a response from .updateDatacenterKVPairs()
 type updateDatacenterKVPairsResponse struct {
 	err      error
 	existing int
@@ -129,6 +130,9 @@ type updateDatacenterKVPairsResponse struct {
 	written  int
 }
 
+// updateDatacenterKVPairs handles updating a list of Consul KV pairs for a single datacenter. Current values are
+// read from the server in a single transaction and any necessary updates are made in a second transaction. If a
+// KVPair from a group is missing on the server all KVPairs will be updated.
 func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc string, kvPairs []*consulapi.KVPair, responses chan updateDatacenterKVPairsResponse) {
 	defer wg.Done()
 
@@ -284,17 +288,20 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 			// receive responses from .updateDatacenterKVPairs()
 			// goroutines, log a summary when channel is closed
 			go func() {
-				var setTxns int
 				summary := updateDatacenterKVPairsResponse{}
+				var getTxns, setTxns int
 				for resp := range responses {
 					summary.existing += resp.existing
 					summary.failed += resp.failed
 					summary.skipped += resp.skipped
 					summary.written += resp.written
-					setTxns++
+					if summary.written > 0 {
+						setTxns++
+					}
+					getTxns++
 				}
-				log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; setTxns: %d, skipped: %d, existing: %d, written: %d, failed: %d",
-					datacenter, setTxns, summary.skipped, summary.existing, summary.written, summary.failed,
+				log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; getTxns: %d, setTxns: %d, skipped: %d, existing: %d, written: %d, failed: %d",
+					datacenter, getTxns, setTxns, summary.skipped, summary.existing, summary.written, summary.failed,
 				)
 			}()
 
