@@ -11,45 +11,45 @@ import (
 	"github.com/openark/orchestrator/go/config"
 )
 
-func TestGroupKVPairsByPrefix(t *testing.T) {
-	config.Config.ConsulMaxKVsPerTransaction = 10
+func TestGroupKVPairsByKeyPrefix(t *testing.T) {
+	config.Config.ConsulMaxKVsPerTransaction = 12 // only 10 (5 x 2) KVs should fit into a max of 12
 	config.Config.KVClusterMasterPrefix = "mysql/master"
 
 	// make 100 KVs for 20 clusters
 	kvPairs := consulapi.KVPairs{}
-	var kvs int
-	for kvs < 100 {
+	var cluster int
+	for cluster < 20 {
 		kvPairs = append(kvPairs,
 			&consulapi.KVPair{
-				Key:   fmt.Sprintf("%s/cluster%d", config.Config.KVClusterMasterPrefix, kvs),
+				Key:   fmt.Sprintf("%s/cluster%d", config.Config.KVClusterMasterPrefix, cluster),
 				Value: []byte("mysql.example.com:3306"),
 			},
 			&consulapi.KVPair{
-				Key:   fmt.Sprintf("%s/cluster%d/hostname", config.Config.KVClusterMasterPrefix, kvs),
+				Key:   fmt.Sprintf("%s/cluster%d/hostname", config.Config.KVClusterMasterPrefix, cluster),
 				Value: []byte("mysql.example.com"),
 			},
 			&consulapi.KVPair{
-				Key:   fmt.Sprintf("%s/cluster%d/ipv4", config.Config.KVClusterMasterPrefix, kvs),
+				Key:   fmt.Sprintf("%s/cluster%d/ipv4", config.Config.KVClusterMasterPrefix, cluster),
 				Value: []byte("10.20.30.40"),
 			},
 			&consulapi.KVPair{
-				Key:   fmt.Sprintf("%s/cluster%d/ipv6", config.Config.KVClusterMasterPrefix, kvs),
+				Key:   fmt.Sprintf("%s/cluster%d/ipv6", config.Config.KVClusterMasterPrefix, cluster),
 				Value: []byte("fdf0:7a53:0b88:d147:xxxx:xxxx:xxxx:xxxx"),
 			},
 			&consulapi.KVPair{
-				Key:   fmt.Sprintf("%s/cluster%d/port", config.Config.KVClusterMasterPrefix, kvs),
+				Key:   fmt.Sprintf("%s/cluster%d/port", config.Config.KVClusterMasterPrefix, cluster),
 				Value: []byte("3306"),
 			},
 		)
-		kvs += 5
+		cluster++
 	}
 
-	grouped := groupKVPairsByPrefix(kvPairs)
+	grouped := groupKVPairsByKeyPrefix(kvPairs)
 	if len(grouped) != 10 {
 		t.Fatalf("expected 10 groups, got %d: %v", len(grouped), grouped)
 	}
-	if len(grouped[0]) != config.Config.ConsulMaxKVsPerTransaction {
-		t.Fatalf("expected %d KVPairs in first group, got %d: %v", config.Config.ConsulMaxKVsPerTransaction, len(grouped[0]), grouped[0])
+	if len(grouped[0]) != 10 {
+		t.Fatalf("expected 10 KVPairs in first group, got %d: %v", len(grouped[0]), grouped[0])
 	}
 
 	// check KVs for a cluster are in a single group

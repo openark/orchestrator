@@ -32,19 +32,18 @@ import (
 	"github.com/openark/golib/log"
 )
 
-// groupKVPairsByPrefix groups Consul Transaction operations by KV key prefix. This ensures KVs
-// for a single cluster are grouped into a single transaction as they have a common key prefix
-func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs) {
-	clusterMasterPrefix := config.Config.KVClusterMasterPrefix
+// groupKVPairsByKeyPrefix groups Consul Transaction operations by KV key prefix. This
+// ensures KVs for a single cluster are grouped into a single transaction
+func groupKVPairsByKeyPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs) {
 	maxOpsPerTxn := config.Config.ConsulMaxKVsPerTransaction
+	clusterMasterPrefix := config.Config.KVClusterMasterPrefix + "/"
 	groupsMap := map[string]consulapi.KVPairs{}
 	for _, pair := range kvPairs {
 		prefix := pair.Key
 		if strings.HasPrefix(prefix, clusterMasterPrefix) {
 			prefix = strings.Replace(prefix, clusterMasterPrefix, "", 1)
-			path := strings.Split(prefix, "/")
-			if len(path) > 1 {
-				prefix = path[1]
+			if path := strings.Split(prefix, "/"); len(path) > 0 {
+				prefix = path[0]
 			}
 		}
 		if _, found := groupsMap[prefix]; found {
@@ -54,20 +53,19 @@ func groupKVPairsByPrefix(kvPairs consulapi.KVPairs) (groups []consulapi.KVPairs
 		}
 	}
 
-	pairs := consulapi.KVPairs{}
+	pairsBuf := consulapi.KVPairs{}
 	for _, group := range groupsMap {
 		groupLen := len(group)
-		pairsLen := len(pairs)
-		if (pairsLen + groupLen) > maxOpsPerTxn {
-			groups = append(groups, pairs)
-			pairs = consulapi.KVPairs{}
+		pairsBufLen := len(pairsBuf)
+		if (pairsBufLen + groupLen) > maxOpsPerTxn {
+			groups = append(groups, pairsBuf)
+			pairsBuf = consulapi.KVPairs{}
 		}
-		pairs = append(pairs, group...)
+		pairsBuf = append(pairsBuf, group...)
 	}
-	if len(pairs) > 0 {
-		groups = append(groups, pairs)
+	if len(pairsBuf) > 0 {
+		groups = append(groups, pairsBuf)
 	}
-
 	return groups
 }
 
@@ -111,7 +109,7 @@ func NewConsulTxnStore() KVStore {
 func (this *consulTxnStore) doWriteTxn(txnOps consulapi.TxnOps, queryOptions *consulapi.QueryOptions) (err error) {
 	ok, resp, _, err := this.client.Txn().Txn(txnOps, queryOptions)
 	if err != nil {
-		log.Errorf("consulTxnStore.doWriteTxn(): failed %v", err)
+		log.Errorf("consulTxnStore.doWriteTxn(): %v", err)
 		return err
 	} else if !ok {
 		for _, terr := range resp.Errors {
@@ -303,9 +301,9 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 			// launch an .updateDatacenterKVPairs() goroutine
 			// for each grouping of consul KV pairs and wait
 			var dcWg sync.WaitGroup
-			for _, consulPairGroup := range groupKVPairsByPrefix(consulPairs) {
+			for _, kvPairGroup := range groupKVPairsByKeyPrefix(consulPairs) {
 				dcWg.Add(1)
-				go this.updateDatacenterKVPairs(&dcWg, datacenter, consulPairGroup, responses)
+				go this.updateDatacenterKVPairs(&dcWg, datacenter, kvPairGroup, responses)
 			}
 			dcWg.Wait()
 			close(responses)
