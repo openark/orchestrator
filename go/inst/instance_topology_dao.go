@@ -250,7 +250,7 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 }
 
 func RestartReplicationQuick(instanceKey *InstanceKey) error {
-	for _, cmd := range []string{`stop slave sql_thread`, `stop slave io_thread`, `start slave io_thread`, `start slave sql_thread`} {
+	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
 			return log.Errorf("%+v: RestartReplicationQuick: '%q' failed: %+v", *instanceKey, cmd, err)
 		} else {
