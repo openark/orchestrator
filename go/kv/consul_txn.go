@@ -128,6 +128,8 @@ type updateDatacenterKVPairsResponse struct {
 	failed   int
 	skipped  int
 	written  int
+	getTxns  int
+	setTxns  int
 }
 
 // updateDatacenterKVPairs handles updating a list of Consul KV pairs for a single datacenter. Current values are
@@ -166,6 +168,7 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 		if terr != nil {
 			log.Errorf("consulTxnStore.DistributePairs(): %v", terr)
 		}
+		resp.getTxns++
 	}
 
 	// find key-value pairs that need updating, add pairs that need updating to set transaction
@@ -204,6 +207,7 @@ func (this *consulTxnStore) updateDatacenterKVPairs(wg *sync.WaitGroup, dc strin
 				resp.written++
 			}
 		}
+		resp.setTxns++
 	}
 
 	responses <- resp
@@ -288,20 +292,17 @@ func (this *consulTxnStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 			// receive responses from .updateDatacenterKVPairs()
 			// goroutines, log a summary when channel is closed
 			go func() {
-				summary := updateDatacenterKVPairsResponse{}
-				var getTxns, setTxns int
+				sum := updateDatacenterKVPairsResponse{}
 				for resp := range responses {
-					summary.existing += resp.existing
-					summary.failed += resp.failed
-					summary.skipped += resp.skipped
-					summary.written += resp.written
-					if summary.written > 0 {
-						setTxns++
-					}
-					getTxns++
+					sum.existing += resp.existing
+					sum.failed += resp.failed
+					sum.skipped += resp.skipped
+					sum.written += resp.written
+					sum.getTxns += resp.getTxns
+					sum.setTxns += resp.setTxns
 				}
 				log.Debugf("consulTxnStore.DistributePairs(): datacenter: %s; getTxns: %d, setTxns: %d, skipped: %d, existing: %d, written: %d, failed: %d",
-					datacenter, getTxns, setTxns, summary.skipped, summary.existing, summary.written, summary.failed,
+					datacenter, sum.getTxns, sum.setTxns, sum.skipped, sum.existing, sum.written, sum.failed,
 				)
 			}()
 
