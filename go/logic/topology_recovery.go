@@ -18,6 +18,7 @@ package logic
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	goos "os"
@@ -45,9 +46,10 @@ var countPendingRecoveries int64
 type RecoveryType string
 
 const (
-	MasterRecovery             RecoveryType = "MasterRecovery"
-	CoMasterRecovery                        = "CoMasterRecovery"
-	IntermediateMasterRecovery              = "IntermediateMasterRecovery"
+	MasterRecovery                 RecoveryType = "MasterRecovery"
+	CoMasterRecovery                            = "CoMasterRecovery"
+	IntermediateMasterRecovery                  = "IntermediateMasterRecovery"
+	ReplicationGroupMemberRecovery              = "ReplicationGroupMemberRecovery"
 )
 
 type RecoveryAcknowledgement struct {
@@ -189,6 +191,9 @@ var recoverDeadIntermediateMasterFailureCounter = metrics.NewCounter()
 var recoverDeadCoMasterCounter = metrics.NewCounter()
 var recoverDeadCoMasterSuccessCounter = metrics.NewCounter()
 var recoverDeadCoMasterFailureCounter = metrics.NewCounter()
+var recoverDeadReplicationGroupMemberCounter = metrics.NewCounter()
+var recoverDeadReplicationGroupMemberSuccessCounter = metrics.NewCounter()
+var recoverDeadReplicationGroupMemberFailureCounter = metrics.NewCounter()
 var countPendingRecoveriesGauge = metrics.NewGauge()
 
 func init() {
@@ -201,6 +206,9 @@ func init() {
 	metrics.Register("recover.dead_co_master.start", recoverDeadCoMasterCounter)
 	metrics.Register("recover.dead_co_master.success", recoverDeadCoMasterSuccessCounter)
 	metrics.Register("recover.dead_co_master.fail", recoverDeadCoMasterFailureCounter)
+	metrics.Register("recover.dead_replication_group_member.start", recoverDeadReplicationGroupMemberCounter)
+	metrics.Register("recover.dead_replication_group_member.success", recoverDeadReplicationGroupMemberSuccessCounter)
+	metrics.Register("recover.dead_replication_group_member.fail", recoverDeadReplicationGroupMemberFailureCounter)
 	metrics.Register("recover.pending", countPendingRecoveriesGauge)
 
 	go initializeTopologyRecoveryPostConfiguration()
@@ -914,10 +922,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
-			for _, kvPair := range kvPairs {
-				err := kv.PutKVPair(kvPair)
-				log.Errore(err)
-			}
+			err := kv.PutKVPairs(kvPairs)
+			log.Errore(err)
 		}
 		{
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
@@ -1198,6 +1204,42 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	return successorInstance, err
 }
 
+// RecoverDeadReplicationGroupMemberWithReplicas performs dead group member recovery. It does so by finding members of
+// the same replication group of the one of the failed instance, picking a random one and relocating replicas to it.
+func RecoverDeadReplicationGroupMemberWithReplicas(topologyRecovery *TopologyRecovery, skipProcesses bool) (successorInstance *inst.Instance, err error) {
+	topologyRecovery.Type = ReplicationGroupMemberRecovery
+	analysisEntry := &topologyRecovery.AnalysisEntry
+	failedGroupMemberInstanceKey := &analysisEntry.AnalyzedInstanceKey
+	inst.AuditOperation("recover-dead-replication-group-member-with-replicas", failedGroupMemberInstanceKey, "problem found; will recover")
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
+			return nil, topologyRecovery.AddError(err)
+		}
+	}
+	failedGroupMember, _, err := inst.ReadInstance(failedGroupMemberInstanceKey)
+	if err != nil {
+		return nil, topologyRecovery.AddError(err)
+	}
+	// Find a group member under which we can relocate the replicas of the failed one.
+	groupMembers := failedGroupMember.ReplicationGroupMembers.GetInstanceKeys()
+	if len(groupMembers) == 0 {
+		return nil, topologyRecovery.AddError(errors.New("RecoverDeadReplicationGroupMemberWithReplicas: unable to find a candidate group member to relocate replicas to"))
+	}
+	// We have a group member to move replicas to, go ahead and do that
+	AuditTopologyRecovery(topologyRecovery, "Finding a candidate group member to relocate replicas to")
+	candidateGroupMemberInstanceKey := &groupMembers[rand.Intn(len(failedGroupMember.ReplicationGroupMembers.GetInstanceKeys()))]
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Found group member %+v", candidateGroupMemberInstanceKey))
+	relocatedReplicas, successorInstance, err, errs := inst.RelocateReplicas(failedGroupMemberInstanceKey, candidateGroupMemberInstanceKey, "")
+	topologyRecovery.AddErrors(errs)
+	if len(relocatedReplicas) != len(failedGroupMember.Replicas.GetInstanceKeys()) {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadReplicationGroupMemberWithReplicas: failed to move all replicas to candidate group member (%+v)", candidateGroupMemberInstanceKey))
+		return nil, topologyRecovery.AddError(errors.New(fmt.Sprintf("RecoverDeadReplicationGroupMemberWithReplicas: Unable to relocate replicas to +%v", candidateGroupMemberInstanceKey)))
+	}
+	AuditTopologyRecovery(topologyRecovery, "All replicas successfully relocated")
+	resolveRecovery(topologyRecovery, successorInstance)
+	return successorInstance, err
+}
+
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
@@ -1411,6 +1453,46 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 	return false, nil, nil
 }
 
+// checkAndRecoverDeadGroupMemberWithReplicas checks whether action needs to be taken for an analysis involving a dead
+// replication group member, and takes the action if applicable. Notice that under our view of the world, a primary
+// replication group member is akin to a master in traditional async/semisync replication; whereas secondary group
+// members are akin to intermediate masters. Considering also that a failed group member can always be considered as a
+// secondary (even if it was primary, the group should have detected its failure and elected a new primary), then
+// failure of a group member with replicas is akin to failure of an intermediate master.
+func checkAndRecoverDeadGroupMemberWithReplicas(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
+	// Don't proceed with recovery unless it was forced or automatic intermediate source recovery is enabled.
+	// We consider failed group members akin to failed intermediate masters, so we re-use the configuration for
+	// intermediates.
+	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
+		return false, nil, nil
+	}
+	// Try to record the recovery. It it fails to be recorded, it because it is already being dealt with.
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, !forceInstanceRecovery, !forceInstanceRecovery)
+	if err != nil {
+		return false, nil, err
+	}
+	// Proceed with recovery
+	recoverDeadReplicationGroupMemberCounter.Inc(1)
+
+	recoveredToGroupMember, err := RecoverDeadReplicationGroupMemberWithReplicas(topologyRecovery, skipProcesses)
+
+	if recoveredToGroupMember != nil {
+		// success
+		recoverDeadReplicationGroupMemberSuccessCounter.Inc(1)
+
+		if !skipProcesses {
+			// Execute post failover processes
+			topologyRecovery.SuccessorKey = &recoveredToGroupMember.Key
+			topologyRecovery.SuccessorAlias = recoveredToGroupMember.InstanceAlias
+			// For the same reasons that were mentioned above, we re-use the post intermediate master fail-over hooks
+			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
+		}
+	} else {
+		recoverDeadReplicationGroupMemberFailureCounter.Inc(1)
+	}
+	return true, topologyRecovery, err
+}
+
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
 func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) (instance *inst.Instance, err error) {
@@ -1441,7 +1523,23 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 		// Just recently attempted on this specific replica
 		return
 	}
+
 	go inst.ExecuteOnTopology(func() {
+		instance, _, err := inst.ReadInstance(instanceKey)
+		if err != nil {
+			return
+		}
+		if instance.UsingMariaDBGTID {
+			// In MariaDB GTID, stopping and starting IO thread actually deletes relay logs.
+			// This is counter productive to our objective.
+			// Specifically, in a situation where the primary is unreachable and where replicas are lagging,
+			// we want to restart IO thread to see if lag is actually caused by locked primary. If this results
+			// with losing relay logs, then we've lost data.
+			// So, unfortunately we avoid this step in MariaDB GTID.
+			// See https://github.com/openark/orchestrator/issues/1260
+			return
+		}
+
 		inst.RestartReplicationQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
 	})
@@ -1549,6 +1647,9 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		return checkAndRecoverGenericProblem, false
+	// replication group members
+	case inst.DeadReplicationGroupMemberWithReplicas:
+		return checkAndRecoverDeadGroupMemberWithReplicas, true
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
@@ -1945,7 +2046,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 	}
 	log.Infof("GracefulMasterTakeover: Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
 
-	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
+	replicationCreds, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
 	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.GracefulMasterTakeoverCommandHint, &clusterMaster.Key)
 	if err != nil {
@@ -1996,22 +2097,21 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", *demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
 	}
 	if !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
-		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationCreds)
 		if err == nil {
 			err = credentialsErr
+		}
+	}
+	if designatedInstance.AllowTLS {
+		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
+		if err == nil {
+			err = enableSSLErr
 		}
 	}
 	if auto {
 		_, startReplicationErr := inst.StartReplication(&clusterMaster.Key)
 		if err == nil {
 			err = startReplicationErr
-		}
-	}
-
-	if designatedInstance.AllowTLS {
-		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
-		if err == nil {
-			err = enableSSLErr
 		}
 	}
 	executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)

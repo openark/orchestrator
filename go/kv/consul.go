@@ -31,6 +31,11 @@ import (
 	"github.com/openark/golib/log"
 )
 
+// getConsulKVCacheKey returns a Consul KV cache key for a given datacenter
+func getConsulKVCacheKey(dc, key string) string {
+	return fmt.Sprintf("%s;%s", dc, key)
+}
+
 // A Consul store based on config's `ConsulAddress`, `ConsulScheme`, and `ConsulKVPrefix`
 type consulStore struct {
 	client                        *consulapi.Client
@@ -86,6 +91,18 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
+func (this *consulStore) PutKVPairs(kvPairs []*KVPair) (err error) {
+	if this.client == nil {
+		return nil
+	}
+	for _, pair := range kvPairs {
+		if err := this.PutKeyValue(pair.Key, pair.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
 	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {
@@ -123,7 +140,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 
 			for _, consulPair := range consulPairs {
 				val := string(consulPair.Value)
-				kcCacheKey := fmt.Sprintf("%s;%s", datacenter, consulPair.Key)
+				kcCacheKey := getConsulKVCacheKey(datacenter, consulPair.Key)
 
 				if value, found := this.kvCache.Get(kcCacheKey); found && val == value {
 					skipped++

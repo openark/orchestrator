@@ -46,7 +46,7 @@ When operating in HTTP mode (API or Web), access to `orchestrator` may be restri
         RewriteRule .* - [E=RU:%1,NS]
         RequestHeader set X-Forwarded-User %{RU}e
 
-   The `proxy` authentication allows for *roles*. Soem users are *Power users* and the rest are just normal users.
+   The `proxy` authentication allows for *roles*. Some users are *Power users* and the rest are just normal users.
    *Power users* are allowed to make changes to the topologies, whereas normal users are in read-only mode.
    To specify the list of known DBAs, use:
 

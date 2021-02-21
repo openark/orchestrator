@@ -254,7 +254,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 			Err:             err,
 		})
 		if util.ClearToLog("discoverInstance", instanceKey.StringCode()) {
-			log.Warningf(" DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			log.Warningf("DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 				instanceKey,
 				totalLatency.Seconds(),
 				backendLatency.Seconds(),
@@ -311,11 +311,11 @@ func onHealthTick() {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
 		if process.SinceLastGoodHealthCheck() > yieldAfterUnhealthyDuration {
-			log.Errorf("Heath test is failing for over %+v seconds. raft yielding", yieldAfterUnhealthyDuration.Seconds())
+			log.Errorf("Health test is failing for over %+v seconds. raft yielding", yieldAfterUnhealthyDuration.Seconds())
 			orcraft.Yield()
 		}
 		if process.SinceLastGoodHealthCheck() > fatalAfterUnhealthyDuration {
-			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity."))
+			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity and/or time synchronisation."))
 		}
 	}
 	if !orcraft.IsRaftEnabled() {
@@ -442,14 +442,19 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
 	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
-	for _, kvPair := range submitKvPairs {
-		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand("put-key-value", kvPair)
-		} else {
-			err = kv.PutKVPair(kvPair)
+	if orcraft.IsRaftEnabled() {
+		for _, kvPair := range submitKvPairs {
+			_, err := orcraft.PublishCommand("put-key-value", kvPair)
+			if err == nil {
+				submittedCount++
+			} else {
+				selectedError = err
+			}
 		}
+	} else {
+		err := kv.PutKVPairs(submitKvPairs)
 		if err == nil {
-			submittedCount++
+			submittedCount += len(submitKvPairs)
 		} else {
 			selectedError = err
 		}

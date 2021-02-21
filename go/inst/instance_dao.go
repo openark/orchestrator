@@ -2639,6 +2639,14 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 }
 
 // writeManyInstances stores instances in the orchestrator backend
+//
+// This may trigger this error: Error 1390: Prepared statement contains too
+// many placeholders if you are monitoring several thousand servers as it
+// may trigger the total number of place holders to exceed (uint)UINT_MAX16
+// in the MySQL source code.
+
+const tooManyPlaceholders = "Error 1390: Prepared statement contains too many placeholders"
+
 func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
 	writeInstances := [](*Instance){}
 	for _, instance := range instances {
@@ -2655,6 +2663,14 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return err
 	}
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
+		if strings.Contains(err.Error(), tooManyPlaceholders) {
+			return fmt.Errorf("writeManyInstances(?,%v,%v): error: %+v, len(instances): %v, len(args): %v.  Reduce InstanceWriteBufferSize to avoid len(args) being > 64k, a limit in the MySQL source code.",
+				instanceWasActuallyFound,
+				updateLastSeen,
+				err.Error(),
+				len(writeInstances),
+				len(args))
+		}
 		return err
 	}
 	return nil
@@ -2710,7 +2726,7 @@ func flushInstanceWriteBuffer() {
 
 	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
 	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
-	// this is why we want to flush all instances in the buffer untill a max of `InstanceWriteBufferSize`.
+	// this is why we want to flush all instances in the buffer until a max of `InstanceWriteBufferSize`.
 	// Otherwise we can flush way more instances than what's expected.
 	for i := 0; i < config.Config.InstanceWriteBufferSize && len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
@@ -3173,6 +3189,8 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 // PopulateGroupReplicationInformation obtains information about Group Replication  for this host as well as other hosts
 // who are members of the same group (if any).
 func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
+	// We exclude below hosts with state OFFLINE because they have joined no group yet, so there is no point in getting
+	// any group replication information from them
 	q := `
 	SELECT
 		MEMBER_ID,
@@ -3184,6 +3202,8 @@ func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
 		@@global.group_replication_single_primary_mode
 	FROM
 		performance_schema.replication_group_members
+	WHERE
+		MEMBER_STATE != 'OFFLINE'
 	`
 	rows, err := db.Query(q)
 	if err != nil {
