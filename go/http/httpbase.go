@@ -30,11 +30,30 @@ import (
 	"github.com/openark/orchestrator/go/raft"
 )
 
+func inSlice(elem string, arr []string) bool {
+	for _, s := range arr {
+		if s == elem {
+			return true
+		}
+	}
+	return false
+}
+
 func getProxyAuthUser(req *http.Request) string {
 	for _, user := range req.Header[config.Config.AuthUserHeader] {
 		return user
 	}
 	return ""
+}
+
+// getProxyAuthGroups looks at the AuthGroupHeader, if exists,
+// and looks up a comma delimited list of groups, e.g.
+// "group1,group2,group3"
+func getProxyAuthGroups(req *http.Request) []string {
+	for _, groups := range req.Header[config.Config.AuthGroupsHeader] {
+		return strings.Split(groups, ",")
+	}
+	return []string{}
 }
 
 // isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
@@ -67,8 +86,20 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 	case "proxy":
 		{
 			authUser := getProxyAuthUser(req)
+
+			if config.Config.UseMutualTLS && authUser == "" {
+				authUser = string(user)
+				return true
+			}
+
 			for _, configPowerAuthUser := range config.Config.PowerAuthUsers {
 				if configPowerAuthUser == "*" || configPowerAuthUser == authUser {
+					return true
+				}
+			}
+			authGroups := getProxyAuthGroups(req)
+			for _, configPowerAuthGroupProxy := range config.Config.PowerAuthGroupsProxy {
+				if configPowerAuthGroupProxy == "*" || inSlice(configPowerAuthGroupProxy, authGroups) {
 					return true
 				}
 			}

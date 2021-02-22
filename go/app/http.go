@@ -115,7 +115,8 @@ func standardHttp(continuousDiscovery bool) {
 	}))
 	m.Use(martini.Static("resources/public", martini.StaticOptions{Prefix: config.Config.URLPrefix}))
 	if config.Config.UseMutualTLS {
-		m.Use(ssl.VerifyOUs(config.Config.SSLValidOUs))
+		m.Use(ssl.VerifyClient(config.Config.SSLValidCNs, ssl.IT_CommonName))
+		m.Use(ssl.VerifyClient(config.Config.SSLValidOUs, ssl.IT_OrganizationalUnit))
 	}
 
 	inst.SetMaintenanceOwner(process.ThisHostname)
@@ -174,7 +175,7 @@ func agentsHttp() {
 	m.Use(gzip.All())
 	m.Use(render.Renderer())
 	if config.Config.AgentsUseMutualTLS {
-		m.Use(ssl.VerifyOUs(config.Config.AgentSSLValidOUs))
+		m.Use(ssl.VerifyClient(config.Config.AgentSSLValidOUs, ssl.IT_CommonName))
 	}
 
 	log.Info("Starting agents listener")

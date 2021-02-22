@@ -173,8 +173,10 @@ type Configuration struct {
 	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
 	AuthUserHeader                             string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
+	AuthGroupsHeader                           string            // HTTP header indicating auth group, when AuthenticationMethod is "proxy"
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	PowerAuthGroups                            []string          // list of unix groups the authenticated user must be a member of to make changes.
+	PowerAuthGroupsProxy                       []string          // list of auth-proxy-supplied groups authorized to make changes.
 	AccessTokenUseExpirySeconds                uint              // Time by which an issued token must be used
 	AccessTokenExpiryMinutes                   uint              // Time after which HTTP access token expires
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
@@ -207,8 +209,9 @@ type Configuration struct {
 	SSLCertFile                                string            // Name of SSL certification file, applies only when UseSSL = true
 	SSLCAFile                                  string            // Name of the Certificate Authority file, applies only when UseSSL = true
 	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
+	SSLValidCNs                                []string          // Valid common names when using mutual TLS
+	SSLSkipVerifyEndpoints                     []string          // List of API endpoints for which TLS OU/CN checks are not enforced
 	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
-	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
@@ -291,7 +294,6 @@ func newConfiguration() *Configuration {
 		HTTPAdvertise:                              "",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             DefaultStatusAPIEndpoint,
-		StatusOUVerify:                             false,
 		BackendDB:                                  "mysql",
 		SQLite3DataFile:                            "",
 		SkipOrchestratorDatabaseUpdate:             false,
@@ -350,8 +352,10 @@ func newConfiguration() *Configuration {
 		HTTPAuthUser:                               "",
 		HTTPAuthPassword:                           "",
 		AuthUserHeader:                             "X-Forwarded-User",
+		AuthGroupsHeader:                           "X-Forwarded-Groups",
 		PowerAuthUsers:                             []string{"*"},
 		PowerAuthGroups:                            []string{},
+		PowerAuthGroupsProxy:                       []string{"*"},
 		AccessTokenUseExpirySeconds:                60,
 		AccessTokenExpiryMinutes:                   1440,
 		ClusterNameToAlias:                         make(map[string]string),

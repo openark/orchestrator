@@ -60,13 +60,20 @@ func setupHttpClient() error {
 		}
 	}
 
-	httpTransport := &http.Transport{
-		TLSClientConfig:       tlsConfig,
-		Dial:                  dialTimeout,
-		ResponseHeaderTimeout: httpTimeout,
+	if config.Config.UseSSL {
+		httpTransport, err := ssl.NewTLSTransport()
+		if err != nil {
+			return err
+		}
+		httpClient = &http.Client{Transport: httpTransport}
+	} else {
+		httpTransport := &http.Transport{
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
+			Dial:                  dialTimeout,
+			ResponseHeaderTimeout: httpTimeout,
+		}
+		httpClient = &http.Client{Transport: httpTransport}
 	}
-	httpClient = &http.Client{Transport: httpTransport}
-
 	return nil
 }
 

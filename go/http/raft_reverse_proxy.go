@@ -11,6 +11,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/ssl"
 )
 
 func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context) {
@@ -44,5 +45,12 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		r.SetBasicAuth(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
+	if config.Config.UseSSL {
+		transport, err := ssl.NewTLSTransport()
+		if err != nil {
+			return
+		}
+		proxy.Transport = transport
+	}
 	proxy.ServeHTTP(w, r)
 }
