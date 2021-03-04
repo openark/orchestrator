@@ -16,19 +16,6 @@ import (
 	"github.com/openark/orchestrator/go/config"
 )
 
-var cipherSuites = []uint16{
-	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-}
-
 // Determine if a string element is in a string array
 func HasString(elem string, arr []string) bool {
 	for _, s := range arr {
@@ -46,8 +33,8 @@ func NewTLSConfig(caFile string, verifyCert bool) (*tls.Config, error) {
 
 	// Set to TLS 1.2 as a minimum.  This is overridden for mysql communication
 	c.MinVersion = tls.VersionTLS12
-	// Remove insecure ciphers from the list
-	c.CipherSuites = cipherSuites
+	// "If CipherSuites is nil, a default list of secure cipher suites is used"
+	c.CipherSuites = nil
 	c.PreferServerCipherSuites = true
 
 	if verifyCert {
