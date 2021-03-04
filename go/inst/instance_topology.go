@@ -19,7 +19,6 @@ package inst
 import (
 	"fmt"
 	goos "os"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -2159,10 +2158,8 @@ func IsBannedFromBeingCandidateReplica(replica *Instance) bool {
 		log.Debugf("instance %+v is banned because of promotion rule", replica.Key)
 		return true
 	}
-	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
-		if matched, _ := regexp.MatchString(filter, replica.Key.Hostname); matched {
-			return true
-		}
+	if FiltersMatchInstanceKey(&replica.Key, config.Config.PromotionIgnoreHostnameFilters) {
+		return true
 	}
 	return false
 }

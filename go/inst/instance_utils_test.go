@@ -23,8 +23,9 @@ func TestRegexpMatchPatterns(t *testing.T) {
 	}
 
 	for _, p := range patterns {
-		if match := RegexpMatchPatterns(p.s, p.patterns); match != p.expected {
-			t.Errorf("RegexpMatchPatterns failed with: %q, %+v, got: %+v, expected: %+v", p.s, p.patterns, match, p.expected)
+		k := &InstanceKey{Hostname: p.s}
+		if match := FiltersMatchInstanceKey(k, p.patterns); match != p.expected {
+			t.Errorf("FiltersMatchInstanceKey failed with: %q, %+v, got: %+v, expected: %+v", p.s, p.patterns, match, p.expected)
 		}
 	}
 }
