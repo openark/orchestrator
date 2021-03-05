@@ -137,6 +137,7 @@ And, in the event a recovery was successful:
 
 - `ORC_SUCCESSOR_HOST`
 - `ORC_SUCCESSOR_PORT`
+- `ORC_SUCCESSOR_BINLOG_COORDINATES`
 - `ORC_SUCCESSOR_ALIAS`
 
 2. Command line text replacement. `orchestrator` replaces the following magic tokens in your `*Proccesses` commands:
@@ -166,6 +167,7 @@ And, in the event a recovery was successful:
 
 - `{successorHost}`
 - `{successorPort}`
+- `{successorBinlogCoordinates}`
 - `{successorAlias}`
 
 ### MySQL Configuration
