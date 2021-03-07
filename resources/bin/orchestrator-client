@@ -212,10 +212,12 @@ function detect_leader_api {
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  # Prevent leaking passwords if the URL has credentials like: http://<user>:<password>@host:3000/api
   local curl_auth_params="$(get_curl_auth_params)"
 
   if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
-    fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
+    santised_api=$(echo "${orchestrator_api}" | sed -e 's|:[^:^@^ ]*@|:<REMOVED>@|g')
+    fail "Cannot access orchestrator at ${santised_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
 
   leader_api=
