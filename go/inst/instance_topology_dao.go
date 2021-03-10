@@ -532,7 +532,6 @@ func WaitForExecBinlogCoordinatesToReach(instanceKey *InstanceKey, coordinates *
 			return instance, false, nil
 		}
 	}
-	return instance, exactMatch, err
 }
 
 // StartReplicationUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance

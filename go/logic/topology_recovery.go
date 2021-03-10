@@ -93,28 +93,29 @@ type BlockedTopologyRecovery struct {
 type TopologyRecovery struct {
 	inst.PostponedFunctionsContainer
 
-	Id                        int64
-	UID                       string
-	AnalysisEntry             inst.ReplicationAnalysis
-	SuccessorKey              *inst.InstanceKey
-	SuccessorAlias            string
-	IsActive                  bool
-	IsSuccessful              bool
-	LostReplicas              inst.InstanceKeyMap
-	ParticipatingInstanceKeys inst.InstanceKeyMap
-	AllErrors                 []string
-	RecoveryStartTimestamp    string
-	RecoveryEndTimestamp      string
-	ProcessingNodeHostname    string
-	ProcessingNodeToken       string
-	Acknowledged              bool
-	AcknowledgedAt            string
-	AcknowledgedBy            string
-	AcknowledgedComment       string
-	LastDetectionId           int64
-	RelatedRecoveryId         int64
-	Type                      RecoveryType
-	RecoveryType              MasterRecoveryType
+	Id                         int64
+	UID                        string
+	AnalysisEntry              inst.ReplicationAnalysis
+	SuccessorKey               *inst.InstanceKey
+	SuccessorAlias             string
+	SuccessorBinlogCoordinates *inst.BinlogCoordinates
+	IsActive                   bool
+	IsSuccessful               bool
+	LostReplicas               inst.InstanceKeyMap
+	ParticipatingInstanceKeys  inst.InstanceKeyMap
+	AllErrors                  []string
+	RecoveryStartTimestamp     string
+	RecoveryEndTimestamp       string
+	ProcessingNodeHostname     string
+	ProcessingNodeToken        string
+	Acknowledged               bool
+	AcknowledgedAt             string
+	AcknowledgedBy             string
+	AcknowledgedComment        string
+	LastDetectionId            int64
+	RelatedRecoveryId          int64
+	Type                       RecoveryType
+	RecoveryType               MasterRecoveryType
 }
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
@@ -122,6 +123,7 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery.UID = util.PrettyUniqueToken()
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
+	topologyRecovery.SuccessorBinlogCoordinates = nil
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
@@ -251,6 +253,8 @@ func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 		topologyRecovery.SuccessorKey = &successorInstance.Key
 		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
 		topologyRecovery.IsSuccessful = true
+		// Assign the current Binlog Coordinates of Successor Instance
+		topologyRecovery.SuccessorBinlogCoordinates = &successorInstance.SelfBinlogCoordinates
 	}
 	if orcraft.IsRaftEnabled() {
 		_, err := orcraft.PublishCommand("resolve-recovery", topologyRecovery)
@@ -291,6 +295,11 @@ func prepareCommand(command string, topologyRecovery *TopologyRecovery) (result 
 	if topologyRecovery.SuccessorKey != nil {
 		command = strings.Replace(command, "{successorHost}", topologyRecovery.SuccessorKey.Hostname, -1)
 		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", topologyRecovery.SuccessorKey.Port), -1)
+		// As long as SuccessorBinlogCoordinates != nil, we replace {successorBinlogCoordinates}
+		// Format of the display string of binlog coordinates would be LogFile:LogPositon
+		if topologyRecovery.SuccessorBinlogCoordinates != nil {
+			command = strings.Replace(command, "{successorBinlogCoordinates}", topologyRecovery.SuccessorBinlogCoordinates.DisplayString(), -1)
+		}
 		// As long as SucesssorKey != nil, we replace {successorAlias}.
 		// If SucessorAlias is "", it's fine. We'll replace {successorAlias} with "".
 		command = strings.Replace(command, "{successorAlias}", topologyRecovery.SuccessorAlias, -1)
@@ -333,6 +342,11 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	if topologyRecovery.SuccessorKey != nil {
 		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", topologyRecovery.SuccessorKey.Hostname))
 		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_PORT=%d", topologyRecovery.SuccessorKey.Port))
+		// As long as SuccessorBinlogCoordinates != nil, we set ORC_SUCCESSOR_BINLOG_COORDINATES
+		// Format of the display string of binlog coordinates would be LogFile:LogPositon
+		if topologyRecovery.SuccessorBinlogCoordinates != nil {
+			env = append(env, fmt.Sprintf("ORC_SUCCESSOR_BINLOG_COORDINATES=%s", topologyRecovery.SuccessorBinlogCoordinates.DisplayString()))
+		}
 		// As long as SucesssorKey != nil, we replace {successorAlias}.
 		// If SucessorAlias is "", it's fine. We'll replace {successorAlias} with "".
 		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_ALIAS=%s", topologyRecovery.SuccessorAlias))
