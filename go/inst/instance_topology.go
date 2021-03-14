@@ -2279,9 +2279,6 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 		stopReplicationMethod = StopReplicationNice
 	}
 	replicas = sortedReplicasDataCenterHint(replicas, stopReplicationMethod, dataCenterHint)
-	if err != nil {
-		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
-	}
 	if len(replicas) == 0 {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, fmt.Errorf("No replicas found for %+v", *masterKey)
 	}
