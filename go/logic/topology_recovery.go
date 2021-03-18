@@ -1450,7 +1450,25 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	return true, topologyRecovery, err
 }
 
-// checkAndRecoverGenericProblem is a general-purpose recovery function
+// checkAndRecoverReadOnlyMaster attempts to recover from a read only master by turning it writeable.
+// This behavior is feature protected, see config.Config.RecoverReadOnlyMaster
+func checkAndRecoverReadOnlyMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	if !config.Config.RecoverReadOnlyMaster {
+		return false, nil, nil
+	}
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another checkAndRecoverReadOnlyMaster.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+	instance, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, false)
+	if err == nil {
+		resolveRecovery(topologyRecovery, instance)
+	}
+	return true, topologyRecovery, err
+}
+
+// checkAndRecoverLockedSemiSyncMaster
 func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
@@ -1632,6 +1650,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		} else {
 			return checkAndRecoverLockedSemiSyncMaster, true
 		}
+	case inst.ReadOnlyMaster:
+		return checkAndRecoverReadOnlyMaster, true
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true

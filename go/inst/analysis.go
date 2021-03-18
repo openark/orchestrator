@@ -41,6 +41,7 @@ const (
 	AllMasterReplicasNotReplicatingOrDead                                = "AllMasterReplicasNotReplicatingOrDead"
 	LockedSemiSyncMasterHypothesis                                       = "LockedSemiSyncMasterHypothesis"
 	LockedSemiSyncMaster                                                 = "LockedSemiSyncMaster"
+	ReadOnlyMaster                                                       = "ReadOnlyMaster"
 	MasterWithoutReplicas                                                = "MasterWithoutReplicas"
 	DeadCoMaster                                                         = "DeadCoMaster"
 	DeadCoMasterAndSomeReplicas                                          = "DeadCoMasterAndSomeReplicas"

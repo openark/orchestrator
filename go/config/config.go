@@ -238,6 +238,7 @@ type Configuration struct {
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostGracefulTakeoverProcesses              []string          // Processes to execute after runnign a graceful master takeover. Uses same placeholders as PostFailoverProcesses
 	PostTakeMasterProcesses                    []string          // Processes to execute after a successful Take-Master event has taken place
+	RecoverReadOnlyMaster                      bool              // When 'true', orchestrator treats a read-only master as a failure scenario and attempts to make the master writeable
 	CoMasterRecoveryMustPromoteOtherCoMaster   bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover        bool              // synonym to DetachLostReplicasAfterMasterFailover
 	DetachLostReplicasAfterMasterFailover      bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
@@ -411,6 +412,7 @@ func newConfiguration() *Configuration {
 		PostUnsuccessfulFailoverProcesses:          []string{},
 		PostGracefulTakeoverProcesses:              []string{},
 		PostTakeMasterProcesses:                    []string{},
+		RecoverReadOnlyMaster:                      false,
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,
 		ApplyMySQLPromotionAfterMasterFailover:     true,
