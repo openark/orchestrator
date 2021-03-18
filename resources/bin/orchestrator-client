@@ -363,7 +363,7 @@ function prompt_help {
   -R <promotion rule>, --promotion-rule <promotion rule>
     rule for 'register-candidate' command
   -U <orchestrator_api>, --api <orchestrator_api>
-    override \$orchestrator_api environemtn variable,
+    override \$orchestrator_api environment variable,
     indicate where the client should connect to.
   -P <api path>, --path <api path>
     With '-c api', indicate the specific API path you wish to call
