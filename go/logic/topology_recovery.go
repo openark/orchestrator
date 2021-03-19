@@ -1650,8 +1650,6 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		} else {
 			return checkAndRecoverLockedSemiSyncMaster, true
 		}
-	case inst.ReadOnlyMaster:
-		return checkAndRecoverReadOnlyMaster, true
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
@@ -1684,6 +1682,9 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 	// replication group members
 	case inst.DeadReplicationGroupMemberWithReplicas:
 		return checkAndRecoverDeadGroupMemberWithReplicas, true
+		// recoverable structure analysis
+	case inst.NoWriteableMasterStructureWarning:
+		return checkAndRecoverReadOnlyMaster, true
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
