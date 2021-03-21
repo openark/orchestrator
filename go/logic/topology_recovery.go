@@ -1682,7 +1682,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 	// replication group members
 	case inst.DeadReplicationGroupMemberWithReplicas:
 		return checkAndRecoverDeadGroupMemberWithReplicas, true
-		// recoverable structure analysis
+	// recoverable structure analysis
 	case inst.NoWriteableMasterStructureWarning:
 		return checkAndRecoverNonWriteableMaster, true
 	}
