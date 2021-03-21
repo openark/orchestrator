@@ -1450,15 +1450,15 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	return true, topologyRecovery, err
 }
 
-// checkAndRecoverReadOnlyMaster attempts to recover from a read only master by turning it writeable.
-// This behavior is feature protected, see config.Config.RecoverReadOnlyMaster
-func checkAndRecoverReadOnlyMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
-	if !config.Config.RecoverReadOnlyMaster {
+// checkAndRecoverNonWriteableMaster attempts to recover from a read only master by turning it writeable.
+// This behavior is feature protected, see config.Config.RecoverNonWriteableMaster
+func checkAndRecoverNonWriteableMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	if !config.Config.RecoverNonWriteableMaster {
 		return false, nil, nil
 	}
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another checkAndRecoverReadOnlyMaster.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another checkAndRecoverNonWriteableMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
 	instance, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, false)
@@ -1684,7 +1684,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		return checkAndRecoverDeadGroupMemberWithReplicas, true
 		// recoverable structure analysis
 	case inst.NoWriteableMasterStructureWarning:
-		return checkAndRecoverReadOnlyMaster, true
+		return checkAndRecoverNonWriteableMaster, true
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
