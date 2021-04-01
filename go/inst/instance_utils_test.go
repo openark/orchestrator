@@ -20,11 +20,17 @@ func TestRegexpMatchPatterns(t *testing.T) {
 		{"hostname", []string{"ho.tname"}, true},
 		{"hostname", []string{"ho.tname2"}, false},
 		{"hostname", []string{"ho.*me"}, true},
+		{"10.0.0.3", []string{"10.0.0.3"}, true},
+		{"10.0.0.3", []string{"10.0.0.3:3306"}, true},
+		{"10.0.0.3", []string{"10.0.0.38"}, false},
 	}
 
 	for _, p := range patterns {
-		if match := RegexpMatchPatterns(p.s, p.patterns); match != p.expected {
-			t.Errorf("RegexpMatchPatterns failed with: %q, %+v, got: %+v, expected: %+v", p.s, p.patterns, match, p.expected)
-		}
+		t.Run(p.s, func(t *testing.T) {
+			k := &InstanceKey{Hostname: p.s, Port: 3306}
+			if match := FiltersMatchInstanceKey(k, p.patterns); match != p.expected {
+				t.Errorf("FiltersMatchInstanceKey failed with: %q, %+v, got: %+v, expected: %+v", p.s, p.patterns, match, p.expected)
+			}
+		})
 	}
 }

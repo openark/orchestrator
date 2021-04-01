@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -249,11 +250,24 @@ func IsSmallerBinlogFormat(binlogFormat string, otherBinlogFormat string) bool {
 	return false
 }
 
-// RegexpMatchPatterns returns true if s matches any of the provided regexpPatterns
-func RegexpMatchPatterns(s string, regexpPatterns []string) bool {
-	for _, filter := range regexpPatterns {
-		if matched, err := regexp.MatchString(filter, s); err == nil && matched {
-			return true
+// FiltersMatchInstanceKey returns true if given instance key matches any one of given filters.
+// A filter could be:
+// - An IP address, in which case we compare exact value
+// - Any other string, in which case we compare via regular expression
+func FiltersMatchInstanceKey(instanceKey *InstanceKey, filters []string) bool {
+	for _, filter := range filters {
+		switch {
+		case net.ParseIP(filter) != nil:
+			// If the filter is an IP address, expect complete match.
+			// This is to avoid matching 10.0.0.3 with 10.0.0.38 if we
+			// were to compare via regexp
+			if filter == instanceKey.Hostname {
+				return true
+			}
+		default:
+			if matched, _ := regexp.MatchString(filter, instanceKey.StringCode()); matched {
+				return true
+			}
 		}
 	}
 	return false
