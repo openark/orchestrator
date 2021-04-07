@@ -82,11 +82,12 @@ This functionality is required in case one has more Consul datacenters than just
 #### Consul Transaction support
 
 Atomic [Consul Transaction](https://www.consul.io/api-docs/txn) support is enabled by configuring:
-
 ```json
   "ConsulKVStoreProvider": "consul-txn",
 ```
 
 _Note: this feature requires Consul version 0.7 or greater._
 
-This will cause Orchestrator to use a [Consul Transaction](https://www.consul.io/api-docs/txn) when distributing one or more Consul KVs. The use of transactions reduces the number of requests to the Consul server while ensuring updates of several KVs are atomic.
+This causes Orchestrator to use a [Consul Transaction](https://www.consul.io/api-docs/txn) when distributing one or more Consul KVs. KVs are read from the server in one transaction and any necessary updates are performed in a second transaction.
+
+Orchestrator groups KV updates by key-prefix into groups of of 5 to 64 operations _(default 5)_. This grouping ensures updates to a single cluster _(5 x KVs)_ happen atomically. Increasing the `ConsulMaxKVsPerTransaction` configuration setting from `5` _(default)_ to a max of `64` _(Consul Transaction API limit)_ allows more operations to be grouped into fewer transactions but more can fail at once.
