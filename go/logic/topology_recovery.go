@@ -35,7 +35,7 @@ import (
 	ometrics "github.com/openark/orchestrator/go/metrics"
 	"github.com/openark/orchestrator/go/os"
 	"github.com/openark/orchestrator/go/process"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 	"github.com/openark/orchestrator/go/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -1456,11 +1456,20 @@ func checkAndRecoverNonWriteableMaster(analysisEntry inst.ReplicationAnalysis, c
 	if !config.Config.RecoverNonWriteableMaster {
 		return false, nil, nil
 	}
+
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another checkAndRecoverNonWriteableMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
+
+	inst.AuditOperation("recover-non-writeable-master", &analysisEntry.AnalyzedInstanceKey, "problem found; will recover")
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
+			return false, topologyRecovery, topologyRecovery.AddError(err)
+		}
+	}
+
 	instance, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, false)
 	if err == nil {
 		resolveRecovery(topologyRecovery, instance)
