@@ -35,7 +35,7 @@ import (
 	ometrics "github.com/openark/orchestrator/go/metrics"
 	"github.com/openark/orchestrator/go/os"
 	"github.com/openark/orchestrator/go/process"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 	"github.com/openark/orchestrator/go/util"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -1450,7 +1450,34 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	return true, topologyRecovery, err
 }
 
-// checkAndRecoverGenericProblem is a general-purpose recovery function
+// checkAndRecoverNonWriteableMaster attempts to recover from a read only master by turning it writeable.
+// This behavior is feature protected, see config.Config.RecoverNonWriteableMaster
+func checkAndRecoverNonWriteableMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	if !config.Config.RecoverNonWriteableMaster {
+		return false, nil, nil
+	}
+
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another checkAndRecoverNonWriteableMaster.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	inst.AuditOperation("recover-non-writeable-master", &analysisEntry.AnalyzedInstanceKey, "problem found; will recover")
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
+			return false, topologyRecovery, topologyRecovery.AddError(err)
+		}
+	}
+
+	instance, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, false)
+	if err == nil {
+		resolveRecovery(topologyRecovery, instance)
+	}
+	return true, topologyRecovery, err
+}
+
+// checkAndRecoverLockedSemiSyncMaster
 func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
@@ -1664,6 +1691,9 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 	// replication group members
 	case inst.DeadReplicationGroupMemberWithReplicas:
 		return checkAndRecoverDeadGroupMemberWithReplicas, true
+	// recoverable structure analysis
+	case inst.NoWriteableMasterStructureWarning:
+		return checkAndRecoverNonWriteableMaster, true
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.

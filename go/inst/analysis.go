@@ -25,7 +25,6 @@ import (
 )
 
 type AnalysisCode string
-type StructureAnalysisCode string
 
 const (
 	NoProblem                                               AnalysisCode = "NoProblem"
@@ -62,16 +61,16 @@ const (
 )
 
 const (
-	StatementAndMixedLoggingReplicasStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingReplicasStructureWarning"
-	StatementAndRowLoggingReplicasStructureWarning                             = "StatementAndRowLoggingReplicasStructureWarning"
-	MixedAndRowLoggingReplicasStructureWarning                                 = "MixedAndRowLoggingReplicasStructureWarning"
-	MultipleMajorVersionsLoggingReplicasStructureWarning                       = "MultipleMajorVersionsLoggingReplicasStructureWarning"
-	NoLoggingReplicasStructureWarning                                          = "NoLoggingReplicasStructureWarning"
-	DifferentGTIDModesStructureWarning                                         = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                                 = "ErrantGTIDStructureWarning"
-	NoFailoverSupportStructureWarning                                          = "NoFailoverSupportStructureWarning"
-	NoWriteableMasterStructureWarning                                          = "NoWriteableMasterStructureWarning"
-	NotEnoughValidSemiSyncReplicasStructureWarning                             = "NotEnoughValidSemiSyncReplicasStructureWarning"
+	StatementAndMixedLoggingReplicasStructureWarning     AnalysisCode = "StatementAndMixedLoggingReplicasStructureWarning"
+	StatementAndRowLoggingReplicasStructureWarning                    = "StatementAndRowLoggingReplicasStructureWarning"
+	MixedAndRowLoggingReplicasStructureWarning                        = "MixedAndRowLoggingReplicasStructureWarning"
+	MultipleMajorVersionsLoggingReplicasStructureWarning              = "MultipleMajorVersionsLoggingReplicasStructureWarning"
+	NoLoggingReplicasStructureWarning                                 = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                        = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                 = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                 = "NoWriteableMasterStructureWarning"
+	NotEnoughValidSemiSyncReplicasStructureWarning                    = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -140,7 +139,7 @@ type ReplicationAnalysis struct {
 	IsFailingToConnectToMaster                bool
 	Analysis                                  AnalysisCode
 	Description                               string
-	StructureAnalysis                         []StructureAnalysisCode
+	StructureAnalysis                         []AnalysisCode
 	IsDowntimed                               bool
 	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterReplicasNotReplicating)
 	DowntimeEndTimestamp                      string

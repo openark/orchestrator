@@ -43,6 +43,7 @@
   "ReduceReplicationAnalysisCount": false,
   "FailureDetectionPeriodBlockMinutes": 5,
   "FailMasterPromotionOnLagMinutes": 1,
+  "RecoverNonWriteableMaster": true,
   "RecoveryPeriodBlockSeconds": 5,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
