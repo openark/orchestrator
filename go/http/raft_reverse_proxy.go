@@ -44,5 +44,10 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		r.SetBasicAuth(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
+	proxy.Transport, err = orcraft.GetRaftHttpTransport()
+	if err != nil {
+		log.Errore(err)
+		return
+	}
 	proxy.ServeHTTP(w, r)
 }

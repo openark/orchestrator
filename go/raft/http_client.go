@@ -31,9 +31,16 @@ import (
 	"github.com/openark/golib/log"
 )
 
-var httpClient *http.Client
+var (
+	httpClient    *http.Client
+	httpTransport *http.Transport
+)
 
-func setupHttpClient() error {
+func GetRaftHttpTransport() (*http.Transport, error) {
+	// Checks whether there is a cached httpTransport to return:
+	if httpTransport != nil {
+		return httpTransport, nil
+	}
 	httpTimeout := time.Duration(config.ActiveNodeExpireSeconds) * time.Second
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
@@ -45,7 +52,7 @@ func setupHttpClient() error {
 	if config.Config.UseSSL {
 		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		tlsConfig.RootCAs = caPool
 
@@ -55,16 +62,25 @@ func setupHttpClient() error {
 				sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
 			}
 			if err := ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	httpTransport := &http.Transport{
+	transport := &http.Transport{
 		TLSClientConfig:       tlsConfig,
 		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
+	return transport, nil
+}
+
+func setupHttpClient() error {
+	transport, err := GetRaftHttpTransport()
+	if err != nil {
+		return err
+	}
+	httpTransport = transport
 	httpClient = &http.Client{Transport: httpTransport}
 
 	return nil
