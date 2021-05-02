@@ -231,7 +231,7 @@ Pending recoveries are unblocked either once `RecoveryPeriodBlockSeconds` has pa
 
 Acknowledging a recovery is possible either via web API/interface (see audit/recovery page) or via command line interface (`orchestrator-client -c ack-cluster-recoveries -alias somealias`).
 
-Note that manual recovery (e.g. `orchestrator-client -c recover` or `orchstrator-client -c force-master-failover`) ignores the blocking period.
+Note that manual recovery (e.g. `orchestrator-client -c recover` or `orchestrator-client -c force-master-failover`) ignores the blocking period.
 
 
 ## Adding promotion rules
