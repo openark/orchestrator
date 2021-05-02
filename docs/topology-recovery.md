@@ -223,7 +223,7 @@ Some corresponding command line invocations:
 
 ## Blocking, acknowledgements, anti-flapping
 
-`orchestrator` avoid flapping (cascading failures causing continuous outage and elimination of resources) by introducing a block period, where on any given cluster, `orchesrartor` will not kick in automated recovery on an interval smaller than said period, unless cleared to do so by a human.
+`orchestrator` avoid flapping (cascading failures causing continuous outage and elimination of resources) by introducing a block period, where on any given cluster, `orchestrator` will not kick in automated recovery on an interval smaller than said period, unless cleared to do so by a human.
 
 The block period is indicated by `RecoveryPeriodBlockSeconds`. It only applies to recoveries on _same cluster_. There is nothing to prevent concurrent recoveries running on _different clusters_.
 
