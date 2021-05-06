@@ -382,8 +382,7 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.MySQLOrchestratorReadTimeoutSeconds)*time.Second)
-	defer cancel()
+	ctx := context.Background()
 	res, err := sqlutils.ExecNoPrepare(ctx, db, query, args...)
 	return res, err
 }
