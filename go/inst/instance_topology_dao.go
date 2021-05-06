@@ -63,7 +63,9 @@ func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (
 	if err != nil {
 		return nil, err
 	}
-	return sqlutils.ExecNoPrepare(db, query, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.MySQLTopologyReadTimeoutSeconds)*time.Second)
+	defer cancel()
+	return sqlutils.ExecNoPrepare(ctx, db, query, args...)
 }
 
 // ExecuteOnTopology will execute given function while maintaining concurrency limit

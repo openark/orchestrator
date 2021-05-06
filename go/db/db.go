@@ -17,6 +17,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -365,7 +366,7 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 	if err != nil {
 		return nil, err
 	}
-	res, err := sqlutils.ExecNoPrepare(db, query, args...)
+	res, err := sqlutils.ExecNoPrepare(context.Background(), db, query, args...)
 	return res, err
 }
 
@@ -380,7 +381,9 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := sqlutils.ExecNoPrepare(db, query, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Config.MySQLOrchestratorReadTimeoutSeconds)*time.Second)
+	defer cancel()
+	res, err := sqlutils.ExecNoPrepare(ctx, db, query, args...)
 	return res, err
 }
 

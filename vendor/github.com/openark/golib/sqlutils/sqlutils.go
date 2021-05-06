@@ -17,6 +17,7 @@
 package sqlutils
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -257,6 +258,12 @@ func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 // QueryRowsMap is a convenience function allowing querying a result set while poviding a callback
 // function activated per read row.
 func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error, args ...interface{}) (err error) {
+	return QueryRowsMapContext(context.Background(), db, query, on_row, args...)
+}
+
+// QueryRowsMapContext is a convenience function allowing querying a result set while poviding a callback
+// function activated per read row.
+func QueryRowsMapContext(ctx context.Context, db *sql.DB, query string, on_row func(RowMap) error, args ...interface{}) (err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			err = fmt.Errorf("QueryRowsMap unexpected error: %+v", derr)
@@ -264,7 +271,7 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error, args ...i
 	}()
 
 	var rows *sql.Rows
-	rows, err = db.Query(query, args...)
+	rows, err = db.QueryContext(ctx, query, args...)
 	if rows != nil {
 		defer rows.Close()
 	}
@@ -332,14 +339,14 @@ func QueryRowsMapBuffered(db *sql.DB, query string, on_row func(RowMap) error, a
 }
 
 // ExecNoPrepare executes given query using given args on given DB, without using prepared statements.
-func ExecNoPrepare(db *sql.DB, query string, args ...interface{}) (res sql.Result, err error) {
+func ExecNoPrepare(ctx context.Context, db *sql.DB, query string, args ...interface{}) (res sql.Result, err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			err = errors.New(fmt.Sprintf("ExecNoPrepare unexpected error: %+v", derr))
 		}
 	}()
 
-	res, err = db.Exec(query, args...)
+	res, err = db.ExecContext(ctx, query, args...)
 	if err != nil {
 		log.Errore(err)
 	}
