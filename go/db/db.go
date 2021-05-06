@@ -257,7 +257,7 @@ func versionIsDeployed(db *sql.DB) (result bool, err error) {
 }
 
 // registerOrchestratorDeployment updates the orchestrator_metadata table upon successful deployment
-func registerOrchestratorDeployment(db *sql.DB) error {
+func registerOrchestratorDeployment(ctx context.Context, db *sql.DB) error {
 	query := `
     	replace into orchestrator_db_deployments (
 				deployed_version, deployed_timestamp
@@ -265,7 +265,7 @@ func registerOrchestratorDeployment(db *sql.DB) error {
 				?, NOW()
 			)
 				`
-	if _, err := execInternal(db, query, config.RuntimeCLIFlags.ConfiguredVersion); err != nil {
+	if _, err := execInternal(ctx, db, query, config.RuntimeCLIFlags.ConfiguredVersion); err != nil {
 		log.Fatalf("Unable to write to orchestrator_metadata: %+v", err)
 	}
 	log.Debugf("Migrated database schema to version [%+v]", config.RuntimeCLIFlags.ConfiguredVersion)
@@ -274,7 +274,7 @@ func registerOrchestratorDeployment(db *sql.DB) error {
 
 // deployStatements will issue given sql queries that are not already known to be deployed.
 // This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
-func deployStatements(db *sql.DB, queries []string) error {
+func deployStatements(ctx context.Context, db *sql.DB, queries []string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatale(err)
@@ -336,6 +336,7 @@ func deployStatements(db *sql.DB, queries []string) error {
 // initOrchestratorDB attempts to create/upgrade the orchestrator backend database. It is created once in the
 // application's lifetime.
 func initOrchestratorDB(db *sql.DB) error {
+	ctx := context.Background()
 	log.Debug("Initializing orchestrator")
 
 	versionAlreadyDeployed, err := versionIsDeployed(db)
@@ -347,9 +348,9 @@ func initOrchestratorDB(db *sql.DB) error {
 		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
 	}
 	log.Debugf("Migrating database schema")
-	deployStatements(db, generateSQLBase)
-	deployStatements(db, generateSQLPatches)
-	registerOrchestratorDeployment(db)
+	deployStatements(ctx, db, generateSQLBase)
+	deployStatements(ctx, db, generateSQLPatches)
+	registerOrchestratorDeployment(ctx, db)
 
 	if IsSQLite() {
 		ExecOrchestrator(`PRAGMA journal_mode = WAL`)
@@ -360,13 +361,13 @@ func initOrchestratorDB(db *sql.DB) error {
 }
 
 // execInternal
-func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+func execInternal(ctx context.Context, db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	var err error
 	query, err = translateStatement(query)
 	if err != nil {
 		return nil, err
 	}
-	res, err := sqlutils.ExecNoPrepare(context.Background(), db, query, args...)
+	res, err := sqlutils.ExecNoPrepare(ctx, db, query, args...)
 	return res, err
 }
 
