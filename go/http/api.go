@@ -208,7 +208,7 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 // AsyncDiscover issues an asynchronous read on an instance. This is
 // useful for bulk loads of a new set of instances and will not block
 // if the instance is slow to respond or not reachable.
-// It will also not block the raft queue in the event ocmmunication to discover instance hangs.
+// It will also not block the raft queue in the event communication to discover instance hangs.
 func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
