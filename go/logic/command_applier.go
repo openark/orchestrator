@@ -21,7 +21,7 @@ import (
 
 	"github.com/openark/orchestrator/go/inst"
 	"github.com/openark/orchestrator/go/kv"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )
@@ -45,6 +45,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.registerNode(value)
 	case "discover":
 		return applier.discover(value)
+	case "async-discover":
+		return applier.asyncDiscover(value)
 	case "injected-pseudo-gtid":
 		return applier.injectedPseudoGTID(value)
 	case "forget":
@@ -106,6 +108,14 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	DiscoverInstance(instanceKey)
+	return nil
+}
+
+// asyncDiscover discover-s in a goroutine so that the discovery cannot block the raft path
+// (e.g. a situation where communication with discovered instannce hangs could block the entire
+// raft queue; this function is therefore safer)
+func (applier *CommandApplier) asyncDiscover(value []byte) interface{} {
+	go applier.discover(value)
 	return nil
 }
 
