@@ -350,6 +350,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	if err != nil {
 		goto Cleanup
 	}
+	if db.Stats().InUse >= config.MySQLTopologyMaxPoolConnections {
+		err = fmt.Errorf("Database connections exhausted for %v", *instanceKey)
+		goto Cleanup
+	}
 
 	instance.Key = *instanceKey
 
