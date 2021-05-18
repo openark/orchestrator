@@ -59,12 +59,12 @@ func All(options ...Options) martini.Handler {
 
 func prepareOptions(options []Options) Options {
 	var opt Options
-	if len(options) > 0 {
-		opt = options[0]
-	}
-	if !isCompressionLevelValid(opt.CompressionLevel) {
-		opt.CompressionLevel = DefaultCompression
-	}
+        if len(options) > 0 {
+                opt = options[0]
+        }
+        if !isCompressionLevelValid(opt.CompressionLevel) {
+                opt.CompressionLevel = DefaultCompression
+        }
 	return opt
 }
 

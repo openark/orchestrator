@@ -342,7 +342,6 @@ func (n *NetworkTransport) InstallSnapshot(target string, args *InstallSnapshotR
 
 	// Decode the response, do not return conn
 	_, err = decodeResponse(conn, resp)
-
 	return err
 }
 
