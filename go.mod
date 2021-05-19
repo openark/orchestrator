@@ -29,7 +29,7 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.0 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/montanaflynn/stats v0.0.0-20161102194025-f8cd06f93c6c
-	github.com/openark/golib v0.0.0-20170126110453-19b96a3b3e8a
+	github.com/openark/golib v0.0.0-20210520103621-827f3ea62180
 	github.com/outbrain/golib v0.0.0-20200503083229-2531e5dbcc71 // indirect
 	github.com/outbrain/zookeepercli v1.0.12
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
@@ -45,7 +45,4 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
 
-replace (
-	github.com/hashicorp/raft => ./migrate/github.com/hashicorp/raft
-	github.com/openark/golib => ./migrate/github.com/openark/golib
-)
+replace github.com/hashicorp/raft => github.com/openark/raft v0.0.0-20170918052300-fba9f909f7fe
