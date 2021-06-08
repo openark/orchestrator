@@ -249,8 +249,17 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 	return ReadTopologyInstance(instanceKey)
 }
 
+func StartSQLThreadQuick(instanceKey *InstanceKey) error {
+	cmd := `start slave sql_thread`
+	if _, err := ExecInstance(instanceKey, cmd); err != nil {
+		return log.Errorf("%+v: StartSQLThreadQuickly: '%q' failed: %+v", *instanceKey, cmd, err)
+	}
+	log.Infof("%s on %+v as part of StartSQLThreadQuickly", cmd, *instanceKey)
+	return nil
+}
+
 func RestartReplicationQuick(instanceKey *InstanceKey) error {
-	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
+	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`, `start slave sql_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
 			return log.Errorf("%+v: RestartReplicationQuick: '%q' failed: %+v", *instanceKey, cmd, err)
 		} else {
