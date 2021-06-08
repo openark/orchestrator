@@ -1578,10 +1578,14 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 			// with losing relay logs, then we've lost data.
 			// So, unfortunately we avoid this step in MariaDB GTID.
 			// See https://github.com/openark/orchestrator/issues/1260
+
+			// We will only start SQL thread
+			inst.StartSQLThreadQuick(instanceKey)
 			return
 		}
 
 		inst.RestartReplicationQuick(instanceKey)
+		inst.StartSQLThreadQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
 	})
 }
