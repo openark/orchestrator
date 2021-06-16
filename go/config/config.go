@@ -140,6 +140,7 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	UseSuperReadOnly                           bool     // Should orchestrator super_read_only any time it sets read_only
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	ReasonableInstanceCheckSeconds             uint     // Number of seconds an instance read is allowed to take before it is considered invalid, i.e. before LastCheckValid will be false
 	InstanceWriteBufferSize                    int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
 	BufferInstanceWrites                       bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
 	InstanceFlushIntervalMilliseconds          int      // Max interval between instance write buffer flushes
@@ -320,6 +321,7 @@ func newConfiguration() *Configuration {
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
+		ReasonableInstanceCheckSeconds:             1,
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
 		InstanceFlushIntervalMilliseconds:          100,
