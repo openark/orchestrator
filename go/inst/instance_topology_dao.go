@@ -457,8 +457,8 @@ func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
 	if instance.SemiSyncEnforced {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
+		// Send ACK only from promotable instances (unless explicitly allowed)
+		sendACK := config.Config.AllowSemiSyncForUnpromotableHosts || instance.PromotionRule != MustNotPromoteRule
 		// Always disable master setting, in case we're converting a former master.
 		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
 			return instance, log.Errore(err)
@@ -1091,8 +1091,8 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	// If async fallback is disallowed, we're responsible for flipping the master
 	// semi-sync switch ON before accepting writes. The setting is off by default.
 	if instance.SemiSyncEnforced && !readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
+		// Send ACK only from promotable instances (unless explicitly allowed)
+		sendACK := config.Config.AllowSemiSyncForUnpromotableHosts || instance.PromotionRule != MustNotPromoteRule
 		if err := EnableSemiSync(instanceKey, true, sendACK); err != nil {
 			return instance, log.Errore(err)
 		}
@@ -1115,8 +1115,8 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
 	if instance.SemiSyncEnforced && readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
+		// Send ACK only from promotable instances (unless explicitly allowed)
+		sendACK := config.Config.AllowSemiSyncForUnpromotableHosts || instance.PromotionRule != MustNotPromoteRule
 		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
 			return instance, log.Errore(err)
 		}

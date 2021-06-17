@@ -192,6 +192,7 @@ type Configuration struct {
 	DetectRegionQuery                          string            // Optional query (executed on topology instance) that returns the region of an instance. If provided, must return one row, one column. Overrides RegionPattern and useful for installments where Region cannot be inferred by hostname
 	DetectPhysicalEnvironmentQuery             string            // Optional query (executed on topology instance) that returns the physical environment of an instance. If provided, must return one row, one column. Overrides PhysicalEnvironmentPattern and useful for installments where env cannot be inferred by hostname
 	DetectSemiSyncEnforcedQuery                string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
+	AllowSemiSyncForUnpromotableHosts          bool              // If true, enable semi-sync even if a replica's promotion rule is "must_not" (assuming that DetectSemiSyncEnforcedQuery returns 1 for the host)
 	SupportFuzzyPoolHostnames                  bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
 	InstancePoolExpiryMinutes                  uint              // Time after which entries in database_instance_pool are expired (resubmit via `submit-pool-instances`)
 	PromotionIgnoreHostnameFilters             []string          // Orchestrator will not promote replicas with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
@@ -370,6 +371,7 @@ func newConfiguration() *Configuration {
 		DetectDataCenterQuery:                      "",
 		DetectPhysicalEnvironmentQuery:             "",
 		DetectSemiSyncEnforcedQuery:                "",
+		AllowSemiSyncForUnpromotableHosts:          false,
 		SupportFuzzyPoolHostnames:                  true,
 		InstancePoolExpiryMinutes:                  60,
 		PromotionIgnoreHostnameFilters:             []string{},
