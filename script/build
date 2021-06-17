@@ -23,6 +23,7 @@ scriptdir="$PWD"/script
 version=$(git rev-parse HEAD)
 describe=$(git describe --tags --always --dirty)
 
+export GO111MODULE=auto
 export GOPATH="$PWD/.gopath"
 cd .gopath/src/github.com/openark/orchestrator
 
