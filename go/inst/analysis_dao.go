@@ -531,6 +531,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 					a.Description = "Semi sync master seems to be locked, more samplings needed to validate"
 				}
 				//
+			} else if config.Config.EnforceSemiSyncReplicaCount && a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients > a.SemiSyncMasterWaitForReplicaCount {
+				a.Analysis = MasterWithTooManySemiSyncReplicas
+				a.Description = "Semi sync master has more semi sync replicas than configured"
+				//
 			} else if a.IsMaster && a.LastCheckValid && a.IsReadOnly && a.CountValidReplicatingReplicas > 0 && config.Config.RecoverNonWriteableMaster {
 				a.Analysis = NoWriteableMasterStructureWarning
 				a.Description = "Master with replicas is read_only"

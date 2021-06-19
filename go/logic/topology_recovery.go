@@ -1479,14 +1479,124 @@ func checkAndRecoverNonWriteableMaster(analysisEntry inst.ReplicationAnalysis, c
 
 // checkAndRecoverLockedSemiSyncMaster
 func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
-
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
 
-	return false, nil, nil
+	if !config.Config.EnforceSemiSyncReplicaCount {
+		return false, nil, nil
+	}
+
+	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
+	if err != nil {
+		return false, topologyRecovery, err
+	}
+	if len(replicas) == 0 {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v.", analysisEntry.AnalyzedInstanceKey))
+		return false, topologyRecovery, nil
+	}
+
+	reversePriorityReplicas := replicas // TODO sort replicas by priority
+	enableCount := int(analysisEntry.SemiSyncMasterWaitForReplicaCount) - int(analysisEntry.CountSemiSyncReplicasEnabled)
+	if enableCount <= 0 || enableCount > len(replicas) {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("invalid state for recovery %+v. Wait count is lower or equal to semi sync replica count or replica count too low.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	// No way back. We're doing this.
+
+	// TODO before actually doing it, do sanity check (downtimed, etc.)
+
+	enabled := 0
+	for _, replica := range reversePriorityReplicas {
+		if replica.IsDowntimed || replica.SemiSyncReplicaEnabled {
+			continue
+		}
+		err := inst.EnableSemiSync(&replica.Key, false, true)
+		if err != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot enable semi sync on replica %+v.", replica.Key))
+			return true, topologyRecovery, nil
+		}
+		err = inst.RestartReplicationQuick(&replica.Key)
+		if err != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot restart replication on replica %+v.", replica.Key))
+			return true, topologyRecovery, nil
+		}
+		enabled++
+		if enabled == enableCount {
+			break
+		}
+	}
+
+	resolveRecovery(topologyRecovery, nil)
+	return true, topologyRecovery, nil
+}
+
+// checkAndRecoverMasterWithTooManySemiSyncReplicas
+func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverMasterWithTooManySemiSyncReplicas.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	// FIXME is this the right spot for this check? We shouldn't even get here right?
+	if !config.Config.EnforceSemiSyncReplicaCount {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi sync replica count enforcement not enabled. Bailng out on recovery of %+v.", analysisEntry.AnalyzedInstanceKey))
+		return false, topologyRecovery, err
+	}
+
+	instance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
+	if !found || err != nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
+		return false, topologyRecovery, err
+	}
+
+	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
+	if err != nil {
+		return false, topologyRecovery, err
+	}
+	if len(replicas) == 0 {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v.", analysisEntry.AnalyzedInstanceKey))
+		return false, topologyRecovery, nil
+	}
+
+	reversePriorityReplicas := replicas // TODO reverse-sort replicas by priority
+	disableCount := int(analysisEntry.CountSemiSyncReplicasEnabled) - int(analysisEntry.SemiSyncMasterWaitForReplicaCount)
+	if disableCount <= 0 || disableCount > len(replicas) {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("invalid state for recovery %+v. Wait count is greater or equal to semi sync replica count or replica count too low.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+
+	// No way back. We're doing this.
+
+	// TODO do preflight checks
+
+	disabled := 0
+	for _, replica := range reversePriorityReplicas {
+		if !replica.SemiSyncReplicaEnabled {
+			continue
+		}
+		err := inst.EnableSemiSync(&replica.Key, false, false)
+		if err != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot disable semi sync on replica %+v.", replica.Key))
+			return true, topologyRecovery, nil
+		}
+		err = inst.RestartReplicationQuick(&replica.Key)
+		if err != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot restart replication on replica %+v.", replica.Key))
+			return true, topologyRecovery, nil
+		}
+		disabled++
+		if disabled == disableCount {
+			break
+		}
+	}
+
+	resolveRecovery(topologyRecovery, instance)
+	return true, topologyRecovery, nil
 }
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
@@ -1659,6 +1769,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		} else {
 			return checkAndRecoverLockedSemiSyncMaster, true
 		}
+	case inst.MasterWithTooManySemiSyncReplicas:
+		return checkAndRecoverMasterWithTooManySemiSyncReplicas, true
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
