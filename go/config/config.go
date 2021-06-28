@@ -136,7 +136,7 @@ type Configuration struct {
 	DefaultInstancePort                        int      // In case port was not specified on command line
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table). Must return a single row with a single numeric column, which is the lag.
-	ReplicationCredentialsQuery                string   // custom query to get replication credentials. Must return a single row, with two text columns: 1st is username, 2nd is password. This is optional, and can be used by orchestrator to configure replication after master takeover or setup of co-masters. You need to ensure the orchestrator user has the privileges to run this query
+	ReplicationCredentialsQuery                string   // custom query to get replication credentials. Must return a single row, with five text columns: 1st is username, 2nd is password, 3rd is SSLCaCert, 4th is SSLCert, 5th is SSLKey. This is optional, and can be used by orchestrator to configure replication after master takeover or setup of co-masters. You need to ensure the orchestrator user has the privileges to run this query
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	UseSuperReadOnly                           bool     // Should orchestrator super_read_only any time it sets read_only
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
