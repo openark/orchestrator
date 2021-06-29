@@ -1490,7 +1490,7 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 		return false, nil, nil
 	}
 	if config.Config.EnforceSemiSyncReplicas == config.EnforceExactSemiSyncReplicas {
-		return recoverExactSemiSyncReplicas(analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
+		return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 	}
 
 	panic("not supported")
@@ -1498,52 +1498,9 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 	// Proceed with "enough"-style recovery:
 	// in priority order, enable semi-sync on replicas until there are enough to match the wait count
 
-	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
-	if err != nil {
-		return false, topologyRecovery, err
-	}
-	if len(replicas) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v.", analysisEntry.AnalyzedInstanceKey))
-		return false, topologyRecovery, nil
-	}
+	// TODO Jun 29 12:05:14 pheckel-devm-orch-1 orchestrator[564933]: 2021-06-29 12:05:14 INFO checkAndExecuteFailureDetectionProcesses: could not register LockedSemiSyncMaster detection on pheckel-devm-db-g0-1:3306
+	// TODO IMPLEMENT THIS
 
-	if config.Config.EnforceSemiSyncReplicas == config.EnforceEnoughSemiSyncReplicas {
-
-	}
-
-	reversePriorityReplicas := replicas // TODO sort replicas by priority
-	enableCount := int(analysisEntry.SemiSyncMasterWaitForReplicaCount) - int(analysisEntry.CountSemiSyncReplicasEnabled)
-	if enableCount <= 0 || enableCount > len(replicas) {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("invalid state for recovery %+v. Wait count is lower or equal to semi sync replica count or replica count too low.", analysisEntry.AnalyzedInstanceKey))
-		return false, nil, err
-	}
-
-	// No way back. We're doing this.
-
-	// TODO before actually doing it, do sanity check (downtimed, etc.)
-
-	enabled := 0
-	for _, replica := range reversePriorityReplicas {
-		if replica.IsDowntimed || replica.SemiSyncReplicaEnabled {
-			continue
-		}
-		err := inst.EnableSemiSync(&replica.Key, false, true)
-		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot enable semi sync on replica %+v.", replica.Key))
-			return true, topologyRecovery, nil
-		}
-		err = inst.RestartReplicationQuick(&replica.Key)
-		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot restart replication on replica %+v.", replica.Key))
-			return true, topologyRecovery, nil
-		}
-		enabled++
-		if enabled == enableCount {
-			break
-		}
-	}
-
-	resolveRecovery(topologyRecovery, nil)
 	return true, topologyRecovery, nil
 }
 
@@ -1560,10 +1517,10 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 		return false, topologyRecovery, err
 	}
 
-	return recoverExactSemiSyncReplicas(analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
+	return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 }
 
-func recoverExactSemiSyncReplicas(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
 	instance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
 	if !found || err != nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
@@ -1581,63 +1538,57 @@ func recoverExactSemiSyncReplicas(analysisEntry inst.ReplicationAnalysis, candid
 	}
 
 	// Filter out downtimed and down replicas
-	validSemiSyncReplicas := make([]*inst.Instance, 0)
+	desiredSemiSyncReplicaCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
+	possibleSemiSyncReplicas := make([]*inst.Instance, 0)
 	for _, replica := range replicas {
 		if replica.IsDowntimed || replica.SemiSyncEnforced == 0 { // TODO do i need to check last seen?
 			continue
 		}
-		validSemiSyncReplicas = append(validSemiSyncReplicas, replica)
+		possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
+	}
+	if uint(len(possibleSemiSyncReplicas)) < desiredSemiSyncReplicaCount {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
+		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
 	}
 
-	// Sort replicas by priority & promotion rule
-	sort.SliceStable(validSemiSyncReplicas, func(i, j int) bool {
-		if validSemiSyncReplicas[i].SemiSyncEnforced != validSemiSyncReplicas[j].SemiSyncEnforced {
-			return validSemiSyncReplicas[i].SemiSyncEnforced < validSemiSyncReplicas[j].SemiSyncEnforced
+	// Sort replicas by priority, promotion rule and name
+	sort.SliceStable(possibleSemiSyncReplicas, func(i, j int) bool {
+		if possibleSemiSyncReplicas[i].SemiSyncEnforced != possibleSemiSyncReplicas[j].SemiSyncEnforced {
+			return possibleSemiSyncReplicas[i].SemiSyncEnforced < possibleSemiSyncReplicas[j].SemiSyncEnforced
 		}
-		if validSemiSyncReplicas[i].PromotionRule != validSemiSyncReplicas[j].PromotionRule {
-			return validSemiSyncReplicas[i].PromotionRule.BetterThan(validSemiSyncReplicas[j].PromotionRule)
+		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
+			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
 		}
-		return strings.Compare(validSemiSyncReplicas[i].Key.String(), validSemiSyncReplicas[j].Key.String()) < 0
+		return strings.Compare(possibleSemiSyncReplicas[i].Key.String(), possibleSemiSyncReplicas[j].Key.String()) < 0
 	})
 
-	//desiredCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
-
-
-	for _, replica := range validSemiSyncReplicas {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replica: %s %d %+v %#v\n", replica.Key, replica.SemiSyncEnforced, replica.PromotionRule, replica))
-	}
-	return false, nil, nil
-
-	reversePriorityReplicas := replicas // TODO reverse-sort replicas by priority
-	disableCount := int(analysisEntry.CountSemiSyncReplicasEnabled) - int(analysisEntry.SemiSyncMasterWaitForReplicaCount)
-	if disableCount <= 0 || disableCount > len(replicas) {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("invalid state for recovery %+v. Wait count is greater or equal to semi sync replica count or replica count too low.", analysisEntry.AnalyzedInstanceKey))
-		return false, nil, err
+	// Figure out which replicas need to be acted upon
+	actions := make(map[*inst.Instance]bool, 0)
+	for i, replica := range possibleSemiSyncReplicas {
+		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
+		shouldSemiSyncBeEnabled := uint(i) < desiredSemiSyncReplicaCount
+		if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
+			actions[replica] = true
+		} else if !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+			actions[replica] = false
+		}
 	}
 
-	// No way back. We're doing this.
-
-	// TODO do preflight checks
-
-	disabled := 0
-	for _, replica := range reversePriorityReplicas {
-		if !replica.SemiSyncReplicaEnabled {
-			continue
-		}
-		_, err := inst.SetSemiSyncReplica(&replica.Key, false)
+	// Take action
+	for replica, enable := range actions {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replica %s: setting rpl_semi_sync_slave_enabled=%t (including potential IO thread restart) to match desired state for recovery of %s on %+v", replica.Key.String(), enable, analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
+		_, err := inst.SetSemiSyncReplica(&replica.Key, enable)
 		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot disable semi sync on replica %+v.", replica.Key))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot change semi sync on replica %+v.", replica.Key))
 			return true, topologyRecovery, nil
 		}
-		err = inst.RestartReplicationQuick(&replica.Key)
-		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot restart replication on replica %+v.", replica.Key))
-			return true, topologyRecovery, nil
-		}
-		disabled++
-		if disabled == disableCount {
-			break
-		}
+	}
+
+	// Re-read source instance to avoid re-triggering the same condition
+	// TODO this does not help; it is still re-triggering the same analysis until the next polling interval. WHY?
+	instance, err = inst.ReadTopologyInstance(&instance.Key)
+	if err != nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("warning: cannot re-read instance after recovery of %s on instance %+v; recovery might be retriggered, but this is harmless.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
 	}
 
 	resolveRecovery(topologyRecovery, instance)
