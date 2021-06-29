@@ -278,7 +278,7 @@ type Configuration struct {
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
 	EnforceExactSemiSyncReplicas               bool              // If true, semi-sync replicas will be enabled/disabled to match the wait count in the desired priority order; this applies to LockedSemiSyncMaster and MasterWithTooManySemiSyncReplicas
-	RecoverLockedSemiSync                      bool              // If true, orchestrator will recover from a LockedSemiSync state by enabling semi-sync on replicas to match the wait count; this behavior can be overridden by EnforceExactSemiSyncReplicas
+	RecoverLockedSemiSyncMaster                bool              // If true, orchestrator will recover from a LockedSemiSync state by enabling semi-sync on replicas to match the wait count; this behavior can be overridden by EnforceExactSemiSyncReplicas
 	ReasonableStaleBinlogCoordinatesSeconds    uint              // Time to evaluate the LockedSemiSyncHypothesis before triggering the LockedSemiSync analysis; falls back to ReasonableReplicationLagSeconds if not set
 }
 
@@ -452,7 +452,7 @@ func newConfiguration() *Configuration {
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
 		EnforceExactSemiSyncReplicas:               false,
-		RecoverLockedSemiSync:                      false,
+		RecoverLockedSemiSyncMaster:                false,
 		ReasonableStaleBinlogCoordinatesSeconds:    0,
 	}
 }

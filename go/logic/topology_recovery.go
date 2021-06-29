@@ -1487,8 +1487,8 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 	if config.Config.EnforceExactSemiSyncReplicas {
 		return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 	}
-	if !config.Config.RecoverLockedSemiSync {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSync or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
+	if !config.Config.RecoverLockedSemiSyncMaster {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
 
