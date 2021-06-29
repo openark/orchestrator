@@ -1209,7 +1209,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DataCenter = m.GetString("data_center")
 	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
-	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
+	instance.SemiSyncEnforced = m.GetUint("semi_sync_enforced")
 	instance.SemiSyncAvailable = m.GetBool("semi_sync_available")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 	instance.SemiSyncMasterTimeout = m.GetUint64("semi_sync_master_timeout")

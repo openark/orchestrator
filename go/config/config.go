@@ -62,6 +62,8 @@ const (
 	SelectTrueQuery                              = "select 1"
 	ConsulKVsPerCluster                          = 5 // KVs: "/", "/hostname", "/ipv4", "/ipv6" and "/port"
 	ConsulMaxTransactionOps                      = 64
+	EnforceExactSemiSyncReplicas                 = "exact"
+	EnforceEnoughSemiSyncReplicas                = "enough"
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -265,17 +267,17 @@ type Configuration struct {
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate seom data from external host
 	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent discovering instances of any kind
-	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
-	ConsulScheme                               string            // Scheme (http or https) for Consul
-	ConsulAclToken                             string            // ACL token used to write to Consul KV
-	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
-	ConsulKVStoreProvider                      string            // Consul KV store provider (consul or consul-txn), default: "consul"
-	ConsulMaxKVsPerTransaction                 int               // Maximum number of KV operations to perform in a single Consul Transaction. Requires the "consul-txn" ConsulKVStoreProvider
-	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
-	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
-	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
-	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
-	EnforceSemiSyncReplicaCount                bool
+	ConsulAddress                     string                     // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ConsulScheme                      string                     // Scheme (http or https) for Consul
+	ConsulAclToken                    string                     // ACL token used to write to Consul KV
+	ConsulCrossDataCenterDistribution bool                       // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
+	ConsulKVStoreProvider             string                     // Consul KV store provider (consul or consul-txn), default: "consul"
+	ConsulMaxKVsPerTransaction        int                        // Maximum number of KV operations to perform in a single Consul Transaction. Requires the "consul-txn" ConsulKVStoreProvider
+	ZkAddress                         string                     // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
+	KVClusterMasterPrefix             string                     // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
+	WebMessage                        string                     // If provided, will be shown on all web pages below the title bar
+	MaxConcurrentReplicaOperations    int                        // Maximum number of concurrent operations on replicas
+	EnforceSemiSyncReplicas           string                     // If empty, semi-sync replicas will not be touched; if "exact", semi-sync replicas will be enabled/disabled to match the wait count; if "enough", semi-sync replicas will be enabled until the wait count is reached
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -437,17 +439,17 @@ func newConfiguration() *Configuration {
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
-		ConsulAddress:                              "",
-		ConsulScheme:                               "http",
-		ConsulAclToken:                             "",
-		ConsulCrossDataCenterDistribution:          false,
-		ConsulKVStoreProvider:                      "consul",
-		ConsulMaxKVsPerTransaction:                 ConsulKVsPerCluster,
-		ZkAddress:                                  "",
-		KVClusterMasterPrefix:                      "mysql/master",
-		WebMessage:                                 "",
-		MaxConcurrentReplicaOperations:             5,
-		EnforceSemiSyncReplicaCount: false,
+		ConsulAddress:                     "",
+		ConsulScheme:                      "http",
+		ConsulAclToken:                    "",
+		ConsulCrossDataCenterDistribution: false,
+		ConsulKVStoreProvider:             "consul",
+		ConsulMaxKVsPerTransaction:        ConsulKVsPerCluster,
+		ZkAddress:                         "",
+		KVClusterMasterPrefix:             "mysql/master",
+		WebMessage:                        "",
+		MaxConcurrentReplicaOperations:    5,
+		EnforceSemiSyncReplicas:           "",
 	}
 }
 
