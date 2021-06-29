@@ -231,3 +231,10 @@ func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType 
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
 	return config.Config.InstancePollSeconds + config.Config.ReasonableInstanceCheckSeconds
 }
+
+func ReasonableStaleBinlogCoordinatesSeconds() uint {
+	if config.Config.ReasonableStaleBinlogCoordinatesSeconds == 0 {
+		return uint(config.Config.ReasonableReplicationLagSeconds)
+	}
+	return config.Config.ReasonableStaleBinlogCoordinatesSeconds
+}

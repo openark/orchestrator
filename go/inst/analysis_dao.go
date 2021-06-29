@@ -55,7 +55,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(config.Config.ReasonableReplicationLagSeconds, ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
+	args := sqlutils.Args(ReasonableStaleBinlogCoordinatesSeconds(), ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
 
 	if config.Config.ReduceReplicationAnalysisCount {
@@ -531,7 +531,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 					a.Description = "Semi sync master seems to be locked, more samplings needed to validate"
 				}
 				//
-			} else if config.Config.EnforceSemiSyncReplicas == config.EnforceExactSemiSyncReplicas && a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients > a.SemiSyncMasterWaitForReplicaCount {
+			} else if config.Config.EnforceExactSemiSyncReplicas && a.IsMaster && a.SemiSyncMasterEnabled && a.SemiSyncMasterStatus && a.SemiSyncMasterWaitForReplicaCount > 0 && a.SemiSyncMasterClients > a.SemiSyncMasterWaitForReplicaCount {
 				a.Analysis = MasterWithTooManySemiSyncReplicas
 				a.Description = "Semi sync master has more semi sync replicas than configured"
 				//

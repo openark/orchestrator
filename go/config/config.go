@@ -265,7 +265,7 @@ type Configuration struct {
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
-	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate seom data from external host
+	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate some data from external host
 	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent discovering instances of any kind
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
 	ConsulScheme                               string            // Scheme (http or https) for Consul
@@ -277,7 +277,9 @@ type Configuration struct {
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
-	EnforceSemiSyncReplicas                    string            // If empty, semi-sync replicas will not be touched; if "exact", semi-sync replicas will be enabled/disabled to match the wait count; if "enough", semi-sync replicas will be enabled until the wait count is reached
+	EnforceExactSemiSyncReplicas               bool              // If true, semi-sync replicas will be enabled/disabled to match the wait count in the desired priority order; this applies to LockedSemiSyncMaster and MasterWithTooManySemiSyncReplicas
+	RecoverLockedSemiSync                      bool              // If true, orchestrator will recover from a LockedSemiSync state by enabling semi-sync on replicas to match the wait count; this behavior can be overridden by EnforceExactSemiSyncReplicas
+	ReasonableStaleBinlogCoordinatesSeconds    uint              // Time to evaluate the LockedSemiSyncHypothesis before triggering the LockedSemiSync analysis; falls back to ReasonableReplicationLagSeconds if not set
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -449,7 +451,9 @@ func newConfiguration() *Configuration {
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
-		EnforceSemiSyncReplicas:                    "",
+		EnforceExactSemiSyncReplicas:               false,
+		RecoverLockedSemiSync:                      false,
+		ReasonableStaleBinlogCoordinatesSeconds:    0,
 	}
 }
 

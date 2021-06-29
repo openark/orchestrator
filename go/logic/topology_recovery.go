@@ -1484,13 +1484,12 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
-
-	if config.Config.EnforceSemiSyncReplicas != config.EnforceExactSemiSyncReplicas && config.Config.EnforceSemiSyncReplicas != config.EnforceEnoughSemiSyncReplicas {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync enforcement is not enabled on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
-		return false, nil, nil
-	}
-	if config.Config.EnforceSemiSyncReplicas == config.EnforceExactSemiSyncReplicas {
+	if config.Config.EnforceExactSemiSyncReplicas {
 		return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
+	}
+	if !config.Config.RecoverLockedSemiSync {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSync or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
 	}
 
 	panic("not supported")
@@ -1511,12 +1510,6 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverMasterWithTooManySemiSyncReplicas.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
-
-	if config.Config.EnforceSemiSyncReplicas != config.EnforceExactSemiSyncReplicas {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi sync replica count enforcement not set to %s. Bailing out on recovery of %+v.", config.EnforceExactSemiSyncReplicas, analysisEntry.AnalyzedInstanceKey))
-		return false, topologyRecovery, err
-	}
-
 	return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 }
 
