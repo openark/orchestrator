@@ -62,8 +62,6 @@ const (
 	SelectTrueQuery                              = "select 1"
 	ConsulKVsPerCluster                          = 5 // KVs: "/", "/hostname", "/ipv4", "/ipv6" and "/port"
 	ConsulMaxTransactionOps                      = 64
-	EnforceExactSemiSyncReplicas                 = "exact"
-	EnforceEnoughSemiSyncReplicas                = "enough"
 )
 
 var deprecatedConfigurationVariables = []string{
