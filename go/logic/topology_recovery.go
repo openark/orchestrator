@@ -1531,34 +1531,11 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 		return false, topologyRecovery, nil
 	}
 
-	// Filter out downtimed and down replicas
-	desiredSemiSyncReplicaCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
-	possibleSemiSyncReplicas := make([]*inst.Instance, 0)
-	asyncReplicas := make([]*inst.Instance, 0)
-	excludedReplicas := make([]*inst.Instance, 0)
-	for _, replica := range replicas {
-		if replica.IsDowntimed || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
-			excludedReplicas = append(excludedReplicas, replica)
-			// TODO make this more resilient: re-read instance if its last check was invalid
-		} else if replica.SemiSyncPriority == 0 {
-			asyncReplicas = append(asyncReplicas, replica)
-		} else {
-			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
-		}
-	}
-
-	// Sort replicas by priority, promotion rule and name
-	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
-		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
-			return possibleSemiSyncReplicas[i].SemiSyncPriority < possibleSemiSyncReplicas[j].SemiSyncPriority
-		}
-		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
-			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
-		}
-		return strings.Compare(possibleSemiSyncReplicas[i].Key.String(), possibleSemiSyncReplicas[j].Key.String()) < 0
-	})
+	// Classify and prioritize replicas
+	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := classifyAndPrioritizeReplicas(replicas)
 
 	// Figure out which replicas need to be acted upon
+	desiredSemiSyncReplicaCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
 	actions := make(map[*inst.Instance]bool, 0)
 	for i, replica := range possibleSemiSyncReplicas {
 		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
@@ -1613,6 +1590,36 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("recovery complete; success = %t", topologyRecovery.IsSuccessful))
 
 	return true, topologyRecovery, nil
+}
+
+func classifyAndPrioritizeReplicas(replicas []*inst.Instance) (possibleSemiSyncReplicas []*inst.Instance, asyncReplicas []*inst.Instance, excludedReplicas[]*inst.Instance) {
+	// Filter out downtimed and down replicas
+	possibleSemiSyncReplicas = make([]*inst.Instance, 0)
+	asyncReplicas = make([]*inst.Instance, 0)
+	excludedReplicas = make([]*inst.Instance, 0)
+	for _, replica := range replicas {
+		if replica.IsDowntimed || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
+			excludedReplicas = append(excludedReplicas, replica)
+			// TODO make this more resilient: re-read instance if its last check was invalid
+		} else if replica.SemiSyncPriority == 0 {
+			asyncReplicas = append(asyncReplicas, replica)
+		} else {
+			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
+		}
+	}
+
+	// Sort replicas by priority, promotion rule and name
+	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
+		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
+			return possibleSemiSyncReplicas[i].SemiSyncPriority < possibleSemiSyncReplicas[j].SemiSyncPriority
+		}
+		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
+			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
+		}
+		return strings.Compare(possibleSemiSyncReplicas[i].Key.String(), possibleSemiSyncReplicas[j].Key.String()) < 0
+	})
+
+	return
 }
 
 func logReplicas(topologyRecovery *TopologyRecovery, description string, replicas []*inst.Instance) {
