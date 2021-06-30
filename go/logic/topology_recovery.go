@@ -1504,7 +1504,7 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 	return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
 }
 
-func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, allowDisable bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
+func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, exactReplicaTopology bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
 	instance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
 	if !found || err != nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
@@ -1527,13 +1527,13 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 
 	// Figure out which replicas need to be acted upon
 	actions := make(map[*inst.Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
-	if allowDisable {
+	if exactReplicaTopology {
 		for i, replica := range possibleSemiSyncReplicas {
 			isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
 			shouldSemiSyncBeEnabled := uint(i) < analysisEntry.SemiSyncMasterWaitForReplicaCount
 			if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
 				actions[replica] = true
-			} else if allowDisable && !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+			} else if exactReplicaTopology && !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
 				actions[replica] = false
 			}
 		}
