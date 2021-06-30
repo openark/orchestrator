@@ -1536,7 +1536,7 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	possibleSemiSyncReplicas := make([]*inst.Instance, 0)
 	excludedReplicas := make([]*inst.Instance, 0)
 	for _, replica := range replicas {
-		if replica.IsDowntimed || replica.SemiSyncEnforced == 0 || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
+		if replica.IsDowntimed || replica.SemiSyncPriority == 0 || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
 			excludedReplicas = append(excludedReplicas, replica)
 			// TODO make this more resilient: re-read instance if its last check was invalid
 			continue
@@ -1546,8 +1546,8 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 
 	// Sort replicas by priority, promotion rule and name
 	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
-		if possibleSemiSyncReplicas[i].SemiSyncEnforced != possibleSemiSyncReplicas[j].SemiSyncEnforced {
-			return possibleSemiSyncReplicas[i].SemiSyncEnforced < possibleSemiSyncReplicas[j].SemiSyncEnforced
+		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
+			return possibleSemiSyncReplicas[i].SemiSyncPriority < possibleSemiSyncReplicas[j].SemiSyncPriority
 		}
 		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
 			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
@@ -1572,7 +1572,7 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	if len(possibleSemiSyncReplicas) > 0 {
 		AuditTopologyRecovery(topologyRecovery, "valid possible semi-sync replicas (in priority order):")
 		for _, replica := range possibleSemiSyncReplicas {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncEnforced, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
 		}
 	} else {
 		AuditTopologyRecovery(topologyRecovery, "valid possible semi-sync replicas: (none)")
@@ -1580,7 +1580,7 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	if len(excludedReplicas) > 0 {
 		AuditTopologyRecovery(topologyRecovery, "excluded replicas:")
 		for _, replica := range excludedReplicas {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncEnforced, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
 		}
 	} else {
 		AuditTopologyRecovery(topologyRecovery, "excluded replicas: (none)")

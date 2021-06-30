@@ -94,7 +94,7 @@ type Instance struct {
 	HasReplicationCredentials         bool
 	ReplicationCredentialsAvailable   bool
 	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
-	SemiSyncEnforced                  uint
+	SemiSyncPriority                  uint
 	SemiSyncMasterEnabled             bool
 	SemiSyncReplicaEnabled            bool
 	SemiSyncMasterTimeout             uint64

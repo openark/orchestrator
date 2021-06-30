@@ -776,7 +776,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
+			err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncPriority)
 			logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
 		}()
 	}
@@ -1209,7 +1209,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DataCenter = m.GetString("data_center")
 	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
-	instance.SemiSyncEnforced = m.GetUint("semi_sync_enforced")
+	instance.SemiSyncPriority = m.GetUint("semi_sync_enforced")
 	instance.SemiSyncAvailable = m.GetBool("semi_sync_available")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 	instance.SemiSyncMasterTimeout = m.GetUint64("semi_sync_master_timeout")
@@ -2610,7 +2610,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ReplicationCredentialsAvailable)
 		args = append(args, instance.HasReplicationCredentials)
 		args = append(args, instance.AllowTLS)
-		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.SemiSyncPriority)
 		args = append(args, instance.SemiSyncAvailable)
 		args = append(args, instance.SemiSyncMasterEnabled)
 		args = append(args, instance.SemiSyncMasterTimeout)

@@ -456,7 +456,7 @@ func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	// some replicas (those that must never be promoted) should never ACK.
 	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
-	if instance.SemiSyncEnforced > 0 {
+	if instance.SemiSyncPriority > 0 {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule
 		// Always disable master setting, in case we're converting a former master.
@@ -550,7 +550,7 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 
 	log.Infof("Will start replication on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
-	if instance.SemiSyncEnforced > 0 {
+	if instance.SemiSyncPriority > 0 {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule
 		// Always disable master setting, in case we're converting a former master.
@@ -1090,7 +1090,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 	// If async fallback is disallowed, we're responsible for flipping the master
 	// semi-sync switch ON before accepting writes. The setting is off by default.
-	if instance.SemiSyncEnforced > 0 && !readOnly {
+	if instance.SemiSyncPriority > 0 && !readOnly {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule
 		if err := EnableSemiSync(instanceKey, true, sendACK); err != nil {
@@ -1114,7 +1114,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
-	if instance.SemiSyncEnforced > 0 && readOnly {
+	if instance.SemiSyncPriority > 0 && readOnly {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule
 		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
