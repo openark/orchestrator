@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2012 Chris Howey
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 package gopass
 
 import (
@@ -5,13 +21,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"golang.org/x/crypto/ssh/terminal"
 )
 
-var defaultGetCh = func() (byte, error) {
+type FdReader interface {
+	io.Reader
+	Fd() uintptr
+}
+
+var defaultGetCh = func(r io.Reader) (byte, error) {
 	buf := make([]byte, 1)
-	if n, err := os.Stdin.Read(buf); n == 0 || err != nil {
+	if n, err := r.Read(buf); n == 0 || err != nil {
 		if err != nil {
 			return 0, err
 		}
@@ -21,16 +40,19 @@ var defaultGetCh = func() (byte, error) {
 }
 
 var (
-	ErrInterrupted = errors.New("Interrupted")
+	maxLength            = 512
+	ErrInterrupted       = errors.New("interrupted")
+	ErrMaxLengthExceeded = fmt.Errorf("maximum byte limit (%v) exceeded", maxLength)
 
 	// Provide variable so that tests can provide a mock implementation.
 	getch = defaultGetCh
 )
 
 // getPasswd returns the input read from terminal.
+// If prompt is not empty, it will be output as a prompt to the user
 // If masked is true, typing will be matched by asterisks on the screen.
 // Otherwise, typing will echo nothing.
-func getPasswd(masked bool) ([]byte, error) {
+func getPasswd(prompt string, masked bool, r FdReader, w io.Writer) ([]byte, error) {
 	var err error
 	var pass, bs, mask []byte
 	if masked {
@@ -38,22 +60,33 @@ func getPasswd(masked bool) ([]byte, error) {
 		mask = []byte("*")
 	}
 
-	if terminal.IsTerminal(int(os.Stdin.Fd())) {
-		if oldState, err := terminal.MakeRaw(int(os.Stdin.Fd())); err != nil {
+	if isTerminal(r.Fd()) {
+		if oldState, err := makeRaw(r.Fd()); err != nil {
 			return pass, err
 		} else {
-			defer terminal.Restore(int(os.Stdin.Fd()), oldState)
+			defer func() {
+				restore(r.Fd(), oldState)
+				fmt.Fprintln(w)
+			}()
 		}
 	}
 
-	for {
-		if v, e := getch(); e != nil {
+	if prompt != "" {
+		fmt.Fprint(w, prompt)
+	}
+
+	// Track total bytes read, not just bytes in the password.  This ensures any
+	// errors that might flood the console with nil or -1 bytes infinitely are
+	// capped.
+	var counter int
+	for counter = 0; counter <= maxLength; counter++ {
+		if v, e := getch(r); e != nil {
 			err = e
 			break
 		} else if v == 127 || v == 8 {
 			if l := len(pass); l > 0 {
 				pass = pass[:l-1]
-				fmt.Print(string(bs))
+				fmt.Fprint(w, string(bs))
 			}
 		} else if v == 13 || v == 10 {
 			break
@@ -62,21 +95,32 @@ func getPasswd(masked bool) ([]byte, error) {
 			break
 		} else if v != 0 {
 			pass = append(pass, v)
-			fmt.Print(string(mask))
+			fmt.Fprint(w, string(mask))
 		}
 	}
-	fmt.Println()
+
+	if counter > maxLength {
+		err = ErrMaxLengthExceeded
+	}
+
 	return pass, err
 }
 
 // GetPasswd returns the password read from the terminal without echoing input.
 // The returned byte array does not include end-of-line characters.
 func GetPasswd() ([]byte, error) {
-	return getPasswd(false)
+	return getPasswd("", false, os.Stdin, os.Stdout)
 }
 
 // GetPasswdMasked returns the password read from the terminal, echoing asterisks.
 // The returned byte array does not include end-of-line characters.
 func GetPasswdMasked() ([]byte, error) {
-	return getPasswd(true)
+	return getPasswd("", true, os.Stdin, os.Stdout)
+}
+
+// GetPasswdPrompt prompts the user and returns the password read from the terminal.
+// If mask is true, then asterisks are echoed.
+// The returned byte array does not include end-of-line characters.
+func GetPasswdPrompt(prompt string, mask bool, r FdReader, w io.Writer) ([]byte, error) {
+	return getPasswd(prompt, mask, r, w)
 }

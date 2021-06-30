@@ -684,7 +684,7 @@ func (r *Raft) runFollower() {
 					didWarn = true
 				}
 			} else {
-				if atomic.LoadInt64(&r.suspendLeadership) > 0 {
+				if atomic.LoadInt64(&r.suspendLeadership) == 1 {
 					r.logger.Printf(`[WARN] raft: Heartbeat timeout from %q reached, but leadership suspended. Will not enter Candidate mode`, lastLeader)
 					return
 				}
@@ -1946,10 +1946,10 @@ func (r *Raft) StepDown() error {
 // Yield instructs the node to not attempt becoming a leader in the
 // following duration.
 func (r *Raft) Yield() error {
-	atomic.AddInt64(&r.suspendLeadership, 1)
+	atomic.StoreInt64(&r.suspendLeadership, 1)
 	yieldDuration := r.conf.HeartbeatTimeout * 5 // time enough for the yielded-to peer to become leader
 	go time.AfterFunc(yieldDuration, func() {
-		atomic.AddInt64(&r.suspendLeadership, -1)
+		atomic.StoreInt64(&r.suspendLeadership, 0)
 	})
 	if r.getState() == Leader {
 		r.StepDown()
