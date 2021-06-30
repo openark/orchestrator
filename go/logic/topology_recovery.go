@@ -227,7 +227,7 @@ func getCountPendingRecoveries() int64 {
 func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
-	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Millisecond*250)
+	emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.MySQLDiscoveryReadTimeoutSeconds)*time.Second, time.Millisecond*500)
 	emergencyRestartReplicaTopologyInstanceMap = cache.New(time.Second*30, time.Second)
 	emergencyOperationGracefulPeriodMap = cache.New(time.Second*5, time.Millisecond*500)
 }

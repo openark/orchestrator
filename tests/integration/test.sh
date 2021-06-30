@@ -18,6 +18,7 @@ exec_command_file=/tmp/orchestrator-test.bash
 test_mysql_defaults_file=/tmp/orchestrator-test-my.cnf
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
+mysql_port=""
 mysql_args="--defaults-extra-file=${test_mysql_defaults_file} --default-character-set=utf8mb4 -s -s"
 
 function run_queries() {
@@ -58,6 +59,8 @@ setup_mysql() {
   echo "mysql config (${test_mysql_defaults_file})"
   cat $test_mysql_defaults_file
   mysql $mysql_args -e "create database if not exists test"
+  mysql_port="$(mysql $mysql_args -e "select @@port")"
+  echo "mysql_port: $mysql_port"
 }
 
 check_db() {
@@ -181,7 +184,7 @@ deploy_internal_db() {
   if [ $? -ne 0 ] ; then
     echo "ERROR deploy internal db failed"
     cat $test_logfile
-    return 1
+    exit 1
   fi
   echo "- deploy_internal_db result: $?"
 }
@@ -190,6 +193,8 @@ generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
+  sed -i -e "s^mysql-orchestrator-port-placeholder^${mysql_port:-3306}^g" ${test_config_file}
+
   touch "$test_mysql_defaults_file" # required even for sqlite because config file references the my.cnf cgf file
   echo "- generate_config_file OK"
 }

@@ -15,7 +15,7 @@
   "BackendDB": "backend-db-placeholder",
   "SQLite3DataFile": "sqlite-data-file-placeholder",
   "MySQLOrchestratorHost": "127.0.0.1",
-  "MySQLOrchestratorPort": 3306,
+  "MySQLOrchestratorPort": mysql-orchestrator-port-placeholder,
   "MySQLOrchestratorDatabase": "test",
   "MySQLOrchestratorCredentialsConfigFile": "/tmp/orchestrator-test-my.cnf",
   "MySQLOrchestratorSSLPrivateKeyFile": "",
