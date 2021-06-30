@@ -1044,13 +1044,36 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 func ReadReplicationCredentials(instanceKey *InstanceKey) (creds *ReplicationCredentials, err error) {
 	creds = &ReplicationCredentials{}
 	if config.Config.ReplicationCredentialsQuery != "" {
-		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery,
-			&creds.User,
-			&creds.Password,
-			&creds.SSLCaCert,
-			&creds.SSLCert,
-			&creds.SSLKey,
-		)
+
+		db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+		if err != nil {
+			return creds, log.Errore(err)
+		}
+		{
+			resultData, err := sqlutils.QueryResultData(db, config.Config.ReplicationCredentialsQuery)
+			if err != nil {
+				return creds, log.Errore(err)
+			}
+			if len(resultData) > 0 {
+				// A row is found
+				row := resultData[0]
+				if len(row) > 0 {
+					creds.User = row[0].String
+				}
+				if len(row) > 1 {
+					creds.Password = row[1].String
+				}
+				if len(row) > 2 {
+					creds.SSLCaCert = row[2].String
+				}
+				if len(row) > 3 {
+					creds.SSLCert = row[3].String
+				}
+				if len(row) > 4 {
+					creds.SSLKey = row[4].String
+				}
+			}
+		}
 		if err == nil && creds.User == "" {
 			err = fmt.Errorf("Empty username retrieved by ReplicationCredentialsQuery")
 		}
