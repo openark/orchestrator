@@ -1534,14 +1534,17 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	// Filter out downtimed and down replicas
 	desiredSemiSyncReplicaCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
 	possibleSemiSyncReplicas := make([]*inst.Instance, 0)
+	asyncReplicas := make([]*inst.Instance, 0)
 	excludedReplicas := make([]*inst.Instance, 0)
 	for _, replica := range replicas {
-		if replica.IsDowntimed || replica.SemiSyncPriority == 0 || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
+		if replica.IsDowntimed || !replica.IsLastCheckValid || !replica.ReplicaRunning() {
 			excludedReplicas = append(excludedReplicas, replica)
 			// TODO make this more resilient: re-read instance if its last check was invalid
-			continue
+		} else if replica.SemiSyncPriority == 0 {
+			asyncReplicas = append(asyncReplicas, replica)
+		} else {
+			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
 		}
-		possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
 	}
 
 	// Sort replicas by priority, promotion rule and name
@@ -1566,25 +1569,17 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 			actions[replica] = false
 		}
 	}
+	for _, replica := range asyncReplicas {
+		if replica.SemiSyncReplicaEnabled {
+			actions[replica] = false
+		}
+	}
 
 	// Summarize what we've determined
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("master semi-sync wait count is %d; we have %d valid possible semi-sync replica(s) and %d excluded replica(s)", desiredSemiSyncReplicaCount, len(possibleSemiSyncReplicas), len(excludedReplicas)))
-	if len(possibleSemiSyncReplicas) > 0 {
-		AuditTopologyRecovery(topologyRecovery, "valid possible semi-sync replicas (in priority order):")
-		for _, replica := range possibleSemiSyncReplicas {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
-		}
-	} else {
-		AuditTopologyRecovery(topologyRecovery, "valid possible semi-sync replicas: (none)")
-	}
-	if len(excludedReplicas) > 0 {
-		AuditTopologyRecovery(topologyRecovery, "excluded replicas:")
-		for _, replica := range excludedReplicas {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
-		}
-	} else {
-		AuditTopologyRecovery(topologyRecovery, "excluded replicas: (none)")
-	}
+	logReplicas(topologyRecovery, "possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
+	logReplicas(topologyRecovery, "always-async replicas", asyncReplicas)
+	logReplicas(topologyRecovery, "excluded replicas (downtimed/defunct)", excludedReplicas)
 
 	// Bail out if we cannot succeed
 	if uint(len(possibleSemiSyncReplicas)) < desiredSemiSyncReplicaCount {
@@ -1618,6 +1613,17 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("recovery complete; success = %t", topologyRecovery.IsSuccessful))
 
 	return true, topologyRecovery, nil
+}
+
+func logReplicas(topologyRecovery *TopologyRecovery, description string, replicas []*inst.Instance) {
+	if len(replicas) > 0 {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("%s:", description))
+		for _, replica := range replicas {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
+		}
+	} else {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("%s: (none)", description))
+	}
 }
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
