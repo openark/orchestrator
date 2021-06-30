@@ -1485,22 +1485,13 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 		return false, nil, err
 	}
 	if config.Config.EnforceExactSemiSyncReplicas {
-		return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry)
+		return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
 	}
 	if !config.Config.RecoverLockedSemiSyncMaster {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
-
-	panic("not supported")
-
-	// Proceed with "enough"-style recovery:
-	// in priority order, enable semi-sync on replicas until there are enough to match the wait count
-
-	// TODO Jun 29 12:05:14 pheckel-devm-orch-1 orchestrator[564933]: 2021-06-29 12:05:14 INFO checkAndExecuteFailureDetectionProcesses: could not register LockedSemiSyncMaster detection on pheckel-devm-db-g0-1:3306
-	// TODO IMPLEMENT THIS
-
-	return true, topologyRecovery, nil
+	return  recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
 }
 
 // checkAndRecoverMasterWithTooManySemiSyncReplicas
@@ -1510,10 +1501,10 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverMasterWithTooManySemiSyncReplicas.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
-	return recoverExactSemiSyncReplicas(topologyRecovery, analysisEntry)
+	return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
 }
 
-func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
+func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, allowDisable bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
 	instance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
 	if !found || err != nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
@@ -1523,11 +1514,11 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	// Read all replicas
 	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
 	if err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("could not read replica instancesfor %+v: %s", analysisEntry.AnalyzedInstanceKey, err.Error()))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("could not read replica instances for %+v: %s", analysisEntry.AnalyzedInstanceKey, err.Error()))
 		return false, topologyRecovery, err
 	}
 	if len(replicas) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v; cannot recover", analysisEntry.AnalyzedInstanceKey))
 		return false, topologyRecovery, nil
 	}
 
@@ -1535,31 +1526,43 @@ func recoverExactSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEn
 	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := classifyAndPrioritizeReplicas(replicas)
 
 	// Figure out which replicas need to be acted upon
-	desiredSemiSyncReplicaCount := analysisEntry.SemiSyncMasterWaitForReplicaCount
-	actions := make(map[*inst.Instance]bool, 0)
-	for i, replica := range possibleSemiSyncReplicas {
-		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
-		shouldSemiSyncBeEnabled := uint(i) < desiredSemiSyncReplicaCount
-		if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
-			actions[replica] = true
-		} else if !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
-			actions[replica] = false
+	actions := make(map[*inst.Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	if allowDisable {
+		for i, replica := range possibleSemiSyncReplicas {
+			isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
+			shouldSemiSyncBeEnabled := uint(i) < analysisEntry.SemiSyncMasterWaitForReplicaCount
+			if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
+				actions[replica] = true
+			} else if allowDisable && !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+				actions[replica] = false
+			}
 		}
-	}
-	for _, replica := range asyncReplicas {
-		if replica.SemiSyncReplicaEnabled {
-			actions[replica] = false
+		for _, replica := range asyncReplicas {
+			if replica.SemiSyncReplicaEnabled {
+				actions[replica] = false
+			}
+		}
+	} else {
+		enabled := uint(0)
+		for _, replica := range possibleSemiSyncReplicas {
+			if !replica.SemiSyncReplicaEnabled {
+				actions[replica] = true
+				enabled++
+			}
+			if enabled == analysisEntry.SemiSyncMasterWaitForReplicaCount - analysisEntry.SemiSyncMasterClients {
+				break
+			}
 		}
 	}
 
 	// Summarize what we've determined
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("master semi-sync wait count is %d; we have %d valid possible semi-sync replica(s) and %d excluded replica(s)", desiredSemiSyncReplicaCount, len(possibleSemiSyncReplicas), len(excludedReplicas)))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("master semi-sync wait count is %d, currently we have %d semi-sync replica(s)", analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients))
 	logReplicas(topologyRecovery, "possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
 	logReplicas(topologyRecovery, "always-async replicas", asyncReplicas)
 	logReplicas(topologyRecovery, "excluded replicas (downtimed/defunct)", excludedReplicas)
 
 	// Bail out if we cannot succeed
-	if uint(len(possibleSemiSyncReplicas)) < desiredSemiSyncReplicaCount {
+	if uint(len(possibleSemiSyncReplicas)) < analysisEntry.SemiSyncMasterWaitForReplicaCount {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
 		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
 	}
