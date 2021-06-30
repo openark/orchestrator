@@ -372,7 +372,7 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				if stopReplicationMethod == StopReplicationNice {
+				if stopReplicationMethod == StopReplicationNice && !replica.IsMariaDB() {
 					StopReplicationNicely(&replica.Key, timeout)
 				}
 				replica, _ = StopReplication(&replica.Key)
@@ -384,11 +384,6 @@ func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationM
 		refreshedReplicas = append(refreshedReplicas, <-barrier)
 	}
 	return refreshedReplicas
-}
-
-// StopReplicasNicely will attemt to stop all given replicas nicely, up to timeout
-func StopReplicasNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
-	return StopReplicas(replicas, StopReplicationNice, timeout)
 }
 
 // StopReplication stops replication on a given instance
