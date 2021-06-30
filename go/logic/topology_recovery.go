@@ -1491,7 +1491,7 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
-	return  recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
+	return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
 }
 
 // checkAndRecoverMasterWithTooManySemiSyncReplicas
@@ -1549,7 +1549,7 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 				actions[replica] = true
 				enabled++
 			}
-			if enabled == analysisEntry.SemiSyncMasterWaitForReplicaCount - analysisEntry.SemiSyncMasterClients {
+			if enabled == analysisEntry.SemiSyncMasterWaitForReplicaCount-analysisEntry.SemiSyncMasterClients {
 				break
 			}
 		}
@@ -1595,7 +1595,7 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	return true, topologyRecovery, nil
 }
 
-func classifyAndPrioritizeReplicas(replicas []*inst.Instance) (possibleSemiSyncReplicas []*inst.Instance, asyncReplicas []*inst.Instance, excludedReplicas[]*inst.Instance) {
+func classifyAndPrioritizeReplicas(replicas []*inst.Instance) (possibleSemiSyncReplicas []*inst.Instance, asyncReplicas []*inst.Instance, excludedReplicas []*inst.Instance) {
 	// Filter out downtimed and down replicas
 	possibleSemiSyncReplicas = make([]*inst.Instance, 0)
 	asyncReplicas = make([]*inst.Instance, 0)
