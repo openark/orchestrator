@@ -1184,7 +1184,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, clusterInstance := range instances {
-				fmt.Println(clusterInstance.Key.DisplayString())
+				if clusterInstance.ReplicaRunning() {
+					fmt.Println(clusterInstance.Key.DisplayString())
+				}
 			}
 		}
 	case registerCliCommand("which-cluster-gh-ost-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a gh-ost working server`):
