@@ -41,3 +41,22 @@ COPY --from=build /etc/orchestrator.conf.json /etc/orchestrator.conf.json
 WORKDIR /usr/local/orchestrator
 ADD docker/entrypoint.sh /entrypoint.sh
 CMD /entrypoint.sh
+
+ENV USER=docker
+ENV UID=1000
+ENV GID=1000
+
+RUN addgroup -g $GID $USER
+RUN adduser \
+    --disabled-password \
+    --gecos "" \
+    --home /usr/local/orchestrator \
+    --ingroup "$USER" \
+    --no-create-home \
+    --uid "$UID" \
+    "$USER"
+
+RUN mkdir -p /app/data && chown -R docker:docker /app \
+    && chown -R docker:docker /etc/orchestrator.conf.json
+
+USER docker
