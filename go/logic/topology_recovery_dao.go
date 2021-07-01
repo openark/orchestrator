@@ -218,9 +218,16 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 		}
 	}
 	if failIfClusterInActiveRecovery {
+		recoveries, err := ReadActiveClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
+		if err != nil {
+			return nil, log.Errore(err)
+		}
+		if len(recoveries) > 0 {
+			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v is experiencing an active recovery. It will not be failed over again.", analysisEntry.ClusterDetails.ClusterName)
+		}
 		// Let's check if this cluster has just experienced a failover and is still in active period.
 		// If so, we reject recovery registration to avoid flapping.
-		recoveries, err := ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
+		recoveries, err = ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
 		if err != nil {
 			return nil, log.Errore(err)
 		}
@@ -259,6 +266,7 @@ func ClearActiveRecoveries() error {
 				end_active_period_unixtime = UNIX_TIMESTAMP()
 			where
 				in_active_period = 1
+				AND end_recovery is not null
 				AND start_active_period < NOW() - INTERVAL ? SECOND
 			`,
 		config.Config.RecoveryPeriodBlockSeconds,
