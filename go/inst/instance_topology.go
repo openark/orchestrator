@@ -2509,6 +2509,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 func RegroupReplicasGTID(
 	masterKey *InstanceKey,
 	returnReplicaEvenOnFailureToRegroup bool,
+	startReplicationOnCandidate bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
 	postponeAllMatchOperations func(*Instance, bool) bool,
@@ -2554,7 +2555,9 @@ func RegroupReplicasGTID(
 		err = moveGTIDFunc()
 	}
 
-	StartReplication(&candidateReplica.Key)
+	if startReplicationOnCandidate {
+		StartReplication(&candidateReplica.Key)
+	}
 
 	log.Debugf("RegroupReplicasGTID: done")
 	AuditOperation("regroup-replicas-gtid", masterKey, fmt.Sprintf("regrouped replicas of %+v via GTID; promoted %+v", *masterKey, candidateReplica.Key))
@@ -2629,7 +2632,7 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	}
 	if allGTID {
 		log.Debugf("RegroupReplicas: using GTID to regroup replicas of %+v", *masterKey)
-		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, nil, nil)
+		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, true, onCandidateReplicaChosen, nil, nil)
 		return unmovedReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allBinlogServers {
