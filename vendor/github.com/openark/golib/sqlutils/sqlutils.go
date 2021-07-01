@@ -176,33 +176,39 @@ var knownDBsMutex = &sync.Mutex{}
 
 // GetDB returns a DB instance based on uri.
 // bool result indicates whether the DB was returned from cache; err
-func GetGenericDB(driverName, dataSourceName string) (*sql.DB, bool, error) {
+func GetGenericDB(driverName, dataSourceName string, useCache bool) (db *sql.DB, fromCache bool, err error) {
 	knownDBsMutex.Lock()
 	defer func() {
 		knownDBsMutex.Unlock()
 	}()
 
-	var exists bool
-	if _, exists = knownDBs[dataSourceName]; !exists {
-		if db, err := sql.Open(driverName, dataSourceName); err == nil {
-			knownDBs[dataSourceName] = db
-		} else {
-			return db, exists, err
-		}
+	if db, fromCache = knownDBs[dataSourceName]; fromCache && useCache {
+		return db, true, nil
 	}
-	return knownDBs[dataSourceName], exists, nil
+	db, err = sql.Open(driverName, dataSourceName)
+	if err != nil {
+		return db, false, err
+	}
+	if useCache {
+		knownDBs[dataSourceName] = db
+	}
+	return db, false, nil
+}
+
+func GetDBNoCache(mysql_uri string) (*sql.DB, bool, error) {
+	return GetGenericDB("mysql", mysql_uri, false)
 }
 
 // GetDB returns a MySQL DB instance based on uri.
 // bool result indicates whether the DB was returned from cache; err
 func GetDB(mysql_uri string) (*sql.DB, bool, error) {
-	return GetGenericDB("mysql", mysql_uri)
+	return GetGenericDB("mysql", mysql_uri, true)
 }
 
 // GetDB returns a SQLite DB instance based on DB file name.
 // bool result indicates whether the DB was returned from cache; err
 func GetSQLiteDB(dbFile string) (*sql.DB, bool, error) {
-	return GetGenericDB("sqlite3", dbFile)
+	return GetGenericDB("sqlite3", dbFile, true)
 }
 
 // RowToArray is a convenience function, typically not called directly, which maps a
@@ -287,7 +293,7 @@ func queryResultData(db *sql.DB, query string, retrieveColumns bool, args ...int
 	rows, err = db.Query(query, args...)
 	defer rows.Close()
 	if err != nil && err != sql.ErrNoRows {
-		return EmptyResultData, columns, log.Errore(err)
+		return EmptyResultData, columns, err
 	}
 	if retrieveColumns {
 		// Don't pay if you don't want to
