@@ -87,6 +87,10 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.healthReport(value)
 	case "set-cluster-alias-manual-override":
 		return applier.setClusterAliasManualOverride(value)
+	case "write-cluster-user-message":
+		return applier.writeClusterUserMessage(value)
+	case "ack-cluster-user-message":
+		return applier.ackClusterUserMessage(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -307,5 +311,23 @@ func (applier *CommandApplier) setClusterAliasManualOverride(value []byte) inter
 	}
 	clusterName, alias := params[0], params[1]
 	err := inst.SetClusterAliasManualOverride(clusterName, alias)
+	return err
+}
+
+func (applier *CommandApplier) writeClusterUserMessage(value []byte) interface{} {
+	message := inst.ClusterUserMessage{}
+	if err := json.Unmarshal(value, &message); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.WriteClusterUserMessage(message)
+	return err
+}
+
+func (applier *CommandApplier) ackClusterUserMessage(value []byte) interface{} {
+	var messageId int64
+	if err := json.Unmarshal(value, &messageId); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.AckClusterUserMessage(messageId)
 	return err
 }
