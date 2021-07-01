@@ -1561,17 +1561,6 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	return true, topologyRecovery, nil
 }
 
-func logReplicas(topologyRecovery *TopologyRecovery, description string, replicas []*inst.Instance) {
-	if len(replicas) > 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("%s:", description))
-		for _, replica := range replicas {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning()))
-		}
-	} else {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("%s: (none)", description))
-	}
-}
-
 // checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil

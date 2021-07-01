@@ -631,6 +631,8 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 // replicas that are downtimed or down. It furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule
 // and hostname (fallback).
 func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingReplicas bool) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
+	// TODO excludeNotReplicatingReplicas should be an exact instance instead, and not apply to ALL instances!
+
 	// Filter out downtimed and down replicas
 	possibleSemiSyncReplicas = make([]*Instance, 0)
 	asyncReplicas = make([]*Instance, 0)
