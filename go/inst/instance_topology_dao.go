@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -456,13 +457,9 @@ func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	// some replicas (those that must never be promoted) should never ACK.
 	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
-	if instance.SemiSyncPriority > 0 {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		// Always disable master setting, in case we're converting a former master.
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
-			return instance, log.Errore(err)
-		}
+	instance, err = MaybeEnableSemiSyncReplica(instance)
+	if err != nil {
+		return instance, log.Errore(err)
 	}
 
 	_, err = ExecInstance(instanceKey, `start slave`)
@@ -534,7 +531,7 @@ func WaitForExecBinlogCoordinatesToReach(instanceKey *InstanceKey, coordinates *
 	}
 }
 
-// StartReplicationUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
+// StartReplicationUntilMasterCoordinates issues a START SLAVE UNTIL... statement on given instance
 func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -550,13 +547,9 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 
 	log.Infof("Will start replication on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
-	if instance.SemiSyncPriority > 0 {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		// Always disable master setting, in case we're converting a former master.
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
-			return instance, log.Errore(err)
-		}
+	instance, err = MaybeEnableSemiSyncReplica(instance)
+	if err != nil {
+		return instance, log.Errore(err)
 	}
 
 	// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
@@ -584,14 +577,124 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 	return instance, err
 }
 
-// EnableSemiSync sets the rpl_semi_sync_(master|replica)_enabled variables
-// on a given instance.
-func EnableSemiSync(instanceKey *InstanceKey, master, replica bool) error {
-	log.Infof("instance %+v rpl_semi_sync_master_enabled: %t, rpl_semi_sync_slave_enabled: %t", instanceKey, master, replica)
-	_, err := ExecInstance(instanceKey,
-		`set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`,
-		master, replica)
-	return err
+// MaybeEnableSemiSyncReplica sets the rpl_semi_sync_(master|replica)_enabled variables on a given instance based on the
+// config and state of the world.
+func MaybeEnableSemiSyncReplica(instance *Instance) (*Instance, error) {
+	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
+	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
+	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster && instance.SemiSyncPriority > 0 {
+		// Send ACK only from promotable instances; always disable master setting, in case we're converting a former master.
+		enableReplica := instance.PromotionRule != MustNotPromoteRule
+		log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &instance.Key, false, enableReplica)
+		_, err := ExecInstance(&instance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
+		if err != nil {
+			return instance, log.Errore(err)
+		}
+	}
+
+	// New logic: If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are set, we enable semi-sync only if the
+	// given replica instance is in the list of replicas to have semi-sync enabled (according to the priority).
+	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	replicas, err := ReadReplicaInstances(&instance.MasterKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := ClassifyAndPrioritizeReplicas(replicas, false)
+	actions := DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients, config.Config.EnforceExactSemiSyncReplicas)
+
+	log.Debugf("semi-sync: determining if %+v should enable rpl_semi_sync_slave_enabled or not", instance.Key)
+	log.Debugf("semi-sync: master = %+v, master semi-sync wait count = %d, master semi-sync replica count = %d", instance.MasterKey, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients)
+	log.Debug("semi-sync: analysis:")
+	debugReplicas("semi-sync: possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
+	debugReplicas("semi-sync: always-async replicas", asyncReplicas)
+	debugReplicas("semi-sync: excluded replicas (downtimed/defunct)", excludedReplicas)
+
+	for replica, enable := range actions {
+		if replica.Key.Equals(&instance.Key) {
+			log.Infof("semi-sync: %s: setting rpl_semi_sync_slave_enabled: %t", &instance.Key, enable)
+			return SetSemiSyncReplica(&instance.Key, enable) // override "instance", since we re-read it in this function
+		}
+	}
+
+	log.Infof("semi-sync: %+v: no action taken", &instance.Key)
+	return instance, nil
+}
+
+func debugReplicas(description string, replicas []*Instance) {
+	if len(replicas) > 0 {
+		log.Debugf("semi-sync: %s:", description)
+		for _, replica := range replicas {
+			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning())
+		}
+	} else {
+		log.Debugf("semi-sync: %s: (none)", description)
+	}
+}
+
+func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingReplicas bool) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
+	// Filter out downtimed and down replicas
+	possibleSemiSyncReplicas = make([]*Instance, 0)
+	asyncReplicas = make([]*Instance, 0)
+	excludedReplicas = make([]*Instance, 0)
+	for _, replica := range replicas {
+		if replica.IsDowntimed || !replica.IsLastCheckValid || (excludeNotReplicatingReplicas && !replica.ReplicaRunning()) {
+			excludedReplicas = append(excludedReplicas, replica)
+			// TODO make this more resilient: re-read instance if its last check was invalid
+		} else if replica.SemiSyncPriority == 0 {
+			asyncReplicas = append(asyncReplicas, replica)
+		} else {
+			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
+		}
+	}
+
+	// Sort replicas by priority, promotion rule and name
+	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
+		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
+			return possibleSemiSyncReplicas[i].SemiSyncPriority < possibleSemiSyncReplicas[j].SemiSyncPriority
+		}
+		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
+			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
+		}
+		return strings.Compare(possibleSemiSyncReplicas[i].Key.String(), possibleSemiSyncReplicas[j].Key.String()) < 0
+	})
+
+	return
+}
+
+func DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint, exactReplicaTopology bool) map[*Instance]bool {
+	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	if exactReplicaTopology {
+		for i, replica := range possibleSemiSyncReplicas {
+			isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
+			shouldSemiSyncBeEnabled := uint(i) < waitCount
+			if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
+				actions[replica] = true
+			} else if exactReplicaTopology && !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+				actions[replica] = false
+			}
+		}
+		for _, replica := range asyncReplicas {
+			if replica.SemiSyncReplicaEnabled {
+				actions[replica] = false
+			}
+		}
+	} else {
+		enabled := uint(0)
+		for _, replica := range possibleSemiSyncReplicas {
+			if !replica.SemiSyncReplicaEnabled {
+				actions[replica] = true
+				enabled++
+			}
+			if enabled == waitCount-currentSemiSyncReplicas {
+				break
+			}
+		}
+	}
+	return actions
 }
 
 // DelayReplication set the replication delay given seconds
@@ -1090,10 +1193,8 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 	// If async fallback is disallowed, we're responsible for flipping the master
 	// semi-sync switch ON before accepting writes. The setting is off by default.
-	if instance.SemiSyncPriority > 0 && !readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		if err := EnableSemiSync(instanceKey, true, sendACK); err != nil {
+	if instance.SemiSyncPriority > 0 && !readOnly { // TODO I feel like this flag is a little overloaded: this is used here to determine if the MASTER's semi-sync is enabled...
+		if _, err := SetSemiSyncMaster(instanceKey, true); err != nil {
 			return instance, log.Errore(err)
 		}
 	}
@@ -1111,13 +1212,14 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		}
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
-	if instance.SemiSyncPriority > 0 && readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
+	if instance.SemiSyncPriority > 0 && readOnly { // TODO I feel like this flag is a little overloaded: this is used here to determine if the MASTER's semi-sync is enabled...
+		if _, err := SetSemiSyncMaster(instanceKey, false); err != nil {
 			return instance, log.Errore(err)
 		}
 	}
