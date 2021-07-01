@@ -37,6 +37,25 @@ func getProxyAuthUser(req *http.Request) string {
 	return ""
 }
 
+// getProxyAuthGroups looks at the AuthGroupHeader, if exists,
+// and looks up a comma delimited list of groups, e.g.
+// "group1,group2,group3"
+func getProxyAuthGroups(req *http.Request) (groups map[string]bool) {
+	groups = map[string]bool{}
+	groupsValue := ""
+	for _, header := range req.Header[config.Config.AuthGroupHeader] {
+		groupsValue = header
+	}
+	tokens := strings.Split(groupsValue, ",")
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token != "" {
+			groups[token] = true
+		}
+	}
+	return groups
+}
+
 // isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
 // This depends on configured authentication method.
 func isAuthorizedForAction(req *http.Request, user auth.User) bool {
@@ -75,6 +94,13 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 			// check the user's group is one of those listed here
 			if len(config.Config.PowerAuthGroups) > 0 && os.UserInGroups(authUser, config.Config.PowerAuthGroups) {
 				return true
+			}
+			// check if auth group header contains a group that is also found in PowerAuthGroups
+			groups := getProxyAuthGroups(req)
+			for _, powerAuthGroup := range config.Config.PowerAuthGroups {
+				if groups[powerAuthGroup] {
+					return true
+				}
 			}
 			return false
 		}
