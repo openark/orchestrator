@@ -668,33 +668,44 @@ func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingRe
 	return
 }
 
+// DetermineSemiSyncReplicaActions returns a map of replicas for which to change the semi-sync replica setting.
+// A value of true indicates semi-sync needs to be enabled, false that it needs to be disabled.
 func DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint, exactReplicaTopology bool) map[*Instance]bool {
-	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
 	if exactReplicaTopology {
-		for i, replica := range possibleSemiSyncReplicas {
-			isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
-			shouldSemiSyncBeEnabled := uint(i) < waitCount
-			if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
-				actions[replica] = true
-			} else if exactReplicaTopology && !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
-				actions[replica] = false
-			}
+		return determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas, asyncReplicas, waitCount)
+	}
+	return determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas, waitCount, currentSemiSyncReplicas)
+}
+
+func determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint) map[*Instance]bool {
+	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	for i, replica := range possibleSemiSyncReplicas {
+		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
+		shouldSemiSyncBeEnabled := uint(i) < waitCount
+		if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
+			actions[replica] = true
+		} else if !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+			actions[replica] = false
 		}
-		for _, replica := range asyncReplicas {
-			if replica.SemiSyncReplicaEnabled {
-				actions[replica] = false
-			}
+	}
+	for _, replica := range asyncReplicas {
+		if replica.SemiSyncReplicaEnabled {
+			actions[replica] = false
 		}
-	} else {
-		enabled := uint(0)
-		for _, replica := range possibleSemiSyncReplicas {
-			if !replica.SemiSyncReplicaEnabled {
-				actions[replica] = true
-				enabled++
-			}
-			if enabled == waitCount-currentSemiSyncReplicas {
-				break
-			}
+	}
+	return actions
+}
+
+func determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint) map[*Instance]bool {
+	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	enabled := uint(0)
+	for _, replica := range possibleSemiSyncReplicas {
+		if !replica.SemiSyncReplicaEnabled {
+			actions[replica] = true
+			enabled++
+		}
+		if enabled == waitCount-currentSemiSyncReplicas {
+			break
 		}
 	}
 	return actions
