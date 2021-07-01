@@ -579,65 +579,57 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 
 // MaybeEnableSemiSyncReplica sets the rpl_semi_sync_(master|replica)_enabled variables on a given instance based on the
 // config and state of the world.
-func MaybeEnableSemiSyncReplica(instance *Instance) (*Instance, error) {
+func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
 	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
 	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster {
-		if instance.SemiSyncPriority > 0 {
+		if replicaInstance.SemiSyncPriority > 0 {
 			// Send ACK only from promotable instances; always disable master setting, in case we're converting a former master.
-			enableReplica := instance.PromotionRule != MustNotPromoteRule
-			log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &instance.Key, false, enableReplica)
-			_, err := ExecInstance(&instance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
+			enableReplica := replicaInstance.PromotionRule != MustNotPromoteRule
+			log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &replicaInstance.Key, false, enableReplica)
+			_, err := ExecInstance(&replicaInstance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
 			if err != nil {
-				return instance, log.Errore(err)
+				return replicaInstance, log.Errore(err)
 			}
 		}
-		return instance, nil
+		return replicaInstance, nil
 	}
 
 	// New logic: If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are set, we enable semi-sync only if the
 	// given replica instance is in the list of replicas to have semi-sync enabled (according to the priority).
-	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
+	masterInstance, err := ReadTopologyInstance(&replicaInstance.MasterKey)
 	if err != nil {
-		return instance, log.Errore(err)
+		return replicaInstance, log.Errore(err)
 	}
-	replicas, err := ReadReplicaInstances(&instance.MasterKey)
+	replicas, err := ReadReplicaInstances(&replicaInstance.MasterKey)
 	if err != nil {
-		return instance, log.Errore(err)
+		return replicaInstance, log.Errore(err)
 	}
 
 	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := ClassifyAndPrioritizeReplicas(replicas, false)
 	actions := DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients, config.Config.EnforceExactSemiSyncReplicas)
 
-	log.Debugf("semi-sync: determining if %+v should enable rpl_semi_sync_slave_enabled or not", instance.Key)
-	log.Debugf("semi-sync: master = %+v, master semi-sync wait count = %d, master semi-sync replica count = %d", instance.MasterKey, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients)
-	log.Debug("semi-sync: analysis:")
-	debugReplicas("semi-sync: possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
-	debugReplicas("semi-sync: always-async replicas", asyncReplicas)
-	debugReplicas("semi-sync: excluded replicas (downtimed/defunct)", excludedReplicas)
+	log.Debugf("semi-sync: %+v: determining whether to enable rpl_semi_sync_slave_enabled", replicaInstance.Key)
+	log.Debugf("semi-sync: master = %+v, master semi-sync wait count = %d, master semi-sync replica count = %d", replicaInstance.MasterKey, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients)
+	LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions, func(s string, a ...interface{}) { log.Debugf(s, a...) })
 
+	// TODO This is a little odd. We sometimes get actions for replicas that are not us. If we do not take this action
+	// TODO then we'll absolutely have a MasterWithTooManySemiSyncReplicas event following this recovery. We could prevent this
+	// TODO by just executing all actions, but we're in the scope of `replicaInstance` here, so..... idk
 	for replica, enable := range actions {
-		if replica.Key.Equals(&instance.Key) {
-			log.Infof("semi-sync: %s: setting rpl_semi_sync_slave_enabled: %t", &instance.Key, enable)
-			return SetSemiSyncReplica(&instance.Key, enable) // override "instance", since we re-read it in this function
+		if replica.Key.Equals(&replicaInstance.Key) {
+			log.Infof("semi-sync: %s: setting rpl_semi_sync_slave_enabled: %t", &replicaInstance.Key, enable)
+			return SetSemiSyncReplica(&replicaInstance.Key, enable) // override "instance", since we re-read it in this function
 		}
 	}
 
-	log.Infof("semi-sync: %+v: no action taken", &instance.Key)
-	return instance, nil
+	log.Infof("semi-sync: %+v: no action taken", &replicaInstance.Key)
+	return replicaInstance, nil
 }
 
-func debugReplicas(description string, replicas []*Instance) {
-	if len(replicas) > 0 {
-		log.Debugf("semi-sync: %s:", description)
-		for _, replica := range replicas {
-			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning())
-		}
-	} else {
-		log.Debugf("semi-sync: %s: (none)", description)
-	}
-}
-
+// ClassifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding
+// replicas that are downtimed or down. It furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule
+// and hostname (fallback).
 func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingReplicas bool) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
 	// Filter out downtimed and down replicas
 	possibleSemiSyncReplicas = make([]*Instance, 0)
@@ -646,7 +638,6 @@ func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingRe
 	for _, replica := range replicas {
 		if replica.IsDowntimed || !replica.IsLastCheckValid || (excludeNotReplicatingReplicas && !replica.ReplicaRunning()) {
 			excludedReplicas = append(excludedReplicas, replica)
-			// TODO make this more resilient: re-read instance if its last check was invalid
 		} else if replica.SemiSyncPriority == 0 {
 			asyncReplicas = append(asyncReplicas, replica)
 		} else {
@@ -709,6 +700,32 @@ func determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas [
 		}
 	}
 	return actions
+}
+
+// LogSemiSyncReplicaAnalysis outputs the analysis results for a semi-sync analysis using the given log function
+func LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance, actions map[*Instance]bool, logf func(s string, a ...interface{})) {
+	logReplicas("possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas, logf)
+	logReplicas("always-async replicas", asyncReplicas, logf)
+	logReplicas("excluded replicas (downtimed/defunct)", excludedReplicas, logf)
+	if len(actions) > 0 {
+		logf("semi-sync: suggested actions:")
+		for replica, enable := range actions {
+			logf("semi-sync: - %+v: should set semi-sync enabled = %t", replica.Key, enable)
+		}
+	} else {
+		logf("semi-sync: suggested actions: (none)")
+	}
+}
+
+func logReplicas(description string, replicas []*Instance, logf func(s string, a ...interface{})) {
+	if len(replicas) > 0 {
+		logf("semi-sync: %s:", description)
+		for _, replica := range replicas {
+			logf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning())
+		}
+	} else {
+		logf("semi-sync: %s: (none)", description)
+	}
 }
 
 // DelayReplication set the replication delay given seconds

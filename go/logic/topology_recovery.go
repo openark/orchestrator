@@ -1505,20 +1505,20 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 }
 
 func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, exactReplicaTopology bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
-	instance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
+	masterInstance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
 	if !found || err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
 		return false, topologyRecovery, err
 	}
 
 	// Read all replicas
 	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
 	if err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("could not read replica instances for %+v: %s", analysisEntry.AnalyzedInstanceKey, err.Error()))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: could not read replica instances for %+v: %s", analysisEntry.AnalyzedInstanceKey, err.Error()))
 		return false, topologyRecovery, err
 	}
 	if len(replicas) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no replicas found for %+v; cannot recover", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: no replicas found for %+v; cannot recover", analysisEntry.AnalyzedInstanceKey))
 		return false, topologyRecovery, nil
 	}
 
@@ -1526,42 +1526,37 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := inst.ClassifyAndPrioritizeReplicas(replicas, true)
 	actions := inst.DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients, exactReplicaTopology)
 
-	// Summarize what we've determined
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("master semi-sync wait count is %d, currently we have %d semi-sync replica(s)", analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients))
-	logReplicas(topologyRecovery, "possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
-	logReplicas(topologyRecovery, "always-async replicas", asyncReplicas)
-	logReplicas(topologyRecovery, "excluded replicas (downtimed/defunct)", excludedReplicas)
+	// Log analysis
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: analysis results for recovery of %+v:", masterInstance.Key))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: semi-sync wait count = %d, semi-sync replica count = %d", analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients))
+	inst.LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions, func(s string, a ...interface{}) { AuditTopologyRecovery(topologyRecovery, fmt.Sprintf(s, a...)) })
 
 	// Bail out if we cannot succeed
 	if uint(len(possibleSemiSyncReplicas)) < analysisEntry.SemiSyncMasterWaitForReplicaCount {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
 		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
 	}
 	if len(actions) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
 		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
 	}
 
 	// Take action
-	AuditTopologyRecovery(topologyRecovery, "taking actions:")
+	AuditTopologyRecovery(topologyRecovery, "semi-sync: taking actions:")
 	for replica, enable := range actions {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
 		_, err := inst.SetSemiSyncReplica(&replica.Key, enable)
 		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("cannot change semi sync on replica %+v.", replica.Key))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
 			return true, topologyRecovery, nil
 		}
 	}
 
 	// Re-read source instance to avoid re-triggering the same condition
-	// TODO this does not help; it is still re-triggering the same analysis until the next polling interval. WHY?
-	instance, err = inst.ReadTopologyInstance(&instance.Key)
-	if err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("warning: cannot re-read instance after recovery of %s on instance %+v; recovery might be retriggered, but this is harmless.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
-	}
+	// TODO even though we resolve correctly here, we are re-triggering the same analysis until the next polling interval. WHY?
 
-	resolveRecovery(topologyRecovery, instance)
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("recovery complete; success = %t", topologyRecovery.IsSuccessful))
+	resolveRecovery(topologyRecovery, masterInstance)
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: recovery complete; success = %t", topologyRecovery.IsSuccessful))
 
 	return true, topologyRecovery, nil
 }
