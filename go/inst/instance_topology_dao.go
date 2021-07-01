@@ -582,14 +582,17 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 func MaybeEnableSemiSyncReplica(instance *Instance) (*Instance, error) {
 	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
 	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
-	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster && instance.SemiSyncPriority > 0 {
-		// Send ACK only from promotable instances; always disable master setting, in case we're converting a former master.
-		enableReplica := instance.PromotionRule != MustNotPromoteRule
-		log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &instance.Key, false, enableReplica)
-		_, err := ExecInstance(&instance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
-		if err != nil {
-			return instance, log.Errore(err)
+	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster {
+		if instance.SemiSyncPriority > 0 {
+			// Send ACK only from promotable instances; always disable master setting, in case we're converting a former master.
+			enableReplica := instance.PromotionRule != MustNotPromoteRule
+			log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &instance.Key, false, enableReplica)
+			_, err := ExecInstance(&instance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
+			if err != nil {
+				return instance, log.Errore(err)
+			}
 		}
+		return instance, nil
 	}
 
 	// New logic: If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are set, we enable semi-sync only if the
