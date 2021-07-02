@@ -55,7 +55,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(ReasonableStaleBinlogCoordinatesSeconds(), ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
+	args := sqlutils.Args(ReasonableLockedSemiSyncMasterSeconds(), ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
 
 	if config.Config.ReduceReplicationAnalysisCount {

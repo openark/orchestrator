@@ -447,6 +447,11 @@ func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
+	instance, err = MaybeDisableSemiSyncMaster(instance)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
 	// If async fallback is disallowed, we'd better make sure to enable replicas to
 	// send ACKs before START SLAVE. Replica ACKing is off at mysqld startup because
 	// some replicas (those that must never be promoted) should never ACK.
@@ -542,6 +547,10 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 
 	log.Infof("Will start replication on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
+	instance, err = MaybeDisableSemiSyncMaster(instance)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 	instance, err = MaybeEnableSemiSyncReplica(instance)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -572,20 +581,30 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 	return instance, err
 }
 
-// MaybeEnableSemiSyncReplica sets the rpl_semi_sync_(master|replica)_enabled variables on a given instance based on the
+// MaybeDisableSemiSyncMaster always disables the semi-sync master if the semi-sync priority is > 0. This is a little odd
+// but in line with the legacy behavior and we really should disable the semi-sync master flag for replicas when starting replication.
+func MaybeDisableSemiSyncMaster(replicaInstance *Instance) (*Instance, error) {
+	if replicaInstance.SemiSyncPriority > 0 {
+		log.Infof("semi-sync: %s: setting rpl_semi_sync_master_enabled: %t", &replicaInstance.Key, false)
+		replicaInstance, err := SetSemiSyncMaster(&replicaInstance.Key, false)
+		if err != nil {
+			log.Warningf("semi-sync: %s: cannot disable rpl_semi_sync_master_enabled; that's not that bad though", &replicaInstance.Key)
+		}
+		return replicaInstance, err
+	}
+	return replicaInstance, nil
+}
+
+// MaybeEnableSemiSyncReplica sets the rpl_semi_sync_replica_enabled variables on a given instance based on the
 // config and state of the world.
 func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
 	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
 	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster {
 		if replicaInstance.SemiSyncPriority > 0 {
-			// Send ACK only from promotable instances; always disable master setting, in case we're converting a former master.
-			enableReplica := replicaInstance.PromotionRule != MustNotPromoteRule
-			log.Infof("semi-sync: %+v: setting rpl_semi_sync_master_enabled = %t, rpl_semi_sync_slave_enabled = %t (legacy behavior)", &replicaInstance.Key, false, enableReplica)
-			_, err := ExecInstance(&replicaInstance.Key, `set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`, false, enableReplica)
-			if err != nil {
-				return replicaInstance, log.Errore(err)
-			}
+			enable := replicaInstance.PromotionRule != MustNotPromoteRule // Send ACK only from promotable instances
+			log.Infof("semi-sync: %+v: setting rpl_semi_sync_slave_enabled = %t (legacy behavior)", &replicaInstance.Key, enable)
+			return SetSemiSyncReplica(&replicaInstance.Key, enable)
 		}
 		return replicaInstance, nil
 	}
@@ -601,7 +620,7 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 		return replicaInstance, log.Errore(err)
 	}
 
-	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := ClassifyAndPrioritizeReplicas(replicas, false)
+	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := ClassifyAndPrioritizeReplicas(replicas, &replicaInstance.Key)
 	actions := DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients, config.Config.EnforceExactSemiSyncReplicas)
 
 	log.Debugf("semi-sync: %+v: determining whether to enable rpl_semi_sync_slave_enabled", replicaInstance.Key)
@@ -614,7 +633,7 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 	for replica, enable := range actions {
 		if replica.Key.Equals(&replicaInstance.Key) {
 			log.Infof("semi-sync: %s: setting rpl_semi_sync_slave_enabled: %t", &replicaInstance.Key, enable)
-			return SetSemiSyncReplica(&replicaInstance.Key, enable) // override "instance", since we re-read it in this function
+			return SetSemiSyncReplica(&replicaInstance.Key, enable)
 		}
 	}
 
@@ -625,15 +644,13 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 // ClassifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding
 // replicas that are downtimed or down. It furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule
 // and hostname (fallback).
-func ClassifyAndPrioritizeReplicas(replicas []*Instance, excludeNotReplicatingReplicas bool) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
-	// TODO excludeNotReplicatingReplicas should be an exact instance instead, and not apply to ALL instances!
-
+func ClassifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingInstance *InstanceKey) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
 	// Filter out downtimed and down replicas
 	possibleSemiSyncReplicas = make([]*Instance, 0)
 	asyncReplicas = make([]*Instance, 0)
 	excludedReplicas = make([]*Instance, 0)
 	for _, replica := range replicas {
-		if replica.IsDowntimed || !replica.IsLastCheckValid || (excludeNotReplicatingReplicas && !replica.ReplicaRunning()) {
+		if replica.IsDowntimed || !replica.IsLastCheckValid || (!replica.Key.Equals(includeNonReplicatingInstance) && !replica.ReplicaRunning()) {
 			excludedReplicas = append(excludedReplicas, replica)
 		} else if replica.SemiSyncPriority == 0 {
 			asyncReplicas = append(asyncReplicas, replica)

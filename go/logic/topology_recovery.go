@@ -1526,7 +1526,7 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	}
 
 	// Classify and prioritize replicas & figure out which replicas need to be acted upon
-	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := inst.ClassifyAndPrioritizeReplicas(replicas, true)
+	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := inst.ClassifyAndPrioritizeReplicas(replicas, nil)
 	actions := inst.DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients, exactReplicaTopology)
 
 	// Log analysis
@@ -1547,6 +1547,7 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	// Take action
 	AuditTopologyRecovery(topologyRecovery, "semi-sync: taking actions:")
 	for replica, enable := range actions {
+		// TODO should we also set master_enabled = false here?
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
 		_, err := inst.SetSemiSyncReplica(&replica.Key, enable)
 		if err != nil {

@@ -232,12 +232,11 @@ func ValidSecondsFromSeenToLastAttemptedCheck() uint {
 	return config.Config.InstancePollSeconds + config.Config.ReasonableInstanceCheckSeconds
 }
 
-// ReasonableStaleBinlogCoordinatesSeconds returns the number of seconds before a LockedSemiSyncMaster
-// is triggered. If the ReasonableStaleBinlogCoordinatesSeconds setting is not set, ReasonableReplicationLagSeconds
-// is used.
-func ReasonableStaleBinlogCoordinatesSeconds() uint {
-	if config.Config.ReasonableStaleBinlogCoordinatesSeconds == 0 {
+// ReasonableLockedSemiSyncMasterSeconds returns the number of seconds before a LockedSemiSyncMaster is triggered.
+// If the ReasonableLockedSemiSyncMasterSeconds setting is not set, ReasonableReplicationLagSeconds is used.
+func ReasonableLockedSemiSyncMasterSeconds() uint {
+	if config.Config.ReasonableLockedSemiSyncMasterSeconds == 0 {
 		return uint(config.Config.ReasonableReplicationLagSeconds)
 	}
-	return config.Config.ReasonableStaleBinlogCoordinatesSeconds
+	return config.Config.ReasonableLockedSemiSyncMasterSeconds
 }
