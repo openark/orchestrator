@@ -581,8 +581,8 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 	return instance, err
 }
 
-// MaybeDisableSemiSyncMaster always disables the semi-sync master if the semi-sync priority is > 0. This is a little odd
-// but in line with the legacy behavior and we really should disable the semi-sync master flag for replicas when starting replication.
+// MaybeDisableSemiSyncMaster always disables the semi-sync master (rpl_semi_sync_master_enabled) if the semi-sync priority is > 0. This is
+// a little odd but in line with the legacy behavior and we really should disable the semi-sync master flag for replicas when starting replication.
 func MaybeDisableSemiSyncMaster(replicaInstance *Instance) (*Instance, error) {
 	if replicaInstance.SemiSyncPriority > 0 {
 		log.Infof("semi-sync: %s: setting rpl_semi_sync_master_enabled: %t", &replicaInstance.Key, false)
@@ -595,8 +595,11 @@ func MaybeDisableSemiSyncMaster(replicaInstance *Instance) (*Instance, error) {
 	return replicaInstance, nil
 }
 
-// MaybeEnableSemiSyncReplica sets the rpl_semi_sync_replica_enabled variables on a given instance based on the
-// config and state of the world.
+// MaybeEnableSemiSyncReplica sets the semi-sync replica variable (rpl_semi_sync_replica_enabled) on a given instance based on the config and
+// state of the world. If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are enabled, the semi-sync replica variable is enabled
+// only if the given instance is supposed to be enabled according to the semi-sync priority order and the number of desired semi-sync replicas.
+// If the flags are both turned off, the legacy behavior kicks in: If SemiSyncPriority > 0 and the instance is promotable (not "must_not"),
+// semi-sync is enabled.
 func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
 	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
@@ -682,6 +685,8 @@ func DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas []*Instance, async
 	return determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas, waitCount, currentSemiSyncReplicas)
 }
 
+// determineSemiSyncReplicaActionsForExactTopology takes a priority-list of possible semi-sync replicas and always-async replicas and returns a list
+// of actions to perform on them. If the current state of a replica's semi-sync flag does not match the desired state, an action is returned for it.
 func determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint) map[*Instance]bool {
 	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
 	for i, replica := range possibleSemiSyncReplicas {
@@ -701,6 +706,8 @@ func determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas []
 	return actions
 }
 
+// determineSemiSyncReplicaActionsForEnoughTopology takes a priority-list of possible semi-sync replicas and returns a list of actions to increase the
+// number of semi-sync replicas to the semi-sync master wait count. This function will never return actions to disable a semi-sync replica.
 func determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint) map[*Instance]bool {
 	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
 	enabled := uint(0)
