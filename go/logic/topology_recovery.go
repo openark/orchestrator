@@ -1508,69 +1508,15 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 }
 
 func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, exactReplicaTopology bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
-	masterInstance, found, err := inst.ReadInstance(&analysisEntry.AnalyzedInstanceKey)
-	if !found || err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: instance not found in recovery %+v.", analysisEntry.AnalyzedInstanceKey))
-		return false, topologyRecovery, err
-	}
-
-	// Read all replicas
-	replicas, err := inst.ReadReplicaInstances(&analysisEntry.AnalyzedInstanceKey)
+	logFn := func(s string, a ...interface{}) { AuditTopologyRecovery(topologyRecovery, fmt.Sprintf(s, a...)) }
+	masterInstance, err := inst.RecoverSemiSyncReplicas(&analysisEntry.AnalyzedInstanceKey, nil, exactReplicaTopology, logFn)
 	if err != nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: could not read replica instances for %+v: %s", analysisEntry.AnalyzedInstanceKey, err.Error()))
-		return false, topologyRecovery, err
+		return true, topologyRecovery, err
 	}
-	if len(replicas) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: no replicas found for %+v; cannot recover", analysisEntry.AnalyzedInstanceKey))
-		return false, topologyRecovery, nil
-	}
-
-	// Classify and prioritize replicas & figure out which replicas need to be acted upon
-	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := inst.ClassifyAndPrioritizeReplicas(replicas, nil)
-	actions := inst.DetermineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients, exactReplicaTopology)
-
-	// Log analysis
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: analysis results for recovery of %+v:", masterInstance.Key))
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: semi-sync wait count = %d, semi-sync replica count = %d", analysisEntry.SemiSyncMasterWaitForReplicaCount, analysisEntry.SemiSyncMasterClients))
-	inst.LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions, func(s string, a ...interface{}) { AuditTopologyRecovery(topologyRecovery, fmt.Sprintf(s, a...)) })
-
-	// Bail out if we cannot succeed
-	if uint(len(possibleSemiSyncReplicas)) < analysisEntry.SemiSyncMasterWaitForReplicaCount {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
-		return true, topologyRecovery, fmt.Errorf("not enough valid live replicas found to recover from %s on %+v", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey)
-	} else if len(actions) == 0 {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
-		return true, topologyRecovery, fmt.Errorf("cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey)
-	}
-
-	// Take action: we first enable and then disable (two loops) in order to avoid "locked master" scenarios
-	AuditTopologyRecovery(topologyRecovery, "semi-sync: taking actions:")
-	// TODO should we also set master_enabled = false here?
-	for replica, enable := range actions {
-		if enable {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
-			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
-				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
-				return true, topologyRecovery, nil
-			}
-		}
-	}
-	for replica, enable := range actions {
-		if !enable {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
-			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
-				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
-				return true, topologyRecovery, nil
-			}
-		}
-	}
-
-	// Re-read source instance to avoid re-triggering the same condition
 	// TODO even though we resolve correctly here, we are re-triggering the same analysis until the next polling interval. WHY?
 
 	resolveRecovery(topologyRecovery, masterInstance)
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: recovery complete; success = %t", topologyRecovery.IsSuccessful))
-
 	return true, topologyRecovery, nil
 }
 
