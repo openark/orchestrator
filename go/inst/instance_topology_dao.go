@@ -1293,7 +1293,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
-	if instance.SemiSyncPriority > 0 && readOnly { // TODO I feel like this flag is a little overloaded: this is used here to determine if the MASTER's semi-sync is enabled...
+	if instance.SemiSyncPriority > 0 && readOnly {
 		if _, err := SetSemiSyncMaster(instanceKey, false); err != nil {
 			return instance, log.Errore(err)
 		}
