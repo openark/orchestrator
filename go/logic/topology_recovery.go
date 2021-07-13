@@ -1490,11 +1490,11 @@ func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis,
 	if config.Config.EnforceExactSemiSyncReplicas {
 		return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
 	}
-	if !config.Config.RecoverLockedSemiSyncMaster {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
-		return false, nil, err
+	if config.Config.RecoverLockedSemiSyncMaster {
+		return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
 	}
-	return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
+	return false, nil, err
 }
 
 // checkAndRecoverMasterWithTooManySemiSyncReplicas
@@ -1537,22 +1537,31 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	// Bail out if we cannot succeed
 	if uint(len(possibleSemiSyncReplicas)) < analysisEntry.SemiSyncMasterWaitForReplicaCount {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: not enough valid live replicas found to recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
-		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
-	}
-	if len(actions) == 0 {
+		return true, topologyRecovery, fmt.Errorf("not enough valid live replicas found to recover from %s on %+v", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey)
+	} else if len(actions) == 0 {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v.", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey))
-		return true, topologyRecovery, nil // TODO recoveryAttempted = true; is this correct? what are the implications of this?
+		return true, topologyRecovery, fmt.Errorf("cannot determine actions based on possible semi-sync replicas; cannot recover from %s on %+v", analysisEntry.AnalysisString(), analysisEntry.AnalyzedInstanceKey)
 	}
 
-	// Take action
+	// Take action: we first enable and then disable (two loops) in order to avoid "locked master" scenarios
 	AuditTopologyRecovery(topologyRecovery, "semi-sync: taking actions:")
+	// TODO should we also set master_enabled = false here?
 	for replica, enable := range actions {
-		// TODO should we also set master_enabled = false here?
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
-		_, err := inst.SetSemiSyncReplica(&replica.Key, enable)
-		if err != nil {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
-			return true, topologyRecovery, nil
+		if enable {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
+			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
+				return true, topologyRecovery, nil
+			}
+		}
+	}
+	for replica, enable := range actions {
+		if !enable {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
+			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot change semi sync on replica %+v.", replica.Key))
+				return true, topologyRecovery, nil
+			}
 		}
 	}
 

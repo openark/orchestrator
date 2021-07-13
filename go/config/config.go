@@ -614,6 +614,9 @@ func (this *Configuration) postReadAdjustments() error {
 	} else if this.ConsulMaxKVsPerTransaction > ConsulMaxTransactionOps {
 		this.ConsulMaxKVsPerTransaction = ConsulMaxTransactionOps
 	}
+	if this.ReasonableLockedSemiSyncMasterSeconds == 0 {
+		this.ReasonableLockedSemiSyncMasterSeconds = uint(this.ReasonableReplicationLagSeconds)
+	}
 
 	return nil
 }

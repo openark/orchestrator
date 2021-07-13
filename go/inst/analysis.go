@@ -231,12 +231,3 @@ func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType 
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
 	return config.Config.InstancePollSeconds + config.Config.ReasonableInstanceCheckSeconds
 }
-
-// ReasonableLockedSemiSyncMasterSeconds returns the number of seconds before a LockedSemiSyncMaster is triggered.
-// If the ReasonableLockedSemiSyncMasterSeconds setting is not set, ReasonableReplicationLagSeconds is used.
-func ReasonableLockedSemiSyncMasterSeconds() uint {
-	if config.Config.ReasonableLockedSemiSyncMasterSeconds == 0 {
-		return uint(config.Config.ReasonableReplicationLagSeconds)
-	}
-	return config.Config.ReasonableLockedSemiSyncMasterSeconds
-}
