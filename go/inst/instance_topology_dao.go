@@ -611,7 +611,7 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 	// given replica instance is in the list of replicas to have semi-sync enabled (according to the priority).
 	logFn := func(s string, a ...interface{}) { log.Debugf(s, a...) }
 	if _, err := RecoverSemiSyncReplicas(&replicaInstance.MasterKey, &replicaInstance.Key, config.Config.EnforceExactSemiSyncReplicas, logFn); err != nil {
-		return replicaInstance, log.Errore(err)
+		return replicaInstance, log.Errorf("semi-sync: %w", err)
 	}
 
 	return replicaInstance, nil
@@ -645,12 +645,12 @@ func RecoverSemiSyncReplicas(masterKey *InstanceKey, recoverOnlyReplicaKey *Inst
 
 	// Classify and prioritize replicas & figure out which replicas need to be acted upon
 	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := classifyAndPrioritizeReplicas(replicas, recoverOnlyReplicaKey)
-	actions := determineSemiSyncReplicaActions(possibleSemiSyncReplicas, asyncReplicas, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients, exactReplicaTopology)
+	actions := determineSemiSyncReplicaActions(masterInstance, possibleSemiSyncReplicas, asyncReplicas, exactReplicaTopology)
 
 	// Log analysis
 	logf("semi-sync: analysis results for recovery of cluster %+v:", masterInstance.ClusterName)
 	logf("semi-sync: master = %+v, replica repair scope = %+v, master semi-sync wait count = %d, master semi-sync replica count = %d", masterKey, recoverOnlyReplicaKey, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients)
-	LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions, logf)
+	logSemiSyncReplicaAnalysis(possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions, logf)
 
 	// Bail out if we cannot succeed
 	if uint(len(possibleSemiSyncReplicas)) < masterInstance.SemiSyncMasterWaitForReplicaCount {
@@ -719,20 +719,20 @@ func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingIn
 
 // determineSemiSyncReplicaActions returns a map of replicas for which to change the semi-sync replica setting.
 // A value of true indicates semi-sync needs to be enabled, false that it needs to be disabled.
-func determineSemiSyncReplicaActions(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint, exactReplicaTopology bool) map[*Instance]bool {
+func determineSemiSyncReplicaActions(masterInstance *Instance, possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, exactReplicaTopology bool) map[*Instance]bool {
 	if exactReplicaTopology {
-		return determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas, asyncReplicas, waitCount)
+		return determineSemiSyncReplicaActionsForExactTopology(masterInstance, possibleSemiSyncReplicas, asyncReplicas)
 	}
-	return determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas, waitCount, currentSemiSyncReplicas)
+	return determineSemiSyncReplicaActionsForEnoughTopology(masterInstance, possibleSemiSyncReplicas)
 }
 
 // determineSemiSyncReplicaActionsForExactTopology takes a priority-list of possible semi-sync replicas and always-async replicas and returns a list
 // of actions to perform on them. If the current state of a replica's semi-sync flag does not match the desired state, an action is returned for it.
-func determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, waitCount uint) map[*Instance]bool {
+func determineSemiSyncReplicaActionsForExactTopology(masterInstance *Instance, possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance) map[*Instance]bool {
 	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
 	for i, replica := range possibleSemiSyncReplicas {
 		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
-		shouldSemiSyncBeEnabled := uint(i) < waitCount
+		shouldSemiSyncBeEnabled := uint(i) < masterInstance.SemiSyncMasterWaitForReplicaCount
 		if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
 			actions[replica] = true
 		} else if !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
@@ -749,7 +749,7 @@ func determineSemiSyncReplicaActionsForExactTopology(possibleSemiSyncReplicas []
 
 // determineSemiSyncReplicaActionsForEnoughTopology takes a priority-list of possible semi-sync replicas and returns a list of actions to increase the
 // number of semi-sync replicas to the semi-sync master wait count. This function will never return actions to disable a semi-sync replica.
-func determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas []*Instance, waitCount uint, currentSemiSyncReplicas uint) map[*Instance]bool {
+func determineSemiSyncReplicaActionsForEnoughTopology(masterInstance *Instance, possibleSemiSyncReplicas []*Instance) map[*Instance]bool {
 	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
 	enabled := uint(0)
 	for _, replica := range possibleSemiSyncReplicas {
@@ -757,15 +757,15 @@ func determineSemiSyncReplicaActionsForEnoughTopology(possibleSemiSyncReplicas [
 			actions[replica] = true
 			enabled++
 		}
-		if enabled == waitCount-currentSemiSyncReplicas {
+		if enabled == masterInstance.SemiSyncMasterWaitForReplicaCount-masterInstance.SemiSyncMasterClients {
 			break
 		}
 	}
 	return actions
 }
 
-// LogSemiSyncReplicaAnalysis outputs the analysis results for a semi-sync analysis using the given log function
-func LogSemiSyncReplicaAnalysis(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance, actions map[*Instance]bool, logf func(s string, a ...interface{})) {
+// logSemiSyncReplicaAnalysis outputs the analysis results for a semi-sync analysis using the given log function
+func logSemiSyncReplicaAnalysis(possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance, actions map[*Instance]bool, logf func(s string, a ...interface{})) {
 	logReplicas("possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas, logf)
 	logReplicas("always-async replicas", asyncReplicas, logf)
 	logReplicas("excluded replicas (defunct)", excludedReplicas, logf)

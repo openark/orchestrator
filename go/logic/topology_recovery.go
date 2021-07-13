@@ -1511,7 +1511,8 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	logFn := func(s string, a ...interface{}) { AuditTopologyRecovery(topologyRecovery, fmt.Sprintf(s, a...)) }
 	masterInstance, err := inst.RecoverSemiSyncReplicas(&analysisEntry.AnalyzedInstanceKey, nil, exactReplicaTopology, logFn)
 	if err != nil {
-		return true, topologyRecovery, err
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: %s", err.Error()))
+		return true, topologyRecovery, log.Errorf("semi-sync: %w", err)
 	}
 	// TODO even though we resolve correctly here, we are re-triggering the same analysis until the next polling interval. WHY?
 
