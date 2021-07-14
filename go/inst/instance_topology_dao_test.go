@@ -2,6 +2,7 @@ package inst
 
 import (
 	"github.com/openark/golib/log"
+	test "github.com/openark/golib/tests"
 	"github.com/openark/orchestrator/go/config"
 	"testing"
 )
@@ -108,4 +109,52 @@ func TestClassifyAndPrioritizeReplicas_NonReplicatingReplica(t *testing.T) {
 	expectInstancesMatch(t, possibleSemiSyncReplicas, []*Instance{replica1, replica2, replica3})
 	expectInstancesMatch(t, asyncReplicas, []*Instance{})
 	expectInstancesMatch(t, excludedReplicas, []*Instance{})
+}
+
+func TestDetermineSemiSyncReplicaActionsForExactTopology_EnableSomeDisableSome(t *testing.T) {
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 2}
+	replica1 := &Instance{SemiSyncReplicaEnabled: true}
+	replica2 := &Instance{SemiSyncReplicaEnabled: false}
+	replica3 := &Instance{SemiSyncReplicaEnabled: true}
+	replica4 := &Instance{SemiSyncReplicaEnabled: false}
+	replica5 := &Instance{SemiSyncReplicaEnabled: true}
+	possibleSemiSyncReplicas := []*Instance{replica1, replica2, replica3, replica4}
+	asyncReplicas := []*Instance{replica5}
+	actions := determineSemiSyncReplicaActionsForExactTopology(master, possibleSemiSyncReplicas, asyncReplicas)
+	test.S(t).ExpectTrue(len(actions) == 3)
+	test.S(t).ExpectTrue(actions[replica2])
+	test.S(t).ExpectFalse(actions[replica3])
+	test.S(t).ExpectTrue(actions[replica5])
+}
+
+func TestDetermineSemiSyncReplicaActionsForExactTopology_NoActions(t *testing.T) {
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1}
+	replica1 := &Instance{SemiSyncReplicaEnabled: true}
+	replica2 := &Instance{SemiSyncReplicaEnabled: false}
+	replica3 := &Instance{SemiSyncReplicaEnabled: false}
+	possibleSemiSyncReplicas := []*Instance{replica1, replica2, replica3}
+	asyncReplicas := []*Instance{}
+	actions := determineSemiSyncReplicaActionsForExactTopology(master, possibleSemiSyncReplicas, asyncReplicas)
+	test.S(t).ExpectTrue(len(actions) == 0)
+}
+
+func TestDetermineSemiSyncReplicaActionsForEnoughTopology_MoreThanWaitCountNoActions(t *testing.T) {
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1}
+	replica1 := &Instance{SemiSyncReplicaEnabled: true}
+	replica2 := &Instance{SemiSyncReplicaEnabled: true}
+	replica3 := &Instance{SemiSyncReplicaEnabled: true}
+	possibleSemiSyncReplicas := []*Instance{replica1, replica2, replica3}
+	actions := determineSemiSyncReplicaActionsForEnoughTopology(master, possibleSemiSyncReplicas)
+	test.S(t).ExpectTrue(len(actions) == 0)
+}
+
+func TestDetermineSemiSyncReplicaActionsForEnoughTopology_LessThanWaitCountEnableOne(t *testing.T) {
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 2}
+	replica1 := &Instance{SemiSyncReplicaEnabled: false}
+	replica2 := &Instance{SemiSyncReplicaEnabled: true}
+	replica3 := &Instance{SemiSyncReplicaEnabled: false}
+	possibleSemiSyncReplicas := []*Instance{replica1, replica2, replica3}
+	actions := determineSemiSyncReplicaActionsForEnoughTopology(master, possibleSemiSyncReplicas)
+	test.S(t).ExpectTrue(len(actions) == 1)
+	test.S(t).ExpectTrue(actions[replica1])
 }
