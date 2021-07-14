@@ -663,8 +663,7 @@ func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatin
 }
 
 // classifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding replicas
-// that are down. Downtimed replicas are treated like async replicas. The function furthermore prioritizes the possible semi-sync replicas
-// based on SemiSyncPriority, PromotionRule and hostname (fallback).
+// that are down. The function furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule and hostname (fallback).
 func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingInstance *InstanceKey) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
 	// Classify based on state and semi-sync priority
 	possibleSemiSyncReplicas = make([]*Instance, 0)
@@ -674,7 +673,7 @@ func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingIn
 		isReplicating := replica.Key.Equals(includeNonReplicatingInstance) || replica.ReplicaRunning()
 		if !replica.IsLastCheckValid || !isReplicating {
 			excludedReplicas = append(excludedReplicas, replica)
-		} else if replica.SemiSyncPriority == 0 || replica.IsDowntimed {
+		} else if replica.SemiSyncPriority == 0 {
 			asyncReplicas = append(asyncReplicas, replica)
 		} else {
 			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
@@ -762,7 +761,7 @@ func logSemiSyncReplicaList(description string, replicas []*Instance) {
 	if len(replicas) > 0 {
 		log.Debugf("semi-sync: %s:", description)
 		for _, replica := range replicas {
-			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning())
+			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsLastCheckValid, replica.ReplicaRunning())
 		}
 	} else {
 		log.Debugf("semi-sync: %s: (none)", description)
