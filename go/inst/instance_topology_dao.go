@@ -676,10 +676,10 @@ func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingIn
 		}
 	}
 
-	// Sort replicas by priority, promotion rule and name
+	// Sort replicas by priority (higher number means higher priority), promotion rule and name
 	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
 		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
-			return possibleSemiSyncReplicas[i].SemiSyncPriority < possibleSemiSyncReplicas[j].SemiSyncPriority
+			return possibleSemiSyncReplicas[i].SemiSyncPriority > possibleSemiSyncReplicas[j].SemiSyncPriority
 		}
 		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
 			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
