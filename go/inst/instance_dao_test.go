@@ -70,7 +70,7 @@ func TestMkInsertOdkuSingle(t *testing.T) {
         `
 	a1 := `i710, 3306, 0, 710, , 5.6.7, 5.6, MySQL, false, false, STATEMENT,
 	FULL, false, false, , 0, , 0,
-	false, false, 0, 0, false, false, false, , , , , , , false, false, , 0, mysql.000007, 10, , 0, , , {0 false}, {0 false}, 0, 0, [], , , , , , 0, false, false, false, false, false, false, false, 0, 0, false, false, 0, false, , 0, , false, , , [], , 0, `
+	false, false, 0, 0, false, false, false, , , , , , , false, false, , 0, mysql.000007, 10, , 0, , , {0 false}, {0 false}, 0, 0, [], , , , , , 0, false, false, false, false, 0, false, false, 0, 0, false, false, 0, false, , 0, , false, , , [], , 0, `
 
 	sql1, args1, err := mkInsertOdkuForInstances(instances[:1], false, true)
 	test.S(t).ExpectNil(err)
