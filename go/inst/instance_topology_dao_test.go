@@ -124,11 +124,11 @@ func TestDetermineSemiSyncReplicaActionsForExactTopology_EnableSomeDisableSome(t
 	test.S(t).ExpectTrue(len(actions) == 3)
 	test.S(t).ExpectTrue(actions[replica2])
 	test.S(t).ExpectFalse(actions[replica3])
-	test.S(t).ExpectTrue(actions[replica5])
+	test.S(t).ExpectFalse(actions[replica5])
 }
 
 func TestDetermineSemiSyncReplicaActionsForExactTopology_NoActions(t *testing.T) {
-	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1}
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1, SemiSyncMasterClients: 1}
 	replica1 := &Instance{SemiSyncReplicaEnabled: true}
 	replica2 := &Instance{SemiSyncReplicaEnabled: false}
 	replica3 := &Instance{SemiSyncReplicaEnabled: false}
@@ -139,7 +139,7 @@ func TestDetermineSemiSyncReplicaActionsForExactTopology_NoActions(t *testing.T)
 }
 
 func TestDetermineSemiSyncReplicaActionsForEnoughTopology_MoreThanWaitCountNoActions(t *testing.T) {
-	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1}
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 1, SemiSyncMasterClients: 3}
 	replica1 := &Instance{SemiSyncReplicaEnabled: true}
 	replica2 := &Instance{SemiSyncReplicaEnabled: true}
 	replica3 := &Instance{SemiSyncReplicaEnabled: true}
@@ -149,7 +149,7 @@ func TestDetermineSemiSyncReplicaActionsForEnoughTopology_MoreThanWaitCountNoAct
 }
 
 func TestDetermineSemiSyncReplicaActionsForEnoughTopology_LessThanWaitCountEnableOne(t *testing.T) {
-	master := &Instance{SemiSyncMasterWaitForReplicaCount: 2}
+	master := &Instance{SemiSyncMasterWaitForReplicaCount: 2, SemiSyncMasterClients: 1}
 	replica1 := &Instance{SemiSyncReplicaEnabled: false}
 	replica2 := &Instance{SemiSyncReplicaEnabled: true}
 	replica3 := &Instance{SemiSyncReplicaEnabled: false}
