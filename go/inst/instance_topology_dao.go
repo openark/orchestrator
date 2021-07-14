@@ -584,7 +584,7 @@ func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoor
 // MaybeDisableSemiSyncMaster always disables the semi-sync master (rpl_semi_sync_master_enabled) if the semi-sync priority is > 0. This is
 // a little odd but in line with the legacy behavior and we really should disable the semi-sync master flag for replicas when starting replication.
 func MaybeDisableSemiSyncMaster(replicaInstance *Instance) (*Instance, error) {
-	if replicaInstance.SemiSyncPriority > 0 {
+	if replicaInstance.SemiSyncPriority > 0 && replicaInstance.SemiSyncMasterEnabled {
 		log.Infof("semi-sync: %s: setting rpl_semi_sync_master_enabled: %t", &replicaInstance.Key, false)
 		replicaInstance, err := SetSemiSyncMaster(&replicaInstance.Key, false)
 		if err != nil {
@@ -609,7 +609,7 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 
 	// New logic: If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are set, we enable semi-sync only if the
 	// given replica instance is in the list of replicas to have semi-sync enabled (according to the priority).
-	_, actions, err := AnalyzeSemiSyncReplicaTopology(&replicaInstance.MasterKey, &replicaInstance.Key, config.Config.EnforceExactSemiSyncReplicas)
+	_, _, actions, err := AnalyzeSemiSyncReplicaTopology(&replicaInstance.MasterKey, &replicaInstance.Key, config.Config.EnforceExactSemiSyncReplicas)
 	if err != nil {
 		return replicaInstance, log.Errorf("semi-sync: %s", err.Error())
 	}
@@ -639,15 +639,15 @@ func maybeEnableSemiSyncReplicaLegacy(replicaInstance *Instance) (*Instance, err
 
 // AnalyzeSemiSyncReplicaTopology analyzes the replica topology for the given master and determines actions for the semi-sync replica enabled
 // variable. It does not take any action itself.
-func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatingInstance *InstanceKey, exactReplicaTopology bool) (masterInstance *Instance, actions map[*Instance]bool, err error) {
+func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatingInstance *InstanceKey, exactReplicaTopology bool) (masterInstance *Instance, replicas []*Instance, actions map[*Instance]bool, err error) {
 	// Read entire topology of master and its replicas
 	masterInstance, err = ReadTopologyInstance(masterKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	replicas, err := ReadReplicaInstances(masterKey)
+	replicas, err = ReadReplicaInstances(masterKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Classify and prioritize replicas & figure out which replicas need to be acted upon
@@ -655,7 +655,7 @@ func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatin
 	actions = determineSemiSyncReplicaActions(masterInstance, possibleSemiSyncReplicas, asyncReplicas, exactReplicaTopology)
 	logSemiSyncReplicaAnalysis(masterInstance, possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions)
 
-	return masterInstance, actions, nil
+	return masterInstance, replicas, actions, nil
 }
 
 // classifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding replicas
@@ -666,9 +666,10 @@ func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingIn
 	asyncReplicas = make([]*Instance, 0)
 	excludedReplicas = make([]*Instance, 0)
 	for _, replica := range replicas {
-		if !replica.IsLastCheckValid || (!replica.Key.Equals(includeNonReplicatingInstance) && !replica.ReplicaRunning()) {
+		isReplicating := replica.Key.Equals(includeNonReplicatingInstance) || replica.ReplicaRunning()
+		if !replica.IsLastCheckValid || !isReplicating {
 			excludedReplicas = append(excludedReplicas, replica)
-		} else if replica.SemiSyncPriority == 0 {
+		} else if replica.SemiSyncPriority == 0 || replica.IsDowntimed {
 			asyncReplicas = append(asyncReplicas, replica)
 		} else {
 			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
@@ -756,7 +757,7 @@ func logSemiSyncReplicaList(description string, replicas []*Instance) {
 	if len(replicas) > 0 {
 		log.Debugf("semi-sync: %s:", description)
 		for _, replica := range replicas {
-			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsLastCheckValid, replica.ReplicaRunning())
+			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, downtimed = %t, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsDowntimed, replica.IsLastCheckValid, replica.ReplicaRunning())
 		}
 	} else {
 		log.Debugf("semi-sync: %s: (none)", description)

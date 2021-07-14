@@ -1510,13 +1510,19 @@ func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.Replica
 // variable (rpl_semi_sync_replica_enabled) of the replicas depending on their semi-sync priority and promotion rule. If exactReplicaTopology, the function will only ever enable
 // semi-sync on replicas and never disable it.
 func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, exactReplicaTopology bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
-	masterInstance, actions, err := inst.AnalyzeSemiSyncReplicaTopology(&analysisEntry.AnalyzedInstanceKey, nil, exactReplicaTopology)
+	masterInstance, replicas, actions, err := inst.AnalyzeSemiSyncReplicaTopology(&analysisEntry.AnalyzedInstanceKey, nil, exactReplicaTopology)
 	if err != nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: %s", err.Error()))
 		return true, topologyRecovery, log.Errorf("semi-sync: %s", err.Error())
 	} else if len(actions) == 0 {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot determine actions based on possible semi-sync replicas; cannot recover on %+v", &analysisEntry.AnalyzedInstanceKey))
 		return true, topologyRecovery, log.Errorf("cannot determine actions based on possible semi-sync replicas; cannot recover on %+v", &analysisEntry.AnalyzedInstanceKey)
+	}
+
+	// Disable semi-sync master on all replicas; this is to avoid semi-sync failures on the replicas (rpl_semi_sync_master_no_tx)
+	// and to make it consistent with the logic in SetReadOnly
+	for _, replica := range replicas {
+		inst.MaybeDisableSemiSyncMaster(replica) // it's okay if this fails
 	}
 
 	// Take action: we first enable and then disable (two loops) in order to avoid "locked master" scenarios
@@ -1537,7 +1543,6 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 			}
 		}
 	}
-	// TODO even though we resolve correctly here, we are re-triggering the same analysis until the next polling interval. WHY?
 
 	resolveRecovery(topologyRecovery, masterInstance)
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: recovery complete; success = %t", topologyRecovery.IsSuccessful))
