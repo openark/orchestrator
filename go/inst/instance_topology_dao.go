@@ -622,11 +622,15 @@ func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
 			return replicaInstance, nil
 		}
 	}
+
+	// We are not taking any action for anything but replicaInstance, so if we detect that another replica has to be enabled,
+	// we won't act here and leave it to a future MasterWithTooManySemiSyncReplicas or LockedSemiSyncMaster event to correct.
+
 	log.Infof("semi-sync: %+v: no action taken; this may lead to future recoveries", &replicaInstance.Key)
 	return replicaInstance, nil
 }
 
-// maybeEnableSemiSyncReplicaLegacy enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced). This is backwards
+// maybeEnableSemiSyncReplicaLegacy enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced). This is a backwards
 // compatible logic that NEVER enables semi-sync if the promotion rule is "must_not".
 func maybeEnableSemiSyncReplicaLegacy(replicaInstance *Instance) (*Instance, error) {
 	if replicaInstance.SemiSyncPriority > 0 {
@@ -659,7 +663,8 @@ func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatin
 }
 
 // classifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding replicas
-// that are down. It furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule and hostname (fallback).
+// that are down. Downtimed replicas are treated like async replicas. The function furthermore prioritizes the possible semi-sync replicas
+// based on SemiSyncPriority, PromotionRule and hostname (fallback).
 func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingInstance *InstanceKey) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
 	// Classify based on state and semi-sync priority
 	possibleSemiSyncReplicas = make([]*Instance, 0)
