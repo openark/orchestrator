@@ -644,14 +644,17 @@ func maybeEnableSemiSyncReplicaLegacy(replicaInstance *Instance) (*Instance, err
 // AnalyzeSemiSyncReplicaTopology analyzes the replica topology for the given master and determines actions for the semi-sync replica enabled
 // variable. It does not take any action itself.
 func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatingInstance *InstanceKey, exactReplicaTopology bool) (masterInstance *Instance, replicas []*Instance, actions map[*Instance]bool, err error) {
-	// Read entire topology of master and its replicas
+	// Read entire topology of master and its replicas to ensure we have the most up-to-date information
 	masterInstance, err = ReadTopologyInstance(masterKey)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	replicas, err = ReadReplicaInstances(masterKey)
+	replicas, err = ReadTopologyInstances(masterInstance.Replicas.GetInstanceKeys())
 	if err != nil {
-		return nil, nil, nil, err
+		replicas, err = ReadReplicaInstances(masterKey) // Falling back to just reading from our backend
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	// Classify and prioritize replicas & figure out which replicas need to be acted upon

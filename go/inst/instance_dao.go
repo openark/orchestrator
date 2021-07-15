@@ -204,6 +204,20 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
 }
 
+// ReadTopologyInstances is a convenience method that calls ReadTopologyInstance
+// for all the instance keys and returns a slice of Instance.
+func ReadTopologyInstances(instanceKeys []InstanceKey) ([]*Instance, error) {
+	instances := make([]*Instance, 0)
+	for _, replicaKey := range instanceKeys {
+		replica, err := ReadTopologyInstance(&replicaKey)
+		if err != nil {
+			return nil, err
+		}
+		instances = append(instances, replica)
+	}
+	return instances, nil
+}
+
 func RetryInstanceFunction(f func() (*Instance, error)) (instance *Instance, err error) {
 	for i := 0; i < retryInstanceFunctionCount; i++ {
 		if instance, err = f(); err == nil {
