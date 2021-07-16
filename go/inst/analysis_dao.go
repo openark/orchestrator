@@ -197,7 +197,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		IFNULL(
 			SUM( replica_instance.last_checked <= replica_instance.last_seen ), 
 			SUM( member_instance.last_checked <= member_instance.last_seen 
-				AND member_instance.replication_group_member_state = 'ONLINE')
+			AND member_instance.replication_group_member_state = 'ONLINE')
 		) AS count_valid_replicas,
 		IFNULL(
 			SUM(
