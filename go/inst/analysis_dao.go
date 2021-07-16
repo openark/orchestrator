@@ -191,12 +191,13 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			) = master_instance.cluster_name
 		) AS is_cluster_master,
 		MIN(master_instance.gtid_mode) AS gtid_mode,
-		COUNT(replica_instance.server_id) AS count_replicas,
+		-- Consider GR group members as replicas
+		GREATEST(COUNT( replica_instance.server_id ), COUNT( member_instance.server_id )-1 ) AS count_replicas,
+		-- Consider GR group members as valid replicas
 		IFNULL(
-			SUM(
-				replica_instance.last_checked <= replica_instance.last_seen
-			),
-			0
+			SUM( replica_instance.last_checked <= replica_instance.last_seen ), 
+			SUM( member_instance.last_checked <= member_instance.last_seen 
+				AND member_instance.replication_group_member_state = 'ONLINE')
 		) AS count_valid_replicas,
 		IFNULL(
 			SUM(
@@ -370,6 +371,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				master_instance.hostname
 			) = replica_instance.master_host
 			AND master_instance.port = replica_instance.master_port
+			AND replica_instance.replication_group_name = ''
+		)
+		LEFT JOIN database_instance member_instance ON (
+			master_instance.replication_group_name = member_instance.replication_group_name 
+			AND master_instance.PORT = member_instance.PORT
+			AND member_instance.replication_group_name != ''
 		)
 		LEFT JOIN database_instance_maintenance ON (
 			master_instance.hostname = database_instance_maintenance.hostname
