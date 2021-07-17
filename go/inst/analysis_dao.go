@@ -227,8 +227,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				), 
 				GROUP_CONCAT( 
 					concat( member_instance.Hostname, 
-					':', 
-					member_instance.PORT ) 
+							':', 
+							member_instance.PORT ) 
 				) 
 		) AS slave_hosts,
 		MIN(
