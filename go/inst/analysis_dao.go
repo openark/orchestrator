@@ -205,7 +205,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				AND replica_instance.slave_io_running != 0
 				AND replica_instance.slave_sql_running != 0
 			),
-			0
+			SUM( 
+				member_instance.last_checked <= member_instance.last_seen 
+				AND member_instance.replication_group_member_state = 'ONLINE'
+			)
 		) AS count_valid_replicating_replicas,
 		IFNULL(
 			SUM(
