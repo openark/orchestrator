@@ -192,7 +192,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		) AS is_cluster_master,
 		MIN(master_instance.gtid_mode) AS gtid_mode,
 		-- Consider GR group members as replicas
-		GREATEST(COUNT( replica_instance.server_id ), COUNT( member_instance.server_id )-1 ) AS count_replicas,
+		GREATEST(COUNT( replica_instance.server_id ), COUNT( member_instance.server_id ) ) AS count_replicas,
 		-- Consider GR group members as valid replicas
 		IFNULL(
 			SUM( replica_instance.last_checked <= replica_instance.last_seen ), 
@@ -220,13 +220,17 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			0
 		) AS count_replicas_failing_to_connect_to_master,
 		MIN(master_instance.replication_depth) AS replication_depth,
-		GROUP_CONCAT(
-			concat(
-				replica_instance.Hostname,
-				':',
-				replica_instance.Port
-			)
-		) as slave_hosts,
+		IFNULL( GROUP_CONCAT( 
+					concat( replica_instance.Hostname, 
+							':', 
+							replica_instance.PORT ) 
+				), 
+				GROUP_CONCAT( 
+					concat( member_instance.Hostname, 
+					':', 
+					member_instance.PORT ) 
+				) 
+		) AS slave_hosts,
 		MIN(
 			master_instance.slave_sql_running = 1
 			AND master_instance.slave_io_running = 0
@@ -378,7 +382,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		)
 		LEFT JOIN database_instance member_instance ON (
 			master_instance.replication_group_name = member_instance.replication_group_name 
-			AND master_instance.PORT = member_instance.PORT
+			AND member_instance.PORT = master_instance.PORT
+			AND member_instance.hostname != master_instance.hostname
 			AND member_instance.replication_group_name != ''
 		)
 		LEFT JOIN database_instance_maintenance ON (
