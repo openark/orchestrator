@@ -192,7 +192,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		) AS is_cluster_master,
 		MIN(master_instance.gtid_mode) AS gtid_mode,
 		-- Consider GR group members as replicas
-		GREATEST(COUNT( replica_instance.server_id ), COUNT( member_instance.server_id ) ) AS count_replicas,
+		CASE 
+			WHEN COUNT( replica_instance.server_id ) > COUNT( member_instance.server_id ) THEN
+				COUNT( replica_instance.server_id ) 
+			ELSE 
+				COUNT( member_instance.server_id )
+			END AS count_replicas,
 		-- Consider GR group members as valid replicas
 		IFNULL(
 			SUM( replica_instance.last_checked <= replica_instance.last_seen ), 
