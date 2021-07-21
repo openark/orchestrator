@@ -136,6 +136,9 @@ type ReplicationAnalysis struct {
 	ReplicationDepth                          uint
 	Replicas                                  InstanceKeyMap
 	SlaveHosts                                InstanceKeyMap // for backwards compatibility. Equals `Replicas`
+	CountReplicationGroupMembers              uint           // GR
+	CountValidReplicationGroupMembers         uint
+	ReplicationGroupMemberHosts               InstanceKeyMap
 	IsFailingToConnectToMaster                bool
 	Analysis                                  AnalysisCode
 	Description                               string

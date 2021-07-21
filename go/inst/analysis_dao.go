@@ -206,6 +206,15 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			),
 			0
 		) AS count_valid_replicating_replicas,
+		-- replication group member
+		COUNT(member_instance.server_id) AS count_replication_group_members,
+		IFNULL(
+			SUM(
+				member_instance.last_checked <= member_instance.last_seen
+				AND member_instance.replication_group_member_state = 'ONLINE'
+			),
+			0
+		) AS count_valid_replication_group_members,
 		IFNULL(
 			SUM(
 				replica_instance.last_checked <= replica_instance.last_seen
@@ -223,6 +232,13 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				replica_instance.Port
 			)
 		) as slave_hosts,
+		GROUP_CONCAT( 
+			concat( 
+				member_instance.Hostname, 
+				':', 
+				member_instance.Port 
+			) 
+		) as replication_group_member_hosts,
 		MIN(
 			master_instance.slave_sql_running = 1
 			AND master_instance.slave_io_running = 0
@@ -370,6 +386,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				master_instance.hostname
 			) = replica_instance.master_host
 			AND master_instance.port = replica_instance.master_port
+			AND master_instance.replication_group_name = ''
+		)
+		LEFT JOIN database_instance member_instance ON (
+ 			master_instance.replication_group_name = member_instance.replication_group_name
+			AND member_instance.last_seen >= member_instance.last_checked
+ 			AND member_instance.replication_group_name != ''
 		)
 		LEFT JOIN database_instance_maintenance ON (
 			master_instance.hostname = database_instance_maintenance.hostname
@@ -443,6 +465,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_replicas")
 		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_replicas_failing_to_connect_to_master")
 		a.CountDowntimedReplicas = m.GetUint("count_downtimed_replicas")
+		a.CountReplicationGroupMembers = m.GetUint("count_replication_group_members") // GR
+		a.CountValidReplicationGroupMembers = m.GetUint("count_valid_replication_group_members")
+
+		a.ReplicationGroupMemberHosts = *NewInstanceKeyMap()
+		a.ReplicationGroupMemberHosts.ReadCommaDelimitedList(m.GetString("replication_group_member_hosts"))
+
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
 		a.IsDowntimed = m.GetBool("is_downtimed")
