@@ -208,12 +208,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 // for all the instance keys and returns a slice of Instance.
 func ReadTopologyInstances(instanceKeys []InstanceKey) ([]*Instance, error) {
 	instances := make([]*Instance, 0)
-	for _, replicaKey := range instanceKeys {
-		replica, err := ReadTopologyInstance(&replicaKey)
+	for _, instanceKey := range instanceKeys {
+		instance, err := ReadTopologyInstance(&instanceKey)
 		if err != nil {
 			return nil, err
 		}
-		instances = append(instances, replica)
+		instances = append(instances, instance)
 	}
 	return instances, nil
 }
