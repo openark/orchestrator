@@ -1545,8 +1545,34 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 		}
 	}
 
+	// Wait for replica count to match desired wait count (this is what triggers the recovery)
+	AuditTopologyRecovery(topologyRecovery, "semi-sync: waiting for desired state:")
+	success := false
+	for i := 0; i < 10; i++ {
+		masterInstance, err = inst.ReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey)
+		if err != nil {
+			return true, topologyRecovery, fmt.Errorf("error re-reading master instance: %s", err.Error())
+		}
+		if exactReplicaTopology {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - current semi-sync replica count = %d, desired semi-sync replica count = %d", masterInstance.SemiSyncMasterClients, masterInstance.SemiSyncMasterWaitForReplicaCount))
+			success = masterInstance.SemiSyncMasterWaitForReplicaCount == masterInstance.SemiSyncMasterClients
+		} else {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - current semi-sync replica count = %d, desired semi-sync replica count >= %d", masterInstance.SemiSyncMasterClients, masterInstance.SemiSyncMasterWaitForReplicaCount))
+			success = masterInstance.SemiSyncMasterWaitForReplicaCount >= masterInstance.SemiSyncMasterClients
+		}
+		if success {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if !success {
+		AuditTopologyRecovery(topologyRecovery, "semi-sync: timed out waiting for desired state")
+		return true, topologyRecovery, fmt.Errorf("timed out waiting for desired state")
+	}
+
 	resolveRecovery(topologyRecovery, masterInstance)
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: recovery complete; success = %t", topologyRecovery.IsSuccessful))
+
 	return true, topologyRecovery, nil
 }
 
