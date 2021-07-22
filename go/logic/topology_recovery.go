@@ -1548,7 +1548,7 @@ func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry i
 	// Wait for replica count to match desired wait count (this is what triggers the recovery)
 	AuditTopologyRecovery(topologyRecovery, "semi-sync: waiting for desired state:")
 	success := false
-	for i := 0; i < 10; i++ {
+	for i := uint(0); i < config.Config.WaitForSemiSyncRecoverySeconds; i++ {
 		masterInstance, err = inst.ReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey)
 		if err != nil {
 			return true, topologyRecovery, fmt.Errorf("error re-reading master instance: %s", err.Error())
