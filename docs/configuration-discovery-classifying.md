@@ -18,7 +18,7 @@
 
 By default, `orchestrator` uses `SHOW SLAVE STATUS` and takes a 1-second granularity value for lag. However this lag does not take into account cascading lags in the event of chained replication. Many use custom heartbeat mechanisms such as `pt-heartbeat`. This provides with "absolute" lag from master, as well as sub-second resolution.
 
-`ReplicationLagQuery` allows you to setup your own query.``~~~~``
+`ReplicationLagQuery` allows you to setup your own query.
 
 ### Cluster alias
 
