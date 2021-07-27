@@ -554,7 +554,7 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	case MasterRecoveryGTID:
 		{
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: regrouping replicas via GTID"))
-			lostReplicas, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasGTID(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer, promotedReplicaIsIdeal)
+			lostReplicas, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasGTID(failedInstanceKey, true, false, nil, &topologyRecovery.PostponedFunctionsContainer, promotedReplicaIsIdeal)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
@@ -870,11 +870,13 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&analysisEntry, promotedReplica); !satisfied {
 			return nil, fmt.Errorf("RecoverDeadMaster: failed %+v promotion; %s", promotedReplica.Key, reason)
 		}
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: promoted replica lag seconds: %+v", promotedReplica.ReplicationLagSeconds.Int64))
 		if config.Config.FailMasterPromotionOnLagMinutes > 0 &&
 			time.Duration(promotedReplica.ReplicationLagSeconds.Int64)*time.Second >= time.Duration(config.Config.FailMasterPromotionOnLagMinutes)*time.Minute {
 			// candidate replica lags too much
 			return nil, fmt.Errorf("RecoverDeadMaster: failed promotion. FailMasterPromotionOnLagMinutes is set to %d (minutes) and promoted replica %+v 's lag is %d (seconds)", config.Config.FailMasterPromotionOnLagMinutes, promotedReplica.Key, promotedReplica.ReplicationLagSeconds.Int64)
 		}
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: promoted replica sql thread up-to-date: %+v", promotedReplica.SQLThreadUpToDate()))
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			return nil, fmt.Errorf("RecoverDeadMaster: failed promotion. FailMasterPromotionIfSQLThreadNotUpToDate is set and promoted replica %+v 's sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
 		}
@@ -886,6 +888,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("DelayMasterPromotionIfSQLThreadNotUpToDate: SQL thread caught up on %+v", promotedReplica.Key))
 		}
 		// All seems well. No override done.
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: found no reason to override promotion of %+v", promotedReplica.Key))
 		return promotedReplica, err
 	}
 	if promotedReplica, err = overrideMasterPromotion(); err != nil {
@@ -1315,7 +1318,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	switch coMasterRecoveryType {
 	case MasterRecoveryGTID:
 		{
-			lostReplicas, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasGTID(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer, nil)
+			lostReplicas, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasGTID(failedInstanceKey, true, false, nil, &topologyRecovery.PostponedFunctionsContainer, nil)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
@@ -1479,14 +1482,72 @@ func checkAndRecoverNonWriteableMaster(analysisEntry inst.ReplicationAnalysis, c
 
 // checkAndRecoverLockedSemiSyncMaster
 func checkAndRecoverLockedSemiSyncMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
-
 	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverLockedSemiSyncMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
 	}
+	if config.Config.EnforceExactSemiSyncReplicas {
+		return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
+	}
+	if config.Config.RecoverLockedSemiSyncMaster {
+		return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, false)
+	}
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no action taken to recover locked semi sync master on %+v. Enable RecoverLockedSemiSyncMaster or EnforceExactSemiSyncReplicas change this behavior.", analysisEntry.AnalyzedInstanceKey))
+	return false, nil, err
+}
 
-	return false, nil, nil
+// checkAndRecoverMasterWithTooManySemiSyncReplicas registers and performs a recovery for MasterWithTooManySemiSyncReplicas
+func checkAndRecoverMasterWithTooManySemiSyncReplicas(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	topologyRecovery, err = AttemptRecoveryRegistration(&analysisEntry, true, true)
+	if topologyRecovery == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverMasterWithTooManySemiSyncReplicas.", analysisEntry.AnalyzedInstanceKey))
+		return false, nil, err
+	}
+	return recoverSemiSyncReplicas(topologyRecovery, analysisEntry, true)
+}
+
+// recoverSemiSyncReplicas analyzes the replica topology for the given master and applies to repair it. If exactReplicaTopology is set, it will enable/disable the semi-sync enabled
+// variable (rpl_semi_sync_replica_enabled) of the replicas depending on their semi-sync priority and promotion rule. If exactReplicaTopology is not set, the function will only ever
+// enable semi-sync on replicas and never disable it. This variable typically corresponds to the EnforceExactSemiSyncReplicas config variable.
+func recoverSemiSyncReplicas(topologyRecovery *TopologyRecovery, analysisEntry inst.ReplicationAnalysis, exactReplicaTopology bool) (recoveryAttempted bool, topologyRecoveryOut *TopologyRecovery, err error) {
+	masterInstance, replicas, actions, err := inst.AnalyzeSemiSyncReplicaTopology(&analysisEntry.AnalyzedInstanceKey, nil, exactReplicaTopology)
+	if err != nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: %s", err.Error()))
+		return true, topologyRecovery, log.Errorf("semi-sync: %s", err.Error())
+	} else if len(actions) == 0 {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: cannot determine actions based on possible semi-sync replicas; cannot recover on %+v", &analysisEntry.AnalyzedInstanceKey))
+		return true, topologyRecovery, log.Errorf("cannot determine actions based on possible semi-sync replicas; cannot recover on %+v", &analysisEntry.AnalyzedInstanceKey)
+	}
+
+	// Disable semi-sync master on all replicas; this is to avoid semi-sync failures on the replicas (rpl_semi_sync_master_no_tx)
+	// and to make it consistent with the logic in SetReadOnly
+	for _, replica := range replicas {
+		inst.MaybeDisableSemiSyncMaster(replica) // it's okay if this fails
+	}
+
+	// Take action: we first enable and then disable (two loops) in order to avoid "locked master" scenarios
+	AuditTopologyRecovery(topologyRecovery, "semi-sync: taking actions:")
+	for replica, enable := range actions {
+		if enable {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
+			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
+				return true, topologyRecovery, log.Errorf("cannot enable semi sync on replica %+v", replica.Key)
+			}
+		}
+	}
+	for replica, enable := range actions {
+		if !enable {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: - %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable))
+			if _, err := inst.SetSemiSyncReplica(&replica.Key, enable); err != nil {
+				return true, topologyRecovery, fmt.Errorf("cannot disable semi sync on replica %+v", replica.Key)
+			}
+		}
+	}
+
+	resolveRecovery(topologyRecovery, masterInstance)
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("semi-sync: recovery complete; success = %t", topologyRecovery.IsSuccessful))
+	return true, topologyRecovery, nil
 }
 
 // checkAndRecoverGenericProblem is a general-purpose recovery function
@@ -1659,6 +1720,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		} else {
 			return checkAndRecoverLockedSemiSyncMaster, true
 		}
+	case inst.MasterWithTooManySemiSyncReplicas:
+		return checkAndRecoverMasterWithTooManySemiSyncReplicas, true
 	// intermediate master
 	case inst.DeadIntermediateMaster:
 		return checkAndRecoverDeadIntermediateMaster, true
