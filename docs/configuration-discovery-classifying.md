@@ -90,21 +90,21 @@ This behavior can be controlled by the following options:
    and `MasterWithTooManyReplicas` will enable _and disable_ semi-sync on the replicas to match the desired topology exactly based on the priority order.
 - `RecoverLockedSemiSyncMaster`: flag that decides whether to recover from a `LockedSemiSyncMaster` scenario. If enabled, the recovery of `LockedSemiSyncMaster`
   will enable _(but never disable)_ semi-sync on the replicas in the priority order to match the master wait count. This option has no effect if 
-  `EnforceExactSemiSyncReplicas` is set. It is only useful if you'd like to only handle a situation which which there are too few semi-sync replicas, 
+  `EnforceExactSemiSyncReplicas` is set. It is useful if you'd like to only handle a situation in which there are too few semi-sync replicas, 
   but not if there are too many.
 - `ReasonableLockedSemiSyncMasterSeconds`: number of seconds after which the `LockedSemiSyncMaster` condition is triggered; if not set, falls back to `ReasonableReplicationLagSeconds`
 
 The priority order is defined by `DetectSemiSyncEnforcedQuery` (zero means async replica; higher number is higher priority), the promotion rule (`DetectPromotionRuleQuery`)
 and the hostname (fallback). 
 
-**Example 1**: Enforcing a strict semi-sync replica topology with two replicas and `rpl_semi_sync_master_wait_for_slave_count=1`:
+**Example 1**: Enforcing a strict semi-sync replica topology, with `rpl_semi_sync_master_wait_for_slave_count=1`:
 
 ```
   "DetectSemiSyncEnforcedQuery": "select priority from meta.semi_sync where cluster_member = @@hostname",
   "EnforceExactSemiSyncReplicas": true
 ```
 
-Assuming this topology:
+Assuming this topology,
 
 ```
          ,- replica1 (priority = 10, rpl_semi_sync_slave_enabled = 1)
@@ -113,9 +113,9 @@ Assuming this topology:
 ```
 
 `orchestrator` would detect a [`MasterWithTooManySemiSyncReplicas`](failure-detection.md#masterwithtoomanysemisyncreplicas) scenario
-and disable semi-sync on replica2.
+and disable semi-sync on replica1 (lower priority).
 
-**Example 2**: Enforcing a weak semi-sync replica toplogy with two replicas and `rpl_semi_sync_master_wait_for_slave_count=1`:
+**Example 2**: Enforcing a weak semi-sync replica toplogy, with `rpl_semi_sync_master_wait_for_slave_count=1`:
 
 ```
   "DetectSemiSyncEnforcedQuery": "select 2586",
@@ -123,7 +123,7 @@ and disable semi-sync on replica2.
   "RecoverLockedSemiSyncMaster": true
 ```
 
-Assuming this topology:
+Assuming this topology,
 
 ```
          ,- replica1 (priority = 2586, promotion rule = prefer, rpl_semi_sync_slave_enabled = 0)
@@ -132,4 +132,4 @@ Assuming this topology:
 ```
 
 `orchestrator` would detect a [`LockedSemiSyncMaster`](failure-detection.md#lockedsemisyncmaster) scenario
-and enable semi-sync on replica1.
+and enable semi-sync on replica1 (more preferable promotion rule).

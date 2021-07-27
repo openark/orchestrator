@@ -104,7 +104,7 @@ This scenario can happen when the master is overloaded. Clients would see a "Too
 3. `rpl_semi_sync_master_timeout` is high enough such that master locks writes and does not fall back to asynchronous replication
 
 This condition only triggers after `ReasonableLockedSemiSyncMasterSeconds` has passed. If `ReasonableLockedSemiSyncMasterSeconds` is not set, 
-it trigger after `ReasonableReplicationLagSeconds`.
+it triggers after `ReasonableReplicationLagSeconds`.
 
 Remediation of this condition can be to disable semi-sync on the master, or to bring up (or enable) sufficient semi-sync replicas.
 
