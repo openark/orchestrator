@@ -40,6 +40,7 @@ const (
 	AllMasterReplicasNotReplicatingOrDead                                = "AllMasterReplicasNotReplicatingOrDead"
 	LockedSemiSyncMasterHypothesis                                       = "LockedSemiSyncMasterHypothesis"
 	LockedSemiSyncMaster                                                 = "LockedSemiSyncMaster"
+	MasterWithTooManySemiSyncReplicas                                    = "MasterWithTooManySemiSyncReplicas"
 	MasterWithoutReplicas                                                = "MasterWithoutReplicas"
 	DeadCoMaster                                                         = "DeadCoMaster"
 	DeadCoMasterAndSomeReplicas                                          = "DeadCoMasterAndSomeReplicas"
@@ -228,5 +229,5 @@ func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType 
 // ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
 // between last_attempted_check to last_checked before we consider the instance as invalid.
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
-	return config.Config.InstancePollSeconds + 1
+	return config.Config.InstancePollSeconds + config.Config.ReasonableInstanceCheckSeconds
 }

@@ -9,6 +9,7 @@ WorkingDirectory=/usr/local/orchestrator
 ExecStart=/usr/local/orchestrator/orchestrator http
 EnvironmentFile=-/etc/sysconfig/orchestrator
 ExecReload=/bin/kill -HUP $MAINPID
+LimitNOFILE=16384
 
 [Install]
 WantedBy=multi-user.target
