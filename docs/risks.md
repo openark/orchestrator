@@ -23,4 +23,4 @@ Failovers are inherently tied to your deployments through hooks.
 
 There's always risk with failovers. Make sure to test them.
 
-Please make sure to read the [LICENSE](https://github.com/github/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.
+Please make sure to read the [LICENSE](https://github.com/openark/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.

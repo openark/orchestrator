@@ -154,21 +154,9 @@ export ORCHESTRATOR_API="https://orchestrator.proxy:80/api"
 
 - An `orchestrator` node cannot run without its backend DB. With `sqlite` backend this is trivial since `sqlite` runs embedded with `orchestrator`. With `MySQL` backend, the `orchestrator` service will bail out if unable to connect to the backend DB over a period of time.
 
-- An `orchestrator` node may be down, then come back. It will rejoin the `raft` group, and receive whatever events it missed while out. There is allowed as long as there is enough `raft` log. On most environments there should be enough log for a few hours.
+- An `orchestrator` node may be down, then come back. It will rejoin the `raft` group, and receive whatever events it missed while out. It does not matter how long the node has been away. If it does not have relevant local `raft` log/snapshots, another node will automatically feed it with a recent snapshot.
 
 - The `orchestrator` service will bail out if it can't join the `raft` group.
-
-- To join an `orchestrator` node that was down/away longer than what log retention permits, or a node where the database is completely empty, you will need to clone the backend DB from another, active node.
-
-  - With `sqlite` you will
-
-```
-active-node$ sqlite3 /var/lib/orchestrator/orchestrator.db .dump > /tmp/orchestrator-dump.sql`
-active-node$ scp /tmp/orchestrator-dump.sql new-node:/tmp/
-new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-dump.sql`
-```
-
-  - With `MySQL` use your favorite backup/restore method.
 
 See also [Master discovery with Key Value stores](kv.md#kv-and-orchestratorraft) via `orchestrator/raft`.
 

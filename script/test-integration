@@ -1,0 +1,23 @@
+#!/bin/bash
+
+export GOPATH="$PWD/.gopath"
+cd .gopath/src/github.com/openark/orchestrator
+
+setup_mysql() {
+  if [ ! -f "dbdeployer" ] ; then
+    return
+  fi
+  ./dbdeployer deploy single "5.7.21" --sandbox-binary $PWD/sandbox/binary --sandbox-home $PWD/sandboxes --sandbox-directory orc-sandbox --port=3306
+  mkdir -p bin
+  ln -s /go/src/github.com/openark/orchestrator/sandboxes/orc-sandbox/use bin/mysql
+  chmod +x bin/mysql
+  PATH=bin:$PATH
+}
+
+integration_tests() {
+  echo "# Running integration tests"
+  ./tests/integration/test.sh || exit 1
+}
+
+setup_mysql
+integration_tests

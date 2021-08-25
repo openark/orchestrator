@@ -19,9 +19,9 @@ package logic
 import (
 	"encoding/json"
 
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
-	"github.com/github/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/kv"
+	"github.com/openark/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )
@@ -77,8 +77,6 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.enableGlobalRecoveries(value)
 	case "put-key-value":
 		return applier.putKeyValue(value)
-	case "add-key-value":
-		return applier.addKeyValue(value)
 	case "put-instance-tag":
 		return applier.putInstanceTag(value)
 	case "delete-instance-tag":
@@ -258,21 +256,11 @@ func (applier *CommandApplier) enableGlobalRecoveries(value []byte) interface{} 
 }
 
 func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
-	kvPair := kv.KVPair{}
-	if err := json.Unmarshal(value, &kvPair); err != nil {
+	kvPair := &kv.KVPair{}
+	if err := json.Unmarshal(value, kvPair); err != nil {
 		return log.Errore(err)
 	}
-	err := kv.PutKVPair(&kvPair)
-	return err
-}
-
-func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
-	kvPair := kv.KVPair{}
-	if err := json.Unmarshal(value, &kvPair); err != nil {
-		return log.Errore(err)
-	}
-	err := kv.AddKVPair(&kvPair)
-
+	err := kv.PutKVPairs([]*kv.KVPair{kvPair})
 	return err
 }
 

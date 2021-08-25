@@ -1,6 +1,6 @@
 /*
    Copyright 2016 GitHub Inc.
-	 See https://github.com/github/orchestrator/blob/master/LICENSE
+	 See https://github.com/openark/orchestrator/blob/master/LICENSE
 */
 
 package app

@@ -21,6 +21,15 @@
 #   with all service nodes and let it figure out by itself identify of leader, no need for proxy. Example:
 #     export ORCHESTRATOR_API="http://service1:3000/api http://service2:3000/api http://service3:3000/api"
 #
+#   Optionally set ORCHESTRATOR_INSTANCE to the local instance where mysql is running.
+#   This is most likely to be used on bare metal or VM systems where you have a single
+#   MySQL instance running on a known port, in which case you would ensure that
+#   /etc/profile.d/orchestrator-client.sh contains code that does:
+#       export ORCHESTRATOR_INSTANCE=`hostname` or
+#       export ORCHESTRATOR_INSTANCE=`hostname`:12345 if using a port other than 3306.
+#   If you do this orchestrator-client will behave the same as the orchestrator binary
+#   and there will be no need to explicitly provide the parameter -i <hostname>:<port>.
+#
 # Usage:
 #   orchestrator-client -c <command> [flags...]
 # Examples:
@@ -40,7 +49,7 @@ orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 leader_api=
 
 command=
-instance=
+instance="${ORCHESTRATOR_INSTANCE:-}"
 destination=
 alias=
 owner="$(whoami | xargs)"
@@ -52,7 +61,9 @@ pool=
 hostname_flag=
 api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
+headers_auth="${ORCHESTRATOR_AUTH_USER_HEADER}"
 binlog=
+seconds=
 
 instance_hostport=
 destination_hostport=
@@ -80,12 +91,14 @@ for arg in "$@"; do
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
+    "-headers-auth"|"--headers-auth")     set -- "$@" "-e" ;;
     "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
+    "-seconds"|"--seconds")               set -- "$@" "-S" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:e:n:h:S:" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -105,8 +118,10 @@ do
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
     b) basic_auth="$OPTARG" ;;
+    e) headers_auth="$OPTARG" ;;
     n) binlog="$OPTARG" ;;
-    q) query="$OPTARG"
+    q) query="$OPTARG" ;;
+    S) seconds="$OPTARG"
   esac
 done
 
@@ -140,6 +155,10 @@ function get_curl_auth_params {
 
     curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
       requires_auth+=" --disallow-username-in-url"
+  fi
+
+  if [[ -n "${headers_auth}" ]]; then
+    requires_auth="-H "${headers_auth}""
   fi
 
   # Test API access
@@ -193,10 +212,12 @@ function detect_leader_api {
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  # Prevent leaking passwords if the URL has credentials like: http://<user>:<password>@host:3000/api
   local curl_auth_params="$(get_curl_auth_params)"
 
   if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
-    fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
+    santised_api=$(echo "${orchestrator_api}" | sed -e 's|:[^:^@^ ]*@|:<REMOVED>@|g')
+    fail "Cannot access orchestrator at ${santised_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
 
   leader_api=
@@ -208,6 +229,15 @@ function detect_leader_api {
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
     leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    if [ "$leader_check" == "200" ] ; then
+      leader_api="$api"
+      return
+    fi
+  done
+  # Cannot find leader directly. Maybe our config is wrong. But, perhaps one of the nodes can route us?
+  for api in ${apis[@]} ; do
+    api=$(normalize_orchestrator_api $api)
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/routed-leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -225,6 +255,7 @@ function api {
   local curl_auth_params="$(get_curl_auth_params)"
 
   path="$1"
+  raw_output="${2:-}"
 
   uri="$leader_api/$path"
   # echo $uri
@@ -256,8 +287,12 @@ function api {
   fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
-    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
-    [ "$api_details" != "null" ] && echo $api_details
+    if [ -n "$raw_output" ] ; then
+      echo $api_response
+    else
+      echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
+      [ "$api_details" != "null" ] && echo $api_details
+    fi
     exit 1
   fi
 }
@@ -283,11 +318,11 @@ function filter_keys {
 }
 
 function filter_broken_replicas {
-  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
+  cat - | jq '.[] | select((.ReplicationSQLThreadRuning == false or .ReplicationIOThreadRuning == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
 }
 
 function filter_running_replicas {
-  cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
+  cat - | jq '.[] | select(.ReplicationSQLThreadRuning == true and .ReplicationIOThreadRuning == true) | [.]'
 }
 
 function print_key {
@@ -304,7 +339,7 @@ function which_api {
 
 function api_call {
   assert_nonempty "path" "$api_path"
-  api "$api_path"
+  api "$api_path" "true"
   print_response
 }
 
@@ -328,18 +363,22 @@ function prompt_help {
   -R <promotion rule>, --promotion-rule <promotion rule>
     rule for 'register-candidate' command
   -U <orchestrator_api>, --api <orchestrator_api>
-    override \$orchestrator_api environemtn variable,
+    override \$orchestrator_api environment variable,
     indicate where the client should connect to.
   -P <api path>, --path <api path>
     With '-c api', indicate the specific API path you wish to call
   -b <username:password>, --auth <username:password>
     Specify when orchestrator uses basic HTTP auth.
+  -e <header:user>, --headers-auth <header:user>
+    Specify when orchestrator uses headers auth.
   -q <query>, --query <query>
     Indicate query for 'restart-replica-statements' command
   -l <pool name>, --pool <pool name>
     pool name for pool related commands
   -H <hostname> -h <hostname>
     indicate host for resolve and raft operations
+  -S <seconds> --seconds
+    seconds for delaying replication
 "
 
   cat "$0" | universal_sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | universal_sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
@@ -366,6 +405,17 @@ function ascii_topology {
 function ascii_topology_tabulated {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology-tabulated/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
+}
+
+function ascii_topology_tags {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tags/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
+}
+
+function snapshot_topologies {
+  api "snapshot-topologies"
   echo "$api_response" | jq -r '.Details'
 }
 
@@ -469,6 +519,12 @@ function which_cluster {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster-info/${alias:-$instance}"
   print_response | jq -r '.ClusterName'
+}
+
+function which_cluster_alias {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-info/${alias:-$instance}"
+  print_response | jq -r '.ClusterAlias'
 }
 
 function which_cluster_master {
@@ -707,6 +763,15 @@ function general_instance_command {
   print_details | filter_key | print_key
 }
 
+function delay_replication_command {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "seconds" "$seconds"
+  api "$path/$instance_hostport/$seconds"
+  print_details
+}
+
 function replication_analysis {
   api "replication-analysis"
   print_details | jq -r '.[] |
@@ -733,6 +798,18 @@ function graceful_master_takeover {
   else
     # Explicit destination (designated master) given
     api "graceful-master-takeover/${alias:-$instance}/${destination_hostport}"
+  fi
+  print_details | jq '.SuccessorKey' | print_key
+}
+
+function graceful_master_takeover_auto {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  if [ -z "$destination_hostport" ] ; then
+    # No destination given.
+    api "graceful-master-takeover-auto/${alias:-$instance}"
+  else
+    # Explicit destination (designated master) given
+    api "graceful-master-takeover-auto/${alias:-$instance}/${destination_hostport}"
   fi
   print_details | jq '.SuccessorKey' | print_key
 }
@@ -837,6 +914,8 @@ function run_command {
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
+    "topology-tags") ascii_topology_tags ;;                     # Show an ascii-graph of a replication topology and instance tags, given a member of that topology
+    "snapshot-topologies") snapshot_topologies ;;               # Trigger topology snapshot (recording host/master settings for all hosts)
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
     "search") search ;;                                         # Search for instances matching given substring
@@ -846,6 +925,7 @@ function run_command {
     "which-broken-replicas") which_broken_replicas ;;           # Output the fully-qualified hostname:port list of broken replicas of a given instance
     "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
     "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
+    "which-cluster-alias") which_cluster_alias ;;               # Output the alias of the cluster an instance belongs to, or error if unknown to orchestrator
     "which-cluster-master") which_cluster_master ;;             # Output the name of a writable master in given cluster
     "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
     "all-instances") all_instances ;;                           # The complete list of known instances
@@ -914,7 +994,7 @@ function run_command {
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
-
+    "delay-replication") delay_replication_command ;;           # Issue a CHANGE MASTER TO DELAY=seconds preserving the replication threads state
     "can-replicate-from") can_replicate_from ;;           # Check if an instance can potentially replicate from another, according to replication rules
     "can-replicate-from-gtid") can_replicate_from_gtid ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
     "is-replicating") is_replicating ;;                   # Check if an instance is replicating at this time (both SQL and IO threads running)
@@ -928,6 +1008,7 @@ function run_command {
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
+    "graceful-master-takeover-auto") graceful_master_takeover_auto ;; # Gracefully promote a new master. orchestrator will attempt to pick the promoted replica automatically
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
     "force-master-takeover") force_master_takeover ;;         # Forcibly discard master and promote another (direct child) instance instead, even if everything is running well
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
@@ -942,7 +1023,6 @@ function run_command {
     "raft-health") raft_health ;;                   # Whether node is part of a healthy raft group
     "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
     "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
-
     *) fail "Unsupported command $command" ;;
   esac
 }

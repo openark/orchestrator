@@ -18,15 +18,15 @@ if [[ -e /etc/redhat-release ]]; then
 
   # Build orchestrator and orchestrator agent
   mkdir -p /home/vagrant/go/{bin,pkg,src} /tmp/orchestrator-release
-  mkdir -p /home/vagrant/go/src/github.com/github/orchestrator
-  mount --bind /orchestrator /home/vagrant/go/src/github.com/github/orchestrator
+  mkdir -p /home/vagrant/go/src/github.com/openark/orchestrator
+  mount --bind /orchestrator /home/vagrant/go/src/github.com/openark/orchestrator
 
   # Build Orchestrator
   export GOPATH=/home/vagrant/go
   export GO15VENDOREXPERIMENT=1
-  cd ${GOPATH}/src/github.com/github/orchestrator
+  cd ${GOPATH}/src/github.com/openark/orchestrator
   /usr/bin/go get ./...
-  ${GOPATH}/src/github.com/github/orchestrator/build.sh
+  ${GOPATH}/src/github.com/openark/orchestrator/build.sh
   chown -R vagrant.vagrant /home/vagrant /tmp/orchestrator-release
 
   # Setup mysql
@@ -88,15 +88,15 @@ elif [[ -e /etc/debian_version ]]; then
 
   # Build orchestrator and orchestrator agent
   mkdir -p /home/vagrant/go/{bin,pkg,src} /tmp/orchestrator-release
-  mkdir -p /home/vagrant/go/src/github.com/github/orchestrator
-  mount --bind /orchestrator /home/vagrant/go/src/github.com/github/orchestrator
+  mkdir -p /home/vagrant/go/src/github.com/openark/orchestrator
+  mount --bind /orchestrator /home/vagrant/go/src/github.com/openark/orchestrator
 
   # Build Orchestrator
   export GOPATH=/home/vagrant/go
   export GO15VENDOREXPERIMENT=1
-  cd ${GOPATH}/src/github.com/github/orchestrator
+  cd ${GOPATH}/src/github.com/openark/orchestrator
   /usr/local/go/bin/go get ./...
-  ${GOPATH}/src/github.com/github/orchestrator/build.sh
+  ${GOPATH}/src/github.com/openark/orchestrator/build.sh
   chown -R vagrant.vagrant /home/vagrant /tmp/orchestrator-release
 
 

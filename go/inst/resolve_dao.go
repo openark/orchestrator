@@ -17,12 +17,10 @@
 package inst
 
 import (
-	"net"
-
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -327,16 +325,7 @@ func deleteHostnameResolves() error {
 }
 
 // writeHostnameIPs stroes an ipv4 and ipv6 associated witha hostname, if available
-func writeHostnameIPs(hostname string, ips []net.IP) error {
-	ipv4String := ""
-	ipv6String := ""
-	for _, ip := range ips {
-		if ip4 := ip.To4(); ip4 != nil {
-			ipv4String = ip.String()
-		} else {
-			ipv6String = ip.String()
-		}
-	}
+func writeHostnameIPs(hostname string, ipv4String string, ipv6String string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			insert into

@@ -1,23 +1,23 @@
 var interestingAnalysis = {
 	"DeadMaster" : true,
-	"DeadMasterAndSlaves" : true,
-	"DeadMasterAndSomeSlaves" : true,
-	"DeadMasterWithoutSlaves" : true,
-	"UnreachableMasterWithStaleSlaves": true,
+	"DeadMasterAndReplicas" : true,
+	"DeadMasterAndSomeReplicas" : true,
+	"DeadMasterWithoutReplicas" : true,
 	"UnreachableMasterWithLaggingReplicas": true,
 	"UnreachableMaster" : true,
-	"AllMasterSlavesNotReplicating" : true,
-	"AllMasterSlavesNotReplicatingOrDead" : true,
-	"AllMasterSlavesStale" : true,
+	"LockedSemiSyncMaster" : true,
+	"AllMasterReplicasNotReplicating" : true,
+	"AllMasterReplicasNotReplicatingOrDead" : true,
 	"DeadCoMaster" : true,
-	"DeadCoMasterAndSomeSlaves" : true,
+	"DeadCoMasterAndSomeReplicas" : true,
 	"DeadIntermediateMaster" : true,
-	"DeadIntermediateMasterWithSingleSlaveFailingToConnect" : true,
-	"DeadIntermediateMasterWithSingleSlave" : true,
-	"DeadIntermediateMasterAndSomeSlaves" : true,
-	"DeadIntermediateMasterAndSlaves" : true,
-	"AllIntermediateMasterSlavesFailingToConnectOrDead" : true,
-	"AllIntermediateMasterSlavesNotReplicating" : true,
+	"DeadIntermediateMasterWithSingleReplicaFailingToConnect" : true,
+	"DeadIntermediateMasterWithSingleReplica" : true,
+	"DeadIntermediateMasterAndSomeReplicas" : true,
+	"DeadIntermediateMasterAndReplicas" : true,
+	"AllIntermediateMasterReplicasFailingToConnectOrDead" : true,
+	"AllIntermediateMasterReplicasNotReplicating" : true,
+	"UnreachableIntermediateMasterWithLaggingReplicas": true,
 	"UnreachableIntermediateMaster" : true,
 	"BinlogServerFailingToConnectToMaster" : true,
 };
@@ -46,5 +46,9 @@ var errorMapping = {
 	"errant_gtid": {
 		"badge": "label-errant",
 		"description": "Errant GTID"
+	},
+	"group_replication_member_not_online": {
+		"badge": "label-danger",
+		"description": "Replication group member is not ONLINE"
 	}
 };

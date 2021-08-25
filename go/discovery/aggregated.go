@@ -21,7 +21,7 @@ import (
 
 	"github.com/montanaflynn/stats"
 
-	"github.com/github/orchestrator/go/collection"
+	"github.com/openark/orchestrator/go/collection"
 )
 
 // AggregatedDiscoveryMetrics contains aggregated metrics for instance discovery.
@@ -157,6 +157,7 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 		FirstSeen:                       first,
 		LastSeen:                        last,
 		CountDistinctInstanceKeys:       len(names[InstanceKeys]),
+		CountDistinctOkInstanceKeys:     len(names[OkInstanceKeys]),
 		CountDistinctFailedInstanceKeys: len(names[FailedInstanceKeys]),
 		FailedDiscoveries:               counters[FailedDiscoveries],
 		SuccessfulDiscoveries:           counters[Discoveries],
