@@ -275,7 +275,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	if instance.InstanceAlias !="" &&
+	if instance.InstanceAlias != "" &&
 		inst.FiltersMatchInstanceKey(&inst.InstanceKey{Hostname: instance.InstanceAlias, Port: instanceKey.Port}, config.Config.DiscoveryIgnoreHostnameFilters) {
 
 		log.Debugf("discoverInstance: skipping discovery of %+v (alias) because it matches DiscoveryIgnoreHostnameFilters", instance.InstanceAlias)
@@ -290,7 +290,6 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		}
 		return
 	}
-
 
 	// Investigate replicas:
 	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
