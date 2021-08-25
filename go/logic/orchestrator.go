@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+	orcraft "github.com/openark/orchestrator/go/raft"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -273,6 +274,23 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		// If not elected, stop drilling up/down the topology
 		return
 	}
+
+	if instance.InstanceAlias !="" &&
+		inst.FiltersMatchInstanceKey(&inst.InstanceKey{Hostname: instance.InstanceAlias, Port: instanceKey.Port}, config.Config.DiscoveryIgnoreHostnameFilters) {
+
+		log.Debugf("discoverInstance: skipping discovery of %+v (alias) because it matches DiscoveryIgnoreHostnameFilters", instance.InstanceAlias)
+
+		var ignoreInstanceKey = &inst.InstanceKey{Hostname: instanceKey.Hostname, Port: instanceKey.Port}
+
+		if !inst.InstanceIsForgotten(ignoreInstanceKey) {
+			err := inst.ForgetInstance(ignoreInstanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+		return
+	}
+
 
 	// Investigate replicas:
 	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
