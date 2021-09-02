@@ -20,14 +20,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/util"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -48,6 +49,14 @@ const (
 const (
 	Error1201CouldnotInitializeMasterInfoStructure = "Error 1201:"
 )
+
+type ReplicationCredentials struct {
+	User      string
+	Password  string
+	SSLCert   string
+	SSLKey    string
+	SSLCaCert string
+}
 
 // ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
@@ -129,31 +138,31 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	}
 }
 
-// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
+// GetReplicationRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
 // and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
 // The caller may provide an injected statememt, to be executed while the replica is stopped.
 // This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the replica
 // is completely stopped.
-func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
+func GetReplicationRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return statements, err
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		statements = append(statements, SemicolonTerminated(`stop slave io_thread`))
 	}
-	if instance.Slave_SQL_Running {
+	if instance.ReplicationSQLThreadRuning {
 		statements = append(statements, SemicolonTerminated(`stop slave sql_thread`))
 	}
 	if injectedStatement != "" {
 		statements = append(statements, SemicolonTerminated(injectedStatement))
 	}
-	if instance.Slave_SQL_Running {
+	if instance.ReplicationSQLThreadRuning {
 		statements = append(statements, SemicolonTerminated(`start slave sql_thread`))
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		statements = append(statements, SemicolonTerminated(`start slave io_thread`))
 	}
 	return statements, err
@@ -231,7 +240,7 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_slave_enabled=?", enableReplica); err != nil {
 		return instance, log.Errore(err)
 	}
-	if instance.Slave_IO_Running {
+	if instance.ReplicationIOThreadRuning {
 		// Need to apply change by stopping starting IO thread
 		ExecInstance(instanceKey, "stop slave io_thread")
 		if _, err := ExecInstance(instanceKey, "start slave io_thread"); err != nil {
@@ -239,22 +248,23 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		}
 	}
 	return ReadTopologyInstance(instanceKey)
-
 }
 
-func RestartIOThread(instanceKey *InstanceKey) error {
+func RestartReplicationQuick(instanceKey *InstanceKey) error {
 	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
-			return log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+			return log.Errorf("%+v: RestartReplicationQuick: '%q' failed: %+v", *instanceKey, cmd, err)
+		} else {
+			log.Infof("%s on %+v as part of RestartReplicationQuick", cmd, *instanceKey)
 		}
 	}
 	return nil
 }
 
-// StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
+// StopReplicationNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the replica is completely stopped.
-func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
+func StopReplicationNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -267,7 +277,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	// stop io_thread, start sql_thread but catch any errors
 	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
-			return nil, log.Errorf("%+v: StopSlaveNicely: '%q' failed: %+v", *instanceKey, cmd, err)
+			return nil, log.Errorf("%+v: StopReplicationNicely: '%q' failed: %+v", *instanceKey, cmd, err)
 		}
 	}
 
@@ -290,7 +300,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	instance, err = ReadTopologyInstance(instanceKey)
-	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
+	log.Infof("Stopped replication nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
 
@@ -344,9 +354,9 @@ func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Dura
 	}
 }
 
-// StopSlaves will stop replication concurrently on given set of replicas.
+// StopReplicas will stop replication concurrently on given set of replicas.
 // It will potentially do nothing, or attempt to stop _nicely_ or just stop normally, all according to stopReplicationMethod
-func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
+func StopReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
 	if stopReplicationMethod == NoStopReplication {
 		return replicas
 	}
@@ -363,10 +373,10 @@ func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMet
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				if stopReplicationMethod == StopReplicationNicely {
-					StopSlaveNicely(&replica.Key, timeout)
+				if stopReplicationMethod == StopReplicationNice && !replica.IsMariaDB() {
+					StopReplicationNicely(&replica.Key, timeout)
 				}
-				replica, _ = StopSlave(&replica.Key)
+				replica, _ = StopReplication(&replica.Key)
 				updatedReplica = &replica
 			})
 		}()
@@ -377,13 +387,8 @@ func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMet
 	return refreshedReplicas
 }
 
-// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
-func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
-	return StopSlaves(replicas, StopReplicationNicely, timeout)
-}
-
-// StopSlave stops replication on a given instance
-func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
+// StopReplication stops replication on a given instance
+func StopReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -400,7 +405,6 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	if err != nil {
-
 		return instance, log.Errore(err)
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
@@ -432,8 +436,8 @@ func waitForReplicationState(instanceKey *InstanceKey, expectedState Replication
 	return false, nil
 }
 
-// StartSlave starts replication on a given instance.
-func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
+// StartReplication starts replication on a given instance.
+func StartReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -443,18 +447,19 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
+	instance, err = MaybeDisableSemiSyncMaster(instance)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
 	// If async fallback is disallowed, we'd better make sure to enable replicas to
 	// send ACKs before START SLAVE. Replica ACKing is off at mysqld startup because
 	// some replicas (those that must never be promoted) should never ACK.
 	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
-	if instance.SemiSyncEnforced {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		// Always disable master setting, in case we're converting a former master.
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
-			return instance, log.Errore(err)
-		}
+	instance, err = MaybeEnableSemiSyncReplica(instance)
+	if err != nil {
+		return instance, log.Errore(err)
 	}
 
 	_, err = ExecInstance(instanceKey, `start slave`)
@@ -475,18 +480,18 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, nil
 }
 
-// RestartSlave stops & starts replication on a given instance
-func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
-	instance, err = StopSlave(instanceKey)
+// RestartReplication stops & starts replication on a given instance
+func RestartReplication(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	instance, err = StartSlave(instanceKey)
+	instance, err = StartReplication(instanceKey)
 	return instance, log.Errore(err)
 }
 
-// StartSlaves will do concurrent start-slave
-func StartSlaves(replicas [](*Instance)) {
+// StartReplicas will do concurrent start-replica
+func StartReplicas(replicas [](*Instance)) {
 	// use concurrency but wait for all to complete
 	log.Debugf("Starting %d replicas", len(replicas))
 	barrier := make(chan InstanceKey)
@@ -496,7 +501,7 @@ func StartSlaves(replicas [](*Instance)) {
 			// Signal compelted replica
 			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a replica
-			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
+			ExecuteOnTopology(func() { StartReplication(&instance.Key) })
 		}()
 	}
 	for range replicas {
@@ -504,8 +509,30 @@ func StartSlaves(replicas [](*Instance)) {
 	}
 }
 
-// StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
-func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
+func WaitForExecBinlogCoordinatesToReach(instanceKey *InstanceKey, coordinates *BinlogCoordinates, maxWait time.Duration) (instance *Instance, exactMatch bool, err error) {
+	startTime := time.Now()
+	for {
+		if maxWait != 0 && time.Since(startTime) > maxWait {
+			return nil, exactMatch, fmt.Errorf("WaitForExecBinlogCoordinatesToReach: reached maxWait %+v on %+v", maxWait, *instanceKey)
+		}
+		instance, err = ReadTopologyInstance(instanceKey)
+		if err != nil {
+			return instance, exactMatch, log.Errore(err)
+		}
+
+		switch {
+		case instance.ExecBinlogCoordinates.SmallerThan(coordinates):
+			time.Sleep(retryInterval)
+		case instance.ExecBinlogCoordinates.Equals(coordinates):
+			return instance, true, nil
+		case coordinates.SmallerThan(&instance.ExecBinlogCoordinates):
+			return instance, false, nil
+		}
+	}
+}
+
+// StartReplicationUntilMasterCoordinates issues a START SLAVE UNTIL... statement on given instance
+func StartReplicationUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -520,13 +547,13 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 	log.Infof("Will start replication on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
-	if instance.SemiSyncEnforced {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		// Always disable master setting, in case we're converting a former master.
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
-			return instance, log.Errore(err)
-		}
+	instance, err = MaybeDisableSemiSyncMaster(instance)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	instance, err = MaybeEnableSemiSyncReplica(instance)
+	if err != nil {
+		return instance, log.Errore(err)
 	}
 
 	// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
@@ -538,23 +565,15 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		return instance, log.Errore(err)
 	}
 
-	for upToDate := false; !upToDate; {
-		instance, err = ReadTopologyInstance(instanceKey)
-		if err != nil {
-			return instance, log.Errore(err)
-		}
-
-		switch {
-		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(retryInterval)
-		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
-			upToDate = true
-		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):
-			return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
-		}
+	instance, exactMatch, err := WaitForExecBinlogCoordinatesToReach(instanceKey, masterCoordinates, 0)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	if !exactMatch {
+		return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
 	}
 
-	instance, err = StopSlave(instanceKey)
+	instance, err = StopReplication(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -562,23 +581,225 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	return instance, err
 }
 
-// EnableSemiSync sets the rpl_semi_sync_(master|slave)_enabled variables
-// on a given instance.
-func EnableSemiSync(instanceKey *InstanceKey, master, slave bool) error {
-	log.Infof("instance %+v rpl_semi_sync_master_enabled: %t, rpl_semi_sync_slave_enabled: %t", instanceKey, master, slave)
-	_, err := ExecInstance(instanceKey,
-		`set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`,
-		master, slave)
-	return err
+// MaybeDisableSemiSyncMaster always disables the semi-sync master (rpl_semi_sync_master_enabled) if the semi-sync priority is > 0. This is
+// a little odd but in line with the legacy behavior and we really should disable the semi-sync master flag for replicas when starting replication.
+func MaybeDisableSemiSyncMaster(replicaInstance *Instance) (*Instance, error) {
+	if replicaInstance.SemiSyncPriority > 0 && replicaInstance.SemiSyncMasterEnabled {
+		log.Infof("semi-sync: %s: setting rpl_semi_sync_master_enabled: %t", &replicaInstance.Key, false)
+		replicaInstance, err := SetSemiSyncMaster(&replicaInstance.Key, false)
+		if err != nil {
+			log.Warningf("semi-sync: %s: cannot disable rpl_semi_sync_master_enabled; that's not that bad though", &replicaInstance.Key)
+		}
+		return replicaInstance, err
+	}
+	return replicaInstance, nil
+}
+
+// MaybeEnableSemiSyncReplica sets the semi-sync replica variable (rpl_semi_sync_replica_enabled) on a given instance based on the config and
+// state of the world. If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are enabled, the semi-sync replica variable is enabled
+// only if the given instance is supposed to be enabled according to the semi-sync priority order and the number of desired semi-sync replicas.
+// If the flags are both turned off, the legacy behavior kicks in: If SemiSyncPriority > 0 and the instance is promotable (not "must_not"),
+// semi-sync is enabled.
+func MaybeEnableSemiSyncReplica(replicaInstance *Instance) (*Instance, error) {
+	// Backwards compatible logic: Enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced)
+	// Note that this logic NEVER enables semi-sync if the promotion rule is "must_not".
+	if !config.Config.EnforceExactSemiSyncReplicas && !config.Config.RecoverLockedSemiSyncMaster {
+		return maybeEnableSemiSyncReplicaLegacy(replicaInstance)
+	}
+
+	// New logic: If EnforceExactSemiSyncReplicas or RecoverLockedSemiSyncMaster are set, we enable semi-sync only if the
+	// given replica instance is in the list of replicas to have semi-sync enabled (according to the priority).
+	_, _, actions, err := AnalyzeSemiSyncReplicaTopology(&replicaInstance.MasterKey, &replicaInstance.Key, config.Config.EnforceExactSemiSyncReplicas)
+	if err != nil {
+		return replicaInstance, log.Errorf("semi-sync: %s", err.Error())
+	}
+	for replica, enable := range actions {
+		if replica.Key.Equals(&replicaInstance.Key) {
+			log.Infof("semi-sync: %s: setting rpl_semi_sync_slave_enabled=%t, restarting slave_io thread", replica.Key.String(), enable)
+			if _, err := SetSemiSyncReplica(&replica.Key, enable); err != nil {
+				return nil, fmt.Errorf("cannot enable semi sync on replica %+v", replica.Key)
+			}
+			return replicaInstance, nil
+		}
+	}
+
+	// We are not taking any action for anything but replicaInstance, so if we detect that another replica has to be enabled,
+	// we won't act here and leave it to a future MasterWithTooManySemiSyncReplicas or LockedSemiSyncMaster event to correct.
+
+	log.Infof("semi-sync: %+v: no action taken; this may lead to future recoveries", &replicaInstance.Key)
+	return replicaInstance, nil
+}
+
+// maybeEnableSemiSyncReplicaLegacy enable semi-sync if SemiSyncPriority > 0 (formerly SemiSyncEnforced). This is a backwards
+// compatible logic that NEVER enables semi-sync if the promotion rule is "must_not".
+func maybeEnableSemiSyncReplicaLegacy(replicaInstance *Instance) (*Instance, error) {
+	if replicaInstance.SemiSyncPriority > 0 {
+		enable := replicaInstance.PromotionRule != MustNotPromoteRule // Send ACK only from promotable instances
+		log.Infof("semi-sync: %+v: setting rpl_semi_sync_slave_enabled = %t (legacy behavior)", &replicaInstance.Key, enable)
+		return SetSemiSyncReplica(&replicaInstance.Key, enable)
+	}
+	return replicaInstance, nil
+}
+
+// AnalyzeSemiSyncReplicaTopology analyzes the replica topology for the given master and determines actions for the semi-sync replica enabled
+// variable. It does not take any action itself.
+func AnalyzeSemiSyncReplicaTopology(masterKey *InstanceKey, includeNonReplicatingInstance *InstanceKey, exactReplicaTopology bool) (masterInstance *Instance, replicas []*Instance, actions map[*Instance]bool, err error) {
+	// Read entire topology of master and its replicas to ensure we have the most up-to-date information
+	masterInstance, err = ReadTopologyInstance(masterKey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	replicas, err = ReadTopologyInstances(masterInstance.Replicas.GetInstanceKeys())
+	if err != nil {
+		replicas, err = ReadReplicaInstances(masterKey) // Falling back to just reading from our backend
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	}
+
+	// Classify and prioritize replicas & figure out which replicas need to be acted upon
+	possibleSemiSyncReplicas, asyncReplicas, excludedReplicas := classifyAndPrioritizeReplicas(replicas, includeNonReplicatingInstance)
+	actions = determineSemiSyncReplicaActions(masterInstance, possibleSemiSyncReplicas, asyncReplicas, exactReplicaTopology)
+	logSemiSyncReplicaAnalysis(masterInstance, possibleSemiSyncReplicas, asyncReplicas, excludedReplicas, actions)
+
+	return masterInstance, replicas, actions, nil
+}
+
+// classifyAndPrioritizeReplicas takes a list of replica instances and classifies them based on their semi-sync priority, excluding replicas
+// that are down. The function furthermore prioritizes the possible semi-sync replicas based on SemiSyncPriority, PromotionRule and hostname (fallback).
+func classifyAndPrioritizeReplicas(replicas []*Instance, includeNonReplicatingInstance *InstanceKey) (possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance) {
+	// Classify based on state and semi-sync priority
+	possibleSemiSyncReplicas = make([]*Instance, 0)
+	asyncReplicas = make([]*Instance, 0)
+	excludedReplicas = make([]*Instance, 0)
+	for _, replica := range replicas {
+		isReplicating := replica.Key.Equals(includeNonReplicatingInstance) || replica.ReplicaRunning()
+		if !replica.IsLastCheckValid || !isReplicating {
+			excludedReplicas = append(excludedReplicas, replica)
+		} else if replica.SemiSyncPriority == 0 {
+			asyncReplicas = append(asyncReplicas, replica)
+		} else {
+			possibleSemiSyncReplicas = append(possibleSemiSyncReplicas, replica)
+		}
+	}
+
+	// Sort replicas by priority (higher number means higher priority), promotion rule and name
+	sort.Slice(possibleSemiSyncReplicas, func(i, j int) bool {
+		if possibleSemiSyncReplicas[i].SemiSyncPriority != possibleSemiSyncReplicas[j].SemiSyncPriority {
+			return possibleSemiSyncReplicas[i].SemiSyncPriority > possibleSemiSyncReplicas[j].SemiSyncPriority
+		}
+		if possibleSemiSyncReplicas[i].PromotionRule != possibleSemiSyncReplicas[j].PromotionRule {
+			return possibleSemiSyncReplicas[i].PromotionRule.BetterThan(possibleSemiSyncReplicas[j].PromotionRule)
+		}
+		return strings.Compare(possibleSemiSyncReplicas[i].Key.String(), possibleSemiSyncReplicas[j].Key.String()) < 0
+	})
+
+	return
+}
+
+// determineSemiSyncReplicaActions returns a map of replicas for which to change the semi-sync replica setting.
+// A value of true indicates semi-sync needs to be enabled, false that it needs to be disabled.
+func determineSemiSyncReplicaActions(masterInstance *Instance, possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, exactReplicaTopology bool) map[*Instance]bool {
+	if exactReplicaTopology {
+		return determineSemiSyncReplicaActionsForExactTopology(masterInstance, possibleSemiSyncReplicas, asyncReplicas)
+	}
+	return determineSemiSyncReplicaActionsForEnoughTopology(masterInstance, possibleSemiSyncReplicas)
+}
+
+// determineSemiSyncReplicaActionsForExactTopology takes a priority-list of possible semi-sync replicas and always-async replicas and returns a list
+// of actions to perform on them. If the current state of a replica's semi-sync flag does not match the desired state, an action is returned for it.
+func determineSemiSyncReplicaActionsForExactTopology(masterInstance *Instance, possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance) map[*Instance]bool {
+	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	for i, replica := range possibleSemiSyncReplicas {
+		isSemiSyncEnabled := replica.SemiSyncReplicaEnabled
+		shouldSemiSyncBeEnabled := uint(i) < masterInstance.SemiSyncMasterWaitForReplicaCount
+		if shouldSemiSyncBeEnabled && !isSemiSyncEnabled {
+			actions[replica] = true
+		} else if !shouldSemiSyncBeEnabled && isSemiSyncEnabled {
+			actions[replica] = false
+		}
+	}
+	for _, replica := range asyncReplicas {
+		if replica.SemiSyncReplicaEnabled {
+			actions[replica] = false
+		}
+	}
+	return actions
+}
+
+// determineSemiSyncReplicaActionsForEnoughTopology takes a priority-list of possible semi-sync replicas and returns a list of actions to increase the
+// number of semi-sync replicas to the semi-sync master wait count. This function will never return actions to disable a semi-sync replica.
+func determineSemiSyncReplicaActionsForEnoughTopology(masterInstance *Instance, possibleSemiSyncReplicas []*Instance) map[*Instance]bool {
+	actions := make(map[*Instance]bool, 0) // true = enable semi-sync, false = disable semi-sync
+	enabled := uint(0)
+	for _, replica := range possibleSemiSyncReplicas {
+		if !replica.SemiSyncReplicaEnabled {
+			actions[replica] = true
+			enabled++
+		}
+		if enabled == masterInstance.SemiSyncMasterWaitForReplicaCount-masterInstance.SemiSyncMasterClients {
+			break
+		}
+	}
+	return actions
+}
+
+func logSemiSyncReplicaAnalysis(masterInstance *Instance, possibleSemiSyncReplicas []*Instance, asyncReplicas []*Instance, excludedReplicas []*Instance, actions map[*Instance]bool) {
+	log.Debugf("semi-sync: analysis results for recovery of cluster %+v:", masterInstance.ClusterName)
+	log.Debugf("semi-sync: master = %+v, master semi-sync wait count = %d, master semi-sync replica count = %d", masterInstance.Key, masterInstance.SemiSyncMasterWaitForReplicaCount, masterInstance.SemiSyncMasterClients)
+	logSemiSyncReplicaList("possible semi-sync replicas (in priority order)", possibleSemiSyncReplicas)
+	logSemiSyncReplicaList("always-async replicas", asyncReplicas)
+	logSemiSyncReplicaList("excluded replicas (defunct)", excludedReplicas)
+	if len(actions) > 0 {
+		log.Debugf("semi-sync: suggested actions:")
+		for replica, enable := range actions {
+			log.Debugf("semi-sync: - %+v: should set semi-sync enabled = %t", replica.Key, enable)
+		}
+	} else {
+		log.Debugf("semi-sync: suggested actions: (none)")
+	}
+}
+
+func logSemiSyncReplicaList(description string, replicas []*Instance) {
+	if len(replicas) > 0 {
+		log.Debugf("semi-sync: %s:", description)
+		for _, replica := range replicas {
+			log.Debugf("semi-sync: - %s: semi-sync enabled = %t, priority = %d, promotion rule = %s, last check = %t, replicating = %t", replica.Key.String(), replica.SemiSyncReplicaEnabled, replica.SemiSyncPriority, replica.PromotionRule, replica.IsLastCheckValid, replica.ReplicaRunning())
+		}
+	} else {
+		log.Debugf("semi-sync: %s: (none)", description)
+	}
+}
+
+// DelayReplication set the replication delay given seconds
+// keeping the current state of the replication threads.
+func DelayReplication(instanceKey *InstanceKey, seconds int) error {
+	if seconds < 0 {
+		return fmt.Errorf("invalid seconds: %d, it should be greater or equal to 0", seconds)
+	}
+	query := fmt.Sprintf("change master to master_delay=%d", seconds)
+	statements, err := GetReplicationRestartPreserveStatements(instanceKey, query)
+	if err != nil {
+		return err
+	}
+	for _, cmd := range statements {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return log.Errorf("%+v: DelayReplication: '%q' failed: %+v", *instanceKey, cmd, err)
+		} else {
+			log.Infof("DelayReplication: %s on %+v", cmd, *instanceKey)
+		}
+	}
+	AuditOperation("delay-replication", instanceKey, fmt.Sprintf("set to %d", seconds))
+	return nil
 }
 
 // ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
-func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, masterPassword string) (*Instance, error) {
+func ChangeMasterCredentials(instanceKey *InstanceKey, creds *ReplicationCredentials) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	if masterUser == "" {
+	if creds.User == "" {
 		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
 	}
 
@@ -590,8 +811,38 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	if *config.RuntimeCLIFlags.Noop {
 		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
-	_, err = ExecInstance(instanceKey, "change master to master_user=?, master_password=?",
-		masterUser, masterPassword)
+
+	var query_params []string
+	var query_params_args []interface{}
+
+	// User
+	query_params = append(query_params, "master_user = ?")
+	query_params_args = append(query_params_args, creds.User)
+	// Password
+	if creds.Password != "" {
+		query_params = append(query_params, "master_password = ?")
+		query_params_args = append(query_params_args, creds.Password)
+	}
+
+	// SSL CA cert
+	if creds.SSLCaCert != "" {
+		query_params = append(query_params, "master_ssl_ca = ?")
+		query_params_args = append(query_params_args, creds.SSLCaCert)
+	}
+	// SSL cert
+	if creds.SSLCert != "" {
+		query_params = append(query_params, "master_ssl_cert = ?")
+		query_params_args = append(query_params_args, creds.SSLCert)
+	}
+	// SSL key
+	if creds.SSLKey != "" {
+		query_params = append(query_params, "master_ssl = 1")
+		query_params = append(query_params, "master_ssl_key = ?")
+		query_params_args = append(query_params_args, creds.SSLKey)
+	}
+
+	query := fmt.Sprintf("change master to %s", strings.Join(query_params, ", "))
+	_, err = ExecInstance(instanceKey, query, query_params_args...)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -696,8 +947,17 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		}
 	} else if instance.IsMariaDB() && gtidHint == GTIDHintForce {
 		// Is MariaDB; not using GTID, turn into GTID
+		mariadbGTIDHint := "slave_pos"
+		if !instance.ReplicationThreadsExist() {
+			// This instance is currently a master. As per https://mariadb.com/kb/en/change-master-to/#master_use_gtid
+			// we should be using current_pos.
+			// See also:
+			// - https://github.com/openark/orchestrator/issues/1146
+			// - https://dba.stackexchange.com/a/234323
+			mariadbGTIDHint = "current_pos"
+		}
 		changeMasterFunc = func() error {
-			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_use_gtid=slave_pos",
+			_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host=?, master_port=?, master_use_gtid=%s", mariadbGTIDHint),
 				changeToMasterKey.Hostname, changeToMasterKey.Port)
 			return err
 		}
@@ -772,22 +1032,22 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	AuditOperation("skip-binlog", instanceKey, fmt.Sprintf("Skipped replication to next binary log: %+v", nextFileCoordinates.LogFile))
-	return StartSlave(instanceKey)
+	return StartReplication(instanceKey)
 }
 
-// ResetSlave resets a replica, breaking the replication
-func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
+// ResetReplication resets a replica, breaking the replication
+func ResetReplication(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
 
 	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
-		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication threads are not stopped", instanceKey)
+		return instance, fmt.Errorf("Cannot reset replication on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
-		return instance, fmt.Errorf("noop: aborting reset-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+		return instance, fmt.Errorf("noop: aborting reset-replication operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
@@ -800,14 +1060,14 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	if err != nil && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
-		log.Debugf("ResetSlave: got %+v", err)
+		log.Debugf("ResetReplication: got %+v", err)
 		workaroundBug83713(instanceKey)
 		_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Reset slave %+v", instanceKey)
+	log.Infof("Reset replication %+v", instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -914,8 +1174,8 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
-	if instance.Slave_SQL_Running {
-		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
+	if instance.ReplicationSQLThreadRuning {
+		return instance, fmt.Errorf("Replication SQL thread is running on %+v", instanceKey)
 	}
 	if instance.LastSQLError == "" {
 		return instance, fmt.Errorf("No SQL error on %+v", instanceKey)
@@ -937,7 +1197,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	AuditOperation("skip-query", instanceKey, "Skipped one query")
-	return StartSlave(instanceKey)
+	return StartReplication(instanceKey)
 }
 
 // MasterPosWait issues a MASTER_POS_WAIT() an given instance according to given coordinates.
@@ -958,14 +1218,44 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 }
 
 // Attempt to read and return replication credentials from the mysql.slave_master_info system table
-func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser string, replicationPassword string, err error) {
+func ReadReplicationCredentials(instanceKey *InstanceKey) (creds *ReplicationCredentials, err error) {
+	creds = &ReplicationCredentials{}
 	if config.Config.ReplicationCredentialsQuery != "" {
-		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery, &replicationUser, &replicationPassword)
-		if err == nil && replicationUser == "" {
+
+		db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+		if err != nil {
+			return creds, log.Errore(err)
+		}
+		{
+			resultData, err := sqlutils.QueryResultData(db, config.Config.ReplicationCredentialsQuery)
+			if err != nil {
+				return creds, log.Errore(err)
+			}
+			if len(resultData) > 0 {
+				// A row is found
+				row := resultData[0]
+				if len(row) > 0 {
+					creds.User = row[0].String
+				}
+				if len(row) > 1 {
+					creds.Password = row[1].String
+				}
+				if len(row) > 2 {
+					creds.SSLCaCert = row[2].String
+				}
+				if len(row) > 3 {
+					creds.SSLCert = row[3].String
+				}
+				if len(row) > 4 {
+					creds.SSLKey = row[4].String
+				}
+			}
+		}
+		if err == nil && creds.User == "" {
 			err = fmt.Errorf("Empty username retrieved by ReplicationCredentialsQuery")
 		}
 		if err == nil {
-			return replicationUser, replicationPassword, nil
+			return creds, nil
 		}
 		log.Errore(err)
 	}
@@ -979,12 +1269,12 @@ func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser strin
 			from
 				mysql.slave_master_info
 		`
-		err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
-		if err == nil && replicationUser == "" {
+		err = ScanInstanceRow(instanceKey, query, &creds.User, &creds.Password)
+		if err == nil && creds.User == "" {
 			err = fmt.Errorf("Empty username found in mysql.slave_master_info")
 		}
 	}
-	return replicationUser, replicationPassword, log.Errore(err)
+	return creds, log.Errore(err)
 }
 
 // SetReadOnly sets or clears the instance's global read_only variable
@@ -1000,10 +1290,8 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 	// If async fallback is disallowed, we're responsible for flipping the master
 	// semi-sync switch ON before accepting writes. The setting is off by default.
-	if instance.SemiSyncEnforced && !readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		if err := EnableSemiSync(instanceKey, true, sendACK); err != nil {
+	if instance.SemiSyncPriority > 0 && !readOnly {
+		if _, err := SetSemiSyncMaster(instanceKey, true); err != nil {
 			return instance, log.Errore(err)
 		}
 	}
@@ -1021,13 +1309,14 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		}
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
-	if instance.SemiSyncEnforced && readOnly {
-		// Send ACK only from promotable instances.
-		sendACK := instance.PromotionRule != MustNotPromoteRule
-		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
+	if instance.SemiSyncPriority > 0 && readOnly {
+		if _, err := SetSemiSyncMaster(instanceKey, false); err != nil {
 			return instance, log.Errore(err)
 		}
 	}

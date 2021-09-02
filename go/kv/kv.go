@@ -19,6 +19,8 @@ package kv
 import (
 	"fmt"
 	"sync"
+
+	"github.com/openark/orchestrator/go/config"
 )
 
 type KVPair struct {
@@ -36,9 +38,9 @@ func (this *KVPair) String() string {
 
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
+	PutKVPairs(kvPairs []*KVPair) (err error)
 	GetKeyValue(key string) (value string, found bool, err error)
-	AddKeyValue(key string, value string) (added bool, err error)
-	DistributePairs(pairs [](*KVPair)) (err error)
+	DistributePairs(kvPairs [](*KVPair)) (err error)
 }
 
 var kvMutex sync.Mutex
@@ -54,8 +56,13 @@ func InitKVStores() {
 	kvInitOnce.Do(func() {
 		kvStores = []KVStore{
 			NewInternalKVStore(),
-			NewConsulStore(),
 			NewZkStore(),
+		}
+		switch config.Config.ConsulKVStoreProvider {
+		case "consul-txn", "consul_txn":
+			kvStores = append(kvStores, NewConsulTxnStore())
+		default:
+			kvStores = append(kvStores, NewConsulStore())
 		}
 	})
 }
@@ -85,36 +92,21 @@ func PutValue(key string, value string) (err error) {
 	return nil
 }
 
-func PutKVPair(kvPair *KVPair) (err error) {
-	if kvPair == nil {
+func PutKVPairs(kvPairs []*KVPair) (err error) {
+	if len(kvPairs) < 1 {
 		return nil
 	}
-	return PutValue(kvPair.Key, kvPair.Value)
-}
-
-func AddValue(key string, value string) (err error) {
 	for _, store := range getKVStores() {
-		added, err := store.AddKeyValue(key, value)
-		if err != nil {
+		if err := store.PutKVPairs(kvPairs); err != nil {
 			return err
-		}
-		if !added {
-			return nil
 		}
 	}
 	return nil
 }
 
-func AddKVPair(kvPair *KVPair) (err error) {
-	if kvPair == nil {
-		return nil
-	}
-	return AddValue(kvPair.Key, kvPair.Value)
-}
-
-func DistributePairs(pairs [](*KVPair)) (err error) {
+func DistributePairs(kvPairs [](*KVPair)) (err error) {
 	for _, store := range getKVStores() {
-		if err := store.DistributePairs(pairs); err != nil {
+		if err := store.DistributePairs(kvPairs); err != nil {
 			return err
 		}
 	}

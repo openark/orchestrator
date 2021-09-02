@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/inst"
 )
 
 type httpMethodFunc func(uri string) (resp *http.Response, err error)
@@ -56,8 +56,8 @@ func InitHttpClient() {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
 	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
-		Dial:            dialTimeout,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
+		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
 	httpClient = &http.Client{Transport: httpTransport}

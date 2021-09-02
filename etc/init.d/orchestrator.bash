@@ -37,7 +37,7 @@ SCRIPTNAME=/etc/init.d/$NAME
 ulimit -n 16384
 
 # initially noop but can adjust according by modifying orchestrator_profile
-# - see https://github.com/github/orchestrator/issues/227 for more details.
+# - see https://github.com/openark/orchestrator/issues/227 for more details.
 post_start_daemon_hook () {
 	# by default do nothing
 	:

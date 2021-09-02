@@ -1,0 +1,76 @@
+name: upgrade
+
+on: [pull_request]
+
+jobs:
+  upgrade:
+
+    runs-on: ubuntu-latest
+    # strategy:
+    #   matrix:
+    #     backend: [sqlite, MySQL]
+
+    steps:
+    - name: Set up Go 1.16
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.16
+
+    - name: Start local MySQL
+      run: sudo /etc/init.d/mysql start
+
+    - name: check out
+      uses: actions/checkout@v2
+
+    - name: copy config file template
+      run: |
+        cp conf/orchestrator-ci-upgrade.conf.json /tmp
+
+    - name: generate SQLite config file
+      run: |
+        test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
+        cp /tmp/orchestrator-ci-upgrade.conf.json ${test_config_file}
+        sed -i -e "s/backend-db-placeholder/sqlite/g" ${test_config_file}
+        echo "SQLite config generated"
+
+    - name: generate MySQL config file
+      run: |
+        test_config_file=/tmp/orchestrator-ci-mysql.conf.json
+        cp /tmp/orchestrator-ci-upgrade.conf.json ${test_config_file}
+        sed -i -e "s/backend-db-placeholder/mysql/g" ${test_config_file}
+        echo "MySQL config generated"
+
+    - name: check out master branch
+      uses: actions/checkout@v2
+      with:
+        ref: master
+
+    - name: build master
+      run:  script/test-build
+
+    - name: execute master via SQLite
+      run: |
+        test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters
+
+    - name: execute master via MySQL
+      run: |
+        test_config_file=/tmp/orchestrator-ci-mysql.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters
+
+
+    - name: check out PR branch
+      uses: actions/checkout@v2
+
+    - name: build branch
+      run:  script/test-build
+
+    - name: execute branch via SQLite
+      run: |
+        test_config_file=/tmp/orchestrator-ci-sqlite.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters
+
+    - name: execute branch via MySQL
+      run: |
+        test_config_file=/tmp/orchestrator-ci-mysql.conf.json
+        bin/orchestrator --config=$test_config_file -c clusters

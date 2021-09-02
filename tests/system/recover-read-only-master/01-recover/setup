@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+mysql -uci -pci -h 127.0.0.1 --port=10111 -e "set global read_only=1"
+sleep 6

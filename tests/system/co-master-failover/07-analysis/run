@@ -1,0 +1,1 @@
+orchestrator-client -c replication-analysis | awk 'NF{ print $NF }'

@@ -7,5 +7,5 @@ set -e
 mkdir -p bin
 bindir="$PWD"/bin
 
-cd .gopath/src/github.com/github/orchestrator
+cd .gopath/src/github.com/openark/orchestrator
 go "$@"

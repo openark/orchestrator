@@ -1,5 +1,6 @@
 *~
 conf/orchestrator.conf.json
+.vscode/
 .DS_Store
 .vagrant/
 vagrant/.sqlite
@@ -19,4 +20,5 @@ main
 *.pcap
 *.log
 .vendor/go19
-./bin
+/bin
+/build

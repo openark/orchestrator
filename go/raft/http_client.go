@@ -25,23 +25,62 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/ssl"
 
 	"github.com/openark/golib/log"
 )
 
-var httpClient *http.Client
+var (
+	httpClient    *http.Client
+	httpTransport *http.Transport
+)
 
-func setupHttpClient() error {
+func GetRaftHttpTransport() (*http.Transport, error) {
+	// Checks whether there is a cached httpTransport to return:
+	if httpTransport != nil {
+		return httpTransport, nil
+	}
 	httpTimeout := time.Duration(config.ActiveNodeExpireSeconds) * time.Second
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
-	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
-		Dial:            dialTimeout,
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: config.Config.SSLSkipVerify,
+	}
+	if config.Config.UseSSL {
+		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.RootCAs = caPool
+
+		if config.Config.UseMutualTLS {
+			var sslPEMPassword []byte
+			if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
+				sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+			}
+			if err := ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig:       tlsConfig,
+		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
+	return transport, nil
+}
+
+func setupHttpClient() error {
+	transport, err := GetRaftHttpTransport()
+	if err != nil {
+		return err
+	}
+	httpTransport = transport
 	httpClient = &http.Client{Transport: httpTransport}
 
 	return nil
@@ -54,7 +93,8 @@ func HttpGetLeader(path string) (response []byte, err error) {
 	}
 	leaderAPI := leaderURI
 	if config.Config.URLPrefix != "" {
-		leaderAPI = fmt.Sprintf("%s/%s", leaderAPI, config.Config.URLPrefix)
+		// We know URLPrefix begind with "/"
+		leaderAPI = fmt.Sprintf("%s%s", leaderAPI, config.Config.URLPrefix)
 	}
 	leaderAPI = fmt.Sprintf("%s/api", leaderAPI)
 

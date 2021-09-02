@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+mysql -uci -pci -h 127.0.0.1 --port=10112 -e "update test.heartbeat set hint='gtid-errant'"
+sleep 3

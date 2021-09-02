@@ -21,6 +21,7 @@ body {
 .orchestrator-brand img {
   padding: 0px;
   padding-right: 8px;
+  display: inline;
 }
 
 .table {
@@ -52,7 +53,7 @@ body {
   padding-right: 10px;
 }
 
-#move-instance-method {
+#dashboard-sort, #move-instance-method {
     padding-bottom: 0px;
 }
 
@@ -318,6 +319,12 @@ body {
 #instance_problems button.btn-fatal {
     background-color: #000000;
     color: #ffffff;
+}
+
+#instance_problems ul.dropdown-menu {
+    height: auto;
+    max-height: 600px;
+    overflow: auto;
 }
 
 .instance.instance-problem {
@@ -898,6 +905,22 @@ body {
 
 .instance:hover {
     z-index: 50;
+}
+
+#cluster_legend {
+  margin-top: 20px;
+}
+
+#cluster_legend span {
+  padding: 3px 5px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+#cluster_legend span.dc {
+  margin-right: 10px;
+  border: 2px solid;
+  border-radius: 5px;
 }
 
 #clusters_analysis .popover {

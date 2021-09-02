@@ -30,8 +30,8 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/go-metrics/exp"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/inst"
 )
 
 // HttpWeb is the web requests server, mapping each request to a web page
@@ -428,10 +428,12 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerWebRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerWebRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	this.registerWebRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/alias/:clusterAlias/:page", this.AuditRecovery)
 	this.registerWebRequest(m, "audit-failure-detection", this.AuditFailureDetection)
 	this.registerWebRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
 	this.registerWebRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
 	this.registerWebRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
+	this.registerWebRequest(m, "audit-failure-detection/alias/:clusterAlias/:page", this.AuditFailureDetection)
 	this.registerWebRequest(m, "audit-recovery-steps/:uid", this.AuditRecovery)
 	this.registerWebRequest(m, "agents", this.Agents)
 	this.registerWebRequest(m, "agent/:host", this.Agent)

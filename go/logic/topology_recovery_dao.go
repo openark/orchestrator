@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
-	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
+	"github.com/openark/orchestrator/go/db"
+	"github.com/openark/orchestrator/go/inst"
+	"github.com/openark/orchestrator/go/process"
+	"github.com/openark/orchestrator/go/raft"
+	"github.com/openark/orchestrator/go/util"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -41,7 +41,7 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,
 		analysisEntry.CountReplicas,
-		analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.Replicas.ToCommaDelimitedList(),
 		analysisEntry.IsActionableRecovery,
 	)
 	startActivePeriodHint := "now()"
@@ -182,7 +182,7 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 		string(analysisEntry.Analysis),
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,
-		analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.CountReplicas, analysisEntry.Replicas.ToCommaDelimitedList(),
 		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
 	)
 	if err != nil {
@@ -268,7 +268,7 @@ func ClearActiveRecoveries() error {
 
 // RegisterBlockedRecoveries writes down currently blocked recoveries, and indicates what recovery they are blocked on.
 // Recoveries are blocked thru the in_active_period flag, which comes to avoid flapping.
-func RegisterBlockedRecoveries(analysisEntry *inst.ReplicationAnalysis, blockingRecoveries []TopologyRecovery) error {
+func RegisterBlockedRecoveries(analysisEntry *inst.ReplicationAnalysis, blockingRecoveries []*TopologyRecovery) error {
 	for _, recovery := range blockingRecoveries {
 		_, err := db.ExecOrchestrator(`
 			insert
@@ -502,8 +502,8 @@ func writeResolveRecovery(topologyRecovery *TopologyRecovery) error {
 }
 
 // readRecoveries reads recovery entry/audit entries from topology_recovery
-func readRecoveries(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
-	res := []TopologyRecovery{}
+func readRecoveries(whereCondition string, limit string, args []interface{}) ([]*TopologyRecovery, error) {
+	res := []*TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
       recovery_id,
@@ -578,7 +578,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 
 		topologyRecovery.LastDetectionId = m.GetInt64("last_detection_id")
 
-		res = append(res, topologyRecovery)
+		res = append(res, &topologyRecovery)
 		return nil
 	})
 
@@ -586,7 +586,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 }
 
 // ReadActiveRecoveries reads active recovery entry/audit entries from topology_recovery
-func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+func ReadActiveClusterRecovery(clusterName string) ([]*TopologyRecovery, error) {
 	whereClause := `
 		where
 			in_active_period=1
@@ -597,7 +597,7 @@ func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 
 // ReadInActivePeriodClusterRecovery reads recoveries (possibly complete!) that are in active period.
 // (may be used to block further recoveries on this cluster)
-func ReadInActivePeriodClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+func ReadInActivePeriodClusterRecovery(clusterName string) ([]*TopologyRecovery, error) {
 	whereClause := `
 		where
 			in_active_period=1
@@ -606,7 +606,7 @@ func ReadInActivePeriodClusterRecovery(clusterName string) ([]TopologyRecovery, 
 }
 
 // ReadRecentlyActiveClusterRecovery reads recently completed entries for a given cluster
-func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+func ReadRecentlyActiveClusterRecovery(clusterName string) ([]*TopologyRecovery, error) {
 	whereClause := `
 		where
 			end_recovery > now() - interval 5 minute
@@ -614,17 +614,9 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
-// ReadRecoveriesForClusterAlias reads open/closed recoveries by alias
-func ReadRecoveriesForClusterAlias(clusteAlias string) ([]TopologyRecovery, error) {
-	whereClause := `
-		where
-			cluster_alias=?`
-	return readRecoveries(whereClause, ``, sqlutils.Args(clusteAlias))
-}
-
 // ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
 // was promoted as result, still in active period (may be used to block further recoveries should this instance die)
-func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
+func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]*TopologyRecovery, error) {
 	whereClause := `
 		where
 			in_active_period=1
@@ -634,7 +626,7 @@ func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) 
 }
 
 // ReadRecentlyActiveInstanceRecovery reads recently completed entries for a given instance
-func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
+func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]*TopologyRecovery, error) {
 	whereClause := `
 		where
 			end_recovery > now() - interval 5 minute
@@ -644,7 +636,7 @@ func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]Topolo
 }
 
 // ReadActiveRecoveries reads active recovery entry/audit entries from topology_recovery
-func ReadActiveRecoveries() ([]TopologyRecovery, error) {
+func ReadActiveRecoveries() ([]*TopologyRecovery, error) {
 	return readRecoveries(`
 		where
 			in_active_period=1
@@ -653,7 +645,7 @@ func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 }
 
 // ReadCompletedRecoveries reads completed recovery entry/audit entries from topology_recovery
-func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
+func ReadCompletedRecoveries(page int) ([]*TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
@@ -661,19 +653,19 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 }
 
 // ReadRecovery reads completed recovery entry/audit entries from topology_recovery
-func ReadRecovery(recoveryId int64) ([]TopologyRecovery, error) {
+func ReadRecovery(recoveryId int64) ([]*TopologyRecovery, error) {
 	whereClause := `where recovery_id = ?`
 	return readRecoveries(whereClause, ``, sqlutils.Args(recoveryId))
 }
 
 // ReadRecoveryByUID reads completed recovery entry/audit entries from topology_recovery
-func ReadRecoveryByUID(recoveryUID string) ([]TopologyRecovery, error) {
+func ReadRecoveryByUID(recoveryUID string) ([]*TopologyRecovery, error) {
 	whereClause := `where uid = ?`
 	return readRecoveries(whereClause, ``, sqlutils.Args(recoveryUID))
 }
 
 // ReadCRecoveries reads latest recovery entries from topology_recovery
-func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
+func ReadRecentRecoveries(clusterName string, clusterAlias string, unacknowledgedOnly bool, page int) ([]*TopologyRecovery, error) {
 	whereConditions := []string{}
 	whereClause := ""
 	args := sqlutils.Args()
@@ -683,6 +675,9 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 	if clusterName != "" {
 		whereConditions = append(whereConditions, `cluster_name=?`)
 		args = append(args, clusterName)
+	} else if clusterAlias != "" {
+		whereConditions = append(whereConditions, `cluster_alias=?`)
+		args = append(args, clusterAlias)
 	}
 	if len(whereConditions) > 0 {
 		whereClause = fmt.Sprintf("where %s", strings.Join(whereConditions, " and "))
@@ -695,8 +690,8 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 }
 
 // readRecoveries reads recovery entry/audit entries from topology_recovery
-func readFailureDetections(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
-	res := []TopologyRecovery{}
+func readFailureDetections(whereCondition string, limit string, args []interface{}) ([]*TopologyRecovery, error) {
+	res := []*TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
       detection_id,
@@ -742,7 +737,7 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 
 		failureDetection.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
-		res = append(res, failureDetection)
+		res = append(res, &failureDetection)
 		return nil
 	})
 
@@ -750,23 +745,24 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 }
 
 // ReadRecentFailureDetections
-func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
+func ReadRecentFailureDetections(clusterAlias string, page int) ([]*TopologyRecovery, error) {
+	whereClause := ""
+	args := sqlutils.Args()
+	if clusterAlias != "" {
+		whereClause = `where cluster_alias = ?`
+		args = append(args, clusterAlias)
+	}
 	limit := `
 		limit ?
 		offset ?`
-	return readFailureDetections(``, limit, sqlutils.Args(config.AuditPageSize, page*config.AuditPageSize))
+	args = append(args, config.AuditPageSize, page*config.AuditPageSize)
+	return readFailureDetections(whereClause, limit, args)
 }
 
 // ReadFailureDetection
-func ReadFailureDetection(detectionId int64) ([]TopologyRecovery, error) {
+func ReadFailureDetection(detectionId int64) ([]*TopologyRecovery, error) {
 	whereClause := `where detection_id = ?`
 	return readFailureDetections(whereClause, ``, sqlutils.Args(detectionId))
-}
-
-// ReadFailureDetectionsForClusterAlias
-func ReadFailureDetectionsForClusterAlias(clusterAlias string) ([]TopologyRecovery, error) {
-	whereClause := `where cluster_alias = ?`
-	return readFailureDetections(whereClause, ``, sqlutils.Args(clusterAlias))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)

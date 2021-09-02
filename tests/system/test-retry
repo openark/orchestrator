@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for i in $(seq 1 10) ; do
+  if "$@" ; then
+    exit 0
+  fi
+done
+exit 1

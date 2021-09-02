@@ -541,4 +541,80 @@ var generateSQLPatches = []string{
 		DROP PRIMARY KEY,
 		ADD PRIMARY KEY (hostname, port, tag_name)
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_timeout INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_enabled
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_wait_for_slave_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_timeout
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_status TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_wait_for_slave_count
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_replica_status TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_status
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_clients INT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_master_status
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_available TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER semi_sync_enforced
+	`,
+	`
+		ALTER TABLE /* sqlite3-skip */
+			database_instance
+			MODIFY semi_sync_master_timeout BIGINT UNSIGNED NOT NULL DEFAULT 0
+  `,
+	// Fields related to Replication Group the instance belongs to
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_group_name VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER gtid_mode
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_is_single_primary_mode TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER replication_group_name
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_member_state VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_is_single_primary_mode
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_member_role VARCHAR(16) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_member_state
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_members text CHARACTER SET ascii NOT NULL AFTER replication_group_member_role
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_primary_host varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER replication_group_members
+	`,
+	`
+		ALTER TABLE
+		database_instance
+			ADD COLUMN replication_group_primary_port smallint(5) unsigned NOT NULL DEFAULT 0 AFTER replication_group_primary_host
+	`,
 }

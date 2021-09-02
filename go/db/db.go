@@ -18,18 +18,23 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/openark/orchestrator/go/config"
 )
 
+const dsnRegexp = `^([^:]+)(:.*)?(@(socket|tcp)\(.+\)/.*)$`
+
 var (
-	EmptyArgs []interface{}
+	EmptyArgs  []interface{}
+	ErrNoMatch = errors.New("no match")
 )
 
 var mysqlURI string
@@ -52,7 +57,7 @@ func getMySQLURI() string {
 	if mysqlURI != "" {
 		return mysqlURI
 	}
-	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
+	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&rejectReadOnly=%t&interpolateParams=true",
 		config.Config.MySQLOrchestratorUser,
 		config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost,
@@ -60,6 +65,7 @@ func getMySQLURI() string {
 		config.Config.MySQLOrchestratorDatabase,
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
+		config.Config.MySQLOrchestratorRejectReadOnly,
 	)
 	if config.Config.MySQLOrchestratorUseMutualTLS {
 		mysqlURI, _ = SetupMySQLOrchestratorTLS(mysqlURI)
@@ -128,6 +134,42 @@ func isInMemorySQLite() bool {
 	return config.Config.IsSQLite() && strings.Contains(config.Config.SQLite3DataFile, ":memory:")
 }
 
+// matchDSN tries to match the DSN or returns an error
+func matchDSN(dsn string) (string, error) {
+	re := regexp.MustCompile(dsnRegexp)
+
+	matches := re.FindStringSubmatch(dsn)
+	if matches == nil {
+		return "", ErrNoMatch
+	}
+
+	// matching dsn so printout excluding the password
+	// - if no password is provided the lack of a password will be visible!
+	maskedPass := ""
+	if len(matches[2]) > 0 {
+		maskedPass = `:?`
+	}
+
+	return matches[1] + maskedPass + matches[3], nil
+}
+
+// safeMySQLURI returns a version of the dsn without showing the password so it can be logged safely.
+// - if we are unable to correctly match the provided dsn we build an incomplete one based on some of the settings.
+func safeMySQLURI(dsn string) string {
+	if safeDSN, err := matchDSN(dsn); err == nil {
+		return safeDSN
+	}
+
+	// Fallback to use an incomplete dsn which may be good enough.
+	// Do not show the password but do show what we connect to.
+	return fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds (incomplete dsn!)",
+		config.Config.MySQLOrchestratorUser,
+		config.Config.MySQLOrchestratorHost,
+		config.Config.MySQLOrchestratorPort,
+		config.Config.MySQLOrchestratorDatabase,
+		config.Config.MySQLConnectTimeoutSeconds)
+}
+
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (db *sql.DB, err error) {
 	var fromCache bool
@@ -148,12 +190,11 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 				return db, log.Errore(err)
 			}
 		}
-		db, fromCache, err = sqlutils.GetDB(getMySQLURI())
+		dsn := getMySQLURI()
+		db, fromCache, err = sqlutils.GetDB(dsn)
 		if err == nil && !fromCache {
-			// do not show the password but do show what we connect to.
-			safeMySQLURI := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
-				config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
-			log.Debugf("Connected to orchestrator backend: %v", safeMySQLURI)
+			log.Debugf("Connected to orchestrator backend: %v", safeMySQLURI(dsn))
+
 			if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
 				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
 				db.SetMaxOpenConns(config.Config.MySQLOrchestratorMaxPoolConnections)
