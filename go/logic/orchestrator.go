@@ -18,7 +18,6 @@ package logic
 
 import (
 	"fmt"
-	orcraft "github.com/openark/orchestrator/go/raft"
 	"math/rand"
 	"os"
 	"os/signal"
