@@ -2202,6 +2202,8 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 	return sorted.First(), nil
 }
 
+// getPriorityDataCenterForCandidate returns the replica datacenter found
+// among given instances. This will be used for choosing best candidate for promotion.
 func getPriorityDataCenterForCandidate(replicas [](*Instance)) (priorityDataCenter string, err error) {
 	if len(replicas) == 0 {
                 return "", log.Errorf("empty replicas list in getPriorityBinlogFormatForCandidate")
@@ -2214,7 +2216,8 @@ func getPriorityDataCenterForCandidate(replicas [](*Instance)) (priorityDataCent
 	return "", nil
 }
 
-
+// IsDataCenterCandiadateReplica compare master's datacenter and replica datacenter.
+// if master's datacenter eq replica datacenter return true
 func IsDataCenterCandiadateReplica(priorityDataCenter string, replica *Instance) bool {
 	masterOfDesignatedInstance, _ := GetInstanceMaster(replica)
 	if masterOfDesignatedInstance.DataCenter == priorityDataCenter {
@@ -2234,7 +2237,10 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	}
 	priorityMajorVersion, _ := getPriorityMajorVersionForCandidate(replicas)
 	priorityBinlogFormat, _ := getPriorityBinlogFormatForCandidate(replicas)
+	// priorityDataCenter return boll for candidate
 	priorityDataCenter, _ :=  getPriorityDataCenterForCandidate(replicas)
+
+
 	for _, replica := range replicas {
 		replica := replica
 		if isGenerallyValidAsCandidateReplica(replica) &&
