@@ -2241,18 +2241,32 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	priorityDataCenter, _ :=  getPriorityDataCenterForCandidate(replicas)
 
 
-	for _, replica := range replicas {
-		replica := replica
-		if isGenerallyValidAsCandidateReplica(replica) &&
-			!IsBannedFromBeingCandidateReplica(replica) &&
-			!IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
-			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) &&
-			IsDataCenterCandiadateReplica(priorityDataCenter, replica) {
-			// this is the one
-			candidateReplica = replica
-			break
-		}
-	}
+	if config.Config.PreventCrossDataCenterMasterFailover {
+                for _, replica := range replicas {
+                        replica := replica
+                        if isGenerallyValidAsCandidateReplica(replica) &&
+                                !IsBannedFromBeingCandidateReplica(replica) &&
+                                !IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
+                                !IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) &&
+                                IsDataCenterCandiadateReplica(priorityDataCenter, replica) {
+                                // this is the one
+                                candidateReplica = replica
+                                break
+                        }
+                }
+        } else {
+                for _, replica := range replicas {
+                        replica := replica
+                        if isGenerallyValidAsCandidateReplica(replica) &&
+                                !IsBannedFromBeingCandidateReplica(replica) &&
+                                !IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
+                                !IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) {
+                                // this is the one
+                                candidateReplica = replica
+                                break
+                        }
+                }
+        }
 	if candidateReplica == nil {
 		// Unable to find a candidate that will master others.
 		// Instead, pick a (single) replica which is not banned.
