@@ -2202,12 +2202,12 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 	return sorted.First(), nil
 }
 
-func getPriorityDataCenterForCandidate(replica [](*Instance)) (priorityDataCenter string, err error) {
+func getPriorityDataCenterForCandidate(replicas [](*Instance)) (priorityDataCenter string, err error) {
 	if len(replicas) == 0 {
                 return "", log.Errorf("empty replicas list in getPriorityBinlogFormatForCandidate")
 	}
 	candidate := ""
-	for _, replica := range {
+	for _, replica := range replicas {
 		candidate = replica.DataCenter
 		return candidate, nil
 	}
