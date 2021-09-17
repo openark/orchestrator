@@ -2202,6 +2202,31 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 	return sorted.First(), nil
 }
 
+func getPriorityDataCenterForCandidate(replica [](*Instance)) (priorityDataCenter string, err error) {
+	if len(replicas) == 0 {
+                return "", log.Errorf("empty replicas list in getPriorityBinlogFormatForCandidate")
+	}
+	candidate := ""
+	for _, replica := range {
+		candidate = replica.DataCenter
+		return candidate, nil
+	}
+	return "", nil
+}
+
+
+func IsDataCenterCandiadateReplica(priorityDataCenter string, replica *Instance) bool {
+	masterOfDesignatedInstance, _ := GetInstanceMaster(replica)
+	if masterOfDesignatedInstance.DataCenter == priorityDataCenter {
+		log.Debugf("instance %+v is banned because of promotion rule", replica.Key)
+		return true
+	}
+	if matched, _ := regexp.MatchString(config.Config.DataCenterPattern, replica.Key.Hostname); matched {
+		return true
+	}
+	return false
+}
+
 // chooseCandidateReplica
 func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas [](*Instance), err error) {
 	if len(replicas) == 0 {
@@ -2209,13 +2234,14 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	}
 	priorityMajorVersion, _ := getPriorityMajorVersionForCandidate(replicas)
 	priorityBinlogFormat, _ := getPriorityBinlogFormatForCandidate(replicas)
-
+	priorityDataCenter, _ :=  getPriorityDataCenterForCandidate(replicas)
 	for _, replica := range replicas {
 		replica := replica
 		if isGenerallyValidAsCandidateReplica(replica) &&
 			!IsBannedFromBeingCandidateReplica(replica) &&
 			!IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
-			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) {
+			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) &&
+			IsDataCenterCandiadateReplica(priorityDataCenter, replica) {
 			// this is the one
 			candidateReplica = replica
 			break
