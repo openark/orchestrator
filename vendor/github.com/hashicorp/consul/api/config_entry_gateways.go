@@ -96,14 +96,6 @@ func (i *IngressGatewayConfigEntry) GetName() string {
 	return i.Name
 }
 
-func (i *IngressGatewayConfigEntry) GetNamespace() string {
-	return i.Namespace
-}
-
-func (i *IngressGatewayConfigEntry) GetMeta() map[string]string {
-	return i.Meta
-}
-
 func (i *IngressGatewayConfigEntry) GetCreateIndex() uint64 {
 	return i.CreateIndex
 }
@@ -171,14 +163,6 @@ func (g *TerminatingGatewayConfigEntry) GetKind() string {
 
 func (g *TerminatingGatewayConfigEntry) GetName() string {
 	return g.Name
-}
-
-func (g *TerminatingGatewayConfigEntry) GetNamespace() string {
-	return g.Namespace
-}
-
-func (g *TerminatingGatewayConfigEntry) GetMeta() map[string]string {
-	return g.Meta
 }
 
 func (g *TerminatingGatewayConfigEntry) GetCreateIndex() uint64 {

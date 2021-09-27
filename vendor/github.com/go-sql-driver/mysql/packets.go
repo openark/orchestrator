@@ -778,7 +778,7 @@ func (rows *textRows) readRow(dest []driver.Value) error {
 					case fieldTypeTimestamp, fieldTypeDateTime,
 						fieldTypeDate, fieldTypeNewDate:
 						dest[i], err = parseDateTime(
-							string(dest[i].([]byte)),
+							dest[i].([]byte),
 							mc.cfg.Loc,
 						)
 						if err == nil {
@@ -1116,7 +1116,10 @@ func (stmt *mysqlStmt) writeExecutePacket(args []driver.Value) error {
 				if v.IsZero() {
 					b = append(b, "0000-00-00"...)
 				} else {
-					b = v.In(mc.cfg.Loc).AppendFormat(b, timeFormat)
+					b, err = appendDateTime(b, v.In(mc.cfg.Loc))
+					if err != nil {
+						return err
+					}
 				}
 
 				paramValues = appendLengthEncodedInteger(paramValues,

@@ -147,9 +147,6 @@ type DiscoveryGraphNode struct {
 
 	// fields for Type==resolver
 	Resolver *DiscoveryResolver
-
-	// shared by Type==resolver || Type==splitter
-	LoadBalancer *LoadBalancer `json:",omitempty"`
 }
 
 // compiled form of ServiceRoute

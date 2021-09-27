@@ -38,6 +38,7 @@ Observe the following list of potential failures:
 * UnreachableMasterWithLaggingReplicas
 * UnreachableMaster
 * LockedSemiSyncMaster
+* MasterWithTooManySemiSyncReplicas
 * AllMasterReplicasNotReplicating
 * AllMasterReplicasNotReplicatingOrDead
 * DeadCoMaster
@@ -96,15 +97,43 @@ This scenario can happen when the master is overloaded. Clients would see a "Too
 
 `orchestrator` responds to this scenario by restarting replication on all of master's immediate replicas. This will close the old client connections on those replicas and attempt to initiate new ones. These may now fail to connect, leading to a complete replication failure on all replicas. This will next lead `orchestrator` to analyze a `DeadMaster`.
 
-### LockedSemiSyncMaster
+#### `LockedSemiSyncMaster`
 
-1. Master is running with semi-sync enabled
+1. Master is running with semi-sync enabled (`rpl_semi_sync_master_enabled=1`)
 2. Number of connected semi-sync replicas falls short of expected `rpl_semi_sync_master_wait_for_slave_count`
 3. `rpl_semi_sync_master_timeout` is high enough such that master locks writes and does not fall back to asynchronous replication
 
-Remediation can be to disable semi-sync on the master, or to bring up (or enable) sufficient semi-sync replicas.
+This condition only triggers after `ReasonableLockedSemiSyncMasterSeconds` has passed. If `ReasonableLockedSemiSyncMasterSeconds` is not set, 
+it triggers after `ReasonableReplicationLagSeconds`.
 
-At this time `orchestrator` does not invoke processes for this type of analysis.
+Remediation of this condition can be to disable semi-sync on the master, or to bring up (or enable) sufficient semi-sync replicas.
+
+If `EnforceExactSemiSyncReplicas` is enabled, `orchestrator` will determine the desired semi-sync topology and enable/disable semi-sync on the replicas to match it.
+The desired topology is defined by the priority order (see below) and the master wait count.
+
+If `RecoverLockedSemiSyncMaster` is enabled, `orchestrator` will enable (but never disable) semi-sync on the replicas in priority order until
+the number of semi-sync replicas matches the master wait count. Please note that `RecoverLockedSemiSyncMaster` has no effect if `EnforceExactSemiSyncReplicas` is set.
+
+The priority order is defined by `DetectSemiSyncEnforcedQuery` (higher number is higher priority), the promotion rule (`DetectPromotionRuleQuery`) and the hostname (fallback).
+
+If `EnforceExactSemiSyncReplicas` and `RecoverLockedSemiSyncMaster` are both disabled (default), `orchestrator` does not invoke any recovery processes for this type of analysis.
+
+Please also consult the [semi-sync topology](configuration-discovery-classifying.md#semi-sync-topology) documentation for more details.
+
+#### `MasterWithTooManySemiSyncReplicas`
+
+1. Master is running with semi-sync enabled (`rpl_semi_sync_master_enabled=1`)
+2. Number of connected semi-sync replicas is higher than the expected `rpl_semi_sync_master_wait_for_slave_count`
+3. `EnforceExactSemiSyncReplicas` is enabled (this analysis is not triggered if this flag is not enabled)
+
+If `EnforceExactSemiSyncReplicas` is enabled, `orchestrator` will determine the desired semi-sync topology and enable/disable semi-sync on the replicas to match it.
+The desired topology is defined by the priority order and the master wait count.
+
+The priority order is defined by `DetectSemiSyncEnforcedQuery` (higher number is higher priority), the promotion rule (`DetectPromotionRuleQuery`) and the hostname (fallback).
+
+If `EnforceExactSemiSyncReplicas` is disabled (default), `orchestrator` does not invoke any recovery processes for this type of analysis.
+
+Please also consult the [semi-sync topology](configuration-discovery-classifying.md#semi-sync-topology) documentation for more details.
 
 ### Failures of no interest
 

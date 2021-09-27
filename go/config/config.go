@@ -60,6 +60,8 @@ const (
 	StaleInstanceCoordinatesExpireSeconds        = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
+	ConsulKVsPerCluster                          = 5 // KVs: "/", "/hostname", "/ipv4", "/ipv6" and "/port"
+	ConsulMaxTransactionOps                      = 64
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -134,10 +136,11 @@ type Configuration struct {
 	DefaultInstancePort                        int      // In case port was not specified on command line
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table). Must return a single row with a single numeric column, which is the lag.
-	ReplicationCredentialsQuery                string   // custom query to get replication credentials. Must return a single row, with two text columns: 1st is username, 2nd is password. This is optional, and can be used by orchestrator to configure replication after master takeover or setup of co-masters. You need to ensure the orchestrator user has the privileges to run this query
+	ReplicationCredentialsQuery                string   // custom query to get replication credentials. Must return a single row, with five text columns: 1st is username, 2nd is password, 3rd is SSLCaCert, 4th is SSLCert, 5th is SSLKey. This is optional, and can be used by orchestrator to configure replication after master takeover or setup of co-masters. You need to ensure the orchestrator user has the privileges to run this query
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	UseSuperReadOnly                           bool     // Should orchestrator super_read_only any time it sets read_only
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	ReasonableInstanceCheckSeconds             uint     // Number of seconds an instance read is allowed to take before it is considered invalid, i.e. before LastCheckValid will be false
 	InstanceWriteBufferSize                    int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
 	BufferInstanceWrites                       bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
 	InstanceFlushIntervalMilliseconds          int      // Max interval between instance write buffer flushes
@@ -238,6 +241,7 @@ type Configuration struct {
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostGracefulTakeoverProcesses              []string          // Processes to execute after runnign a graceful master takeover. Uses same placeholders as PostFailoverProcesses
 	PostTakeMasterProcesses                    []string          // Processes to execute after a successful Take-Master event has taken place
+	RecoverNonWriteableMaster                  bool              // When 'true', orchestrator treats a read-only master as a failure scenario and attempts to make the master writeable
 	CoMasterRecoveryMustPromoteOtherCoMaster   bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover        bool              // synonym to DetachLostReplicasAfterMasterFailover
 	DetachLostReplicasAfterMasterFailover      bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
@@ -259,17 +263,21 @@ type Configuration struct {
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
-	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate seom data from external host
+	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate some data from external host
 	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent discovering instances of any kind
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
 	ConsulScheme                               string            // Scheme (http or https) for Consul
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ConsulKVStoreProvider                      string            // Consul KV store provider (consul or consul-txn), default: "consul"
+	ConsulMaxKVsPerTransaction                 int               // Maximum number of KV operations to perform in a single Consul Transaction. Requires the "consul-txn" ConsulKVStoreProvider
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 	MaxConcurrentReplicaOperations             int               // Maximum number of concurrent operations on replicas
+	EnforceExactSemiSyncReplicas               bool              // If true, semi-sync replicas will be enabled/disabled to match the wait count in the desired priority order; this applies to LockedSemiSyncMaster and MasterWithTooManySemiSyncReplicas
+	RecoverLockedSemiSyncMaster                bool              // If true, orchestrator will recover from a LockedSemiSync state by enabling semi-sync on replicas to match the wait count; this behavior can be overridden by EnforceExactSemiSyncReplicas
+	ReasonableLockedSemiSyncMasterSeconds      uint              // Time to evaluate the LockedSemiSyncHypothesis before triggering the LockedSemiSync analysis; falls back to ReasonableReplicationLagSeconds if not set
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -316,6 +324,7 @@ func newConfiguration() *Configuration {
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
+		ReasonableInstanceCheckSeconds:             1,
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
 		InstanceFlushIntervalMilliseconds:          100,
@@ -411,6 +420,7 @@ func newConfiguration() *Configuration {
 		PostUnsuccessfulFailoverProcesses:          []string{},
 		PostGracefulTakeoverProcesses:              []string{},
 		PostTakeMasterProcesses:                    []string{},
+		RecoverNonWriteableMaster:                  false,
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,
 		ApplyMySQLPromotionAfterMasterFailover:     true,
@@ -434,10 +444,14 @@ func newConfiguration() *Configuration {
 		ConsulAclToken:                             "",
 		ConsulCrossDataCenterDistribution:          false,
 		ConsulKVStoreProvider:                      "consul",
+		ConsulMaxKVsPerTransaction:                 ConsulKVsPerCluster,
 		ZkAddress:                                  "",
 		KVClusterMasterPrefix:                      "mysql/master",
 		WebMessage:                                 "",
 		MaxConcurrentReplicaOperations:             5,
+		EnforceExactSemiSyncReplicas:               false,
+		RecoverLockedSemiSyncMaster:                false,
+		ReasonableLockedSemiSyncMasterSeconds:      0,
 	}
 }
 
@@ -595,6 +609,15 @@ func (this *Configuration) postReadAdjustments() error {
 			this.BufferInstanceWrites = false
 		}
 	}
+	if this.ConsulMaxKVsPerTransaction < ConsulKVsPerCluster {
+		this.ConsulMaxKVsPerTransaction = ConsulKVsPerCluster
+	} else if this.ConsulMaxKVsPerTransaction > ConsulMaxTransactionOps {
+		this.ConsulMaxKVsPerTransaction = ConsulMaxTransactionOps
+	}
+	if this.ReasonableLockedSemiSyncMasterSeconds == 0 {
+		this.ReasonableLockedSemiSyncMasterSeconds = uint(this.ReasonableReplicationLagSeconds)
+	}
+
 	return nil
 }
 

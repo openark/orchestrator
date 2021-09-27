@@ -25,7 +25,6 @@ import (
 )
 
 type AnalysisCode string
-type StructureAnalysisCode string
 
 const (
 	NoProblem                                               AnalysisCode = "NoProblem"
@@ -41,6 +40,7 @@ const (
 	AllMasterReplicasNotReplicatingOrDead                                = "AllMasterReplicasNotReplicatingOrDead"
 	LockedSemiSyncMasterHypothesis                                       = "LockedSemiSyncMasterHypothesis"
 	LockedSemiSyncMaster                                                 = "LockedSemiSyncMaster"
+	MasterWithTooManySemiSyncReplicas                                    = "MasterWithTooManySemiSyncReplicas"
 	MasterWithoutReplicas                                                = "MasterWithoutReplicas"
 	DeadCoMaster                                                         = "DeadCoMaster"
 	DeadCoMasterAndSomeReplicas                                          = "DeadCoMasterAndSomeReplicas"
@@ -62,16 +62,16 @@ const (
 )
 
 const (
-	StatementAndMixedLoggingReplicasStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingReplicasStructureWarning"
-	StatementAndRowLoggingReplicasStructureWarning                             = "StatementAndRowLoggingReplicasStructureWarning"
-	MixedAndRowLoggingReplicasStructureWarning                                 = "MixedAndRowLoggingReplicasStructureWarning"
-	MultipleMajorVersionsLoggingReplicasStructureWarning                       = "MultipleMajorVersionsLoggingReplicasStructureWarning"
-	NoLoggingReplicasStructureWarning                                          = "NoLoggingReplicasStructureWarning"
-	DifferentGTIDModesStructureWarning                                         = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                                 = "ErrantGTIDStructureWarning"
-	NoFailoverSupportStructureWarning                                          = "NoFailoverSupportStructureWarning"
-	NoWriteableMasterStructureWarning                                          = "NoWriteableMasterStructureWarning"
-	NotEnoughValidSemiSyncReplicasStructureWarning                             = "NotEnoughValidSemiSyncReplicasStructureWarning"
+	StatementAndMixedLoggingReplicasStructureWarning     AnalysisCode = "StatementAndMixedLoggingReplicasStructureWarning"
+	StatementAndRowLoggingReplicasStructureWarning                    = "StatementAndRowLoggingReplicasStructureWarning"
+	MixedAndRowLoggingReplicasStructureWarning                        = "MixedAndRowLoggingReplicasStructureWarning"
+	MultipleMajorVersionsLoggingReplicasStructureWarning              = "MultipleMajorVersionsLoggingReplicasStructureWarning"
+	NoLoggingReplicasStructureWarning                                 = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                        = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                 = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                 = "NoWriteableMasterStructureWarning"
+	NotEnoughValidSemiSyncReplicasStructureWarning                    = "NotEnoughValidSemiSyncReplicasStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -140,7 +140,7 @@ type ReplicationAnalysis struct {
 	IsFailingToConnectToMaster                bool
 	Analysis                                  AnalysisCode
 	Description                               string
-	StructureAnalysis                         []StructureAnalysisCode
+	StructureAnalysis                         []AnalysisCode
 	IsDowntimed                               bool
 	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterReplicasNotReplicating)
 	DowntimeEndTimestamp                      string
@@ -229,5 +229,5 @@ func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType 
 // ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
 // between last_attempted_check to last_checked before we consider the instance as invalid.
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
-	return config.Config.InstancePollSeconds + 1
+	return config.Config.InstancePollSeconds + config.Config.ReasonableInstanceCheckSeconds
 }
