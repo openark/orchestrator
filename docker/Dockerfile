@@ -56,7 +56,6 @@ RUN adduser \
     --uid "$UID" \
     "$USER"
 
-RUN mkdir -p /app/data && chown -R docker:docker /app \
-    && chown -R docker:docker /etc/orchestrator.conf.json
+RUN chown -R docker:docker /usr/local/orchestrator
 
 USER docker
