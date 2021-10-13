@@ -158,7 +158,7 @@ function get_curl_auth_params {
   fi
 
   if [[ -n "${headers_auth}" ]]; then
-    requires_auth="-H "${headers_auth}""
+    requires_auth+=" -H "${headers_auth}""
   fi
 
   # Test API access
