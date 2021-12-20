@@ -75,6 +75,8 @@ var apiSynonyms = map[string]string{
 	"stop-slave-nice":            "stop-replica-nice",
 	"reset-slave":                "reset-replica",
 	"restart-slave-statements":   "restart-replica-statements",
+	"enable-semi-sync-master":    "enable-semi-sync-source",
+	"disable-semi-sync-master":   "disable-semi-sync-source",
 }
 
 var registeredPaths = []string{}

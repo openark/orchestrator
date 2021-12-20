@@ -1,0 +1,2 @@
+# sed is to get rid of MySql version from the output
+orchestrator-client -c topology -i 127.0.0.1:10111 | sed -n "s/\(^.*0s,ok,\)\s*\S*\(,r.,.*$\)/\1VERSION\2/p"
