@@ -1,0 +1,1 @@
+-c which-cluster-osc-replicas -i testhost:55555 | sort
