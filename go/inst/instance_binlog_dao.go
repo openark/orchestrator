@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -660,7 +661,9 @@ const anonymousGTIDNextEvent = "SET @@SESSION.GTID_NEXT= 'ANONYMOUS'"
 
 // check if the event is one we want to skip.
 func specialEventToSkip(event *BinlogEvent) bool {
-	if event != nil && strings.Index(event.Info, anonymousGTIDNextEvent) >= 0 {
+	int gtidDeteched = strings.Index(event.Info, anonymousGTIDNextEvent)
+	if event != nil && gtidDeteched >= 0 {
+		log.Printf("Warning: AnonymousGtid detected, returning true. Event: (%v) and GtidDeteched: (%v)", event, len(gtidDeteched))
 		return true
 	}
 	return false

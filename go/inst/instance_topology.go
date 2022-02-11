@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	"log"
 	goos "os"
 	"regexp"
 	"sort"
