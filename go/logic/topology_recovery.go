@@ -882,7 +882,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		}
 		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("DelayMasterPromotionIfSQLThreadNotUpToDate: waiting for SQL thread on %+v", promotedReplica.Key))
-			if _, err := inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+			// At this time, SQL thread is close.when timeout/overallTimeout is equal 0(24 * time.Hour), SQL thread will start and apply complete binlog events
+			if _, err := inst.StopReplicationNicely(&promotedReplica.Key, 0); err != nil {
 				return nil, fmt.Errorf("DelayMasterPromotionIfSQLThreadNotUpToDate error: %+v", err)
 			}
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("DelayMasterPromotionIfSQLThreadNotUpToDate: SQL thread caught up on %+v", promotedReplica.Key))
@@ -1355,7 +1356,8 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	if promotedReplica != nil {
 		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting to ensure the SQL thread catches up on %+v", promotedReplica.Key))
-			if _, err := inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+			// At this time, SQL thread is close.when timeout/overallTimeout is equal 0(24 * time.Hour), SQL thread will start and apply complete binlog events
+			if _, err := inst.StopReplicationNicely(&promotedReplica.Key, 0); err != nil {
 				return promotedReplica, lostReplicas, err
 			}
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("SQL thread caught up on %+v", promotedReplica.Key))
