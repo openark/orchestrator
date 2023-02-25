@@ -25,6 +25,7 @@ require (
 	github.com/martini-contrib/gzip v0.0.0-20151124214156-6c035326b43f
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11
 	github.com/mattn/go-isatty v0.0.13-0.20200128103942-cb30d6282491 // indirect
+	github.com/mattn/go-sqlite3 v1.14.7
 	github.com/miekg/dns v1.1.31 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.0 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
@@ -38,9 +39,7 @@ require (
 	github.com/samuel/go-zookeeper v0.0.0-20201211165307-7117e9ea2414
 	github.com/sjmudd/stopwatch v0.0.0-20170103085848-637ef30077b7
 	github.com/stretchr/testify v1.6.1 // indirect
-	golang.org/x/crypto v0.0.0-20200930160638-afb6bcd081ae // indirect
-	golang.org/x/net v0.0.0-20200930145003-4acb6c075d10 // indirect
-	golang.org/x/sys v0.0.0-20201126233918-771906719818 // indirect
+	golang.org/x/net v0.7.0 // indirect
 	gopkg.in/gcfg.v1 v1.2.3
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
