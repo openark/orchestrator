@@ -17,6 +17,8 @@
 package process
 
 import (
+	"encoding/json"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,7 +27,7 @@ import (
 	"github.com/openark/orchestrator/go/util"
 
 	"github.com/openark/golib/log"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -121,6 +123,8 @@ func HealthTest() (health *HealthStatus, err error) {
 		health.Healthy = healthy
 	}
 
+	orcraft.IsLeader()
+
 	if orcraft.IsRaftEnabled() {
 		health.ActiveNode.Hostname = orcraft.GetLeader()
 		health.IsActiveNode = orcraft.IsLeader()
@@ -136,6 +140,32 @@ func HealthTest() (health *HealthStatus, err error) {
 		}
 	}
 	health.AvailableNodes, err = ReadAvailableNodes(true)
+
+	if !orcraft.IsLeader() {
+		resBytes, err := orcraft.HttpGetLeader("status")
+		if err != nil {
+			health.Error = err
+			return health, log.Errore(err)
+		}
+		type LeaderResp struct {
+			Code    string
+			Message string
+			Details interface{}
+		}
+		var apiResp LeaderResp
+		if err = json.Unmarshal(resBytes, &apiResp); err != nil {
+			health.Error = err
+			return health, log.Errore(err)
+		}
+		healthOfLeader, ok := apiResp.Details.(map[string]interface{})
+		if ok {
+			var rhm []string
+			for _, v := range healthOfLeader["RaftHealthyMembers"].([]interface{}) {
+				rhm = append(rhm, fmt.Sprint(v))
+			}
+			health.RaftHealthyMembers = rhm
+		}
+	}
 
 	return health, nil
 }
