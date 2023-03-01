@@ -261,6 +261,9 @@ type Configuration struct {
 	GraphitePath                               string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
+	EnablePrometheusMetrics                    bool              // If true, exports prometheus style metrics in /debug/prom-metrics
+	PrometheusNamespace                        string            // namespace and subsystem are components of the fully-qualified name of the metric (created by joining these components with "_")
+	PrometheusSubsystem                        string            // namespace and subsystem are components of the fully-qualified name of the metric (created by joining these components with "_")
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate some data from external host
