@@ -95,6 +95,8 @@ type Instance struct {
 	ReplicationCredentialsAvailable   bool
 	SemiSyncAvailable                 bool // when both semi sync plugins (master & replica) are loaded
 	SemiSyncPriority                  uint // higher value means higher priority, zero means async replica
+	SemiSyncMasterPluginNewVersion    bool // true for the plugin introduced with MySql 8.0.26
+	SemiSyncReplicaPluginNewVersion   bool // true for the plugin introduced with MySql 8.0.26
 	SemiSyncMasterEnabled             bool
 	SemiSyncReplicaEnabled            bool
 	SemiSyncMasterTimeout             uint64

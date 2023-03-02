@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -e
+
+orchestrator-client -c enable-semi-sync-master -i 127.0.0.1:10111
+orchestrator-client -c enable-semi-sync-replica -i 127.0.0.1:10112
+orchestrator-client -c enable-semi-sync-replica -i 127.0.0.1:10113
+orchestrator-client -c enable-semi-sync-replica -i 127.0.0.1:10114
+sleep 10
