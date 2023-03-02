@@ -972,7 +972,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 		if !skipProcesses {
 			// Execute post master-failover processes
-			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
@@ -1280,7 +1280,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 			// Execute post intermediate-master-failover processes
 			topologyRecovery.SuccessorKey = &promotedReplica.Key
 			topologyRecovery.SuccessorAlias = promotedReplica.InstanceAlias
-			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {
 		recoverDeadIntermediateMasterFailureCounter.Inc(1)
@@ -1445,7 +1445,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 			// Execute post intermediate-master-failover processes
 			topologyRecovery.SuccessorKey = &promotedReplica.Key
 			topologyRecovery.SuccessorAlias = promotedReplica.InstanceAlias
-			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {
 		recoverDeadCoMasterFailureCounter.Inc(1)
@@ -1587,7 +1587,7 @@ func checkAndRecoverDeadGroupMemberWithReplicas(analysisEntry inst.ReplicationAn
 			topologyRecovery.SuccessorKey = &recoveredToGroupMember.Key
 			topologyRecovery.SuccessorAlias = recoveredToGroupMember.InstanceAlias
 			// For the same reasons that were mentioned above, we re-use the post intermediate master fail-over hooks
-			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {
 		recoverDeadReplicationGroupMemberFailureCounter.Inc(1)
@@ -1881,11 +1881,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if !skipProcesses {
 		if topologyRecovery.SuccessorKey == nil {
 			// Execute general unsuccessful post failover processes
-			executeProcesses(config.Config.PostUnsuccessfulFailoverProcesses, "PostUnsuccessfulFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostUnsuccessfulFailoverProcesses, "PostUnsuccessfulFailoverProcesses", topologyRecovery, false)
 		} else {
 			// Execute general post failover processes
 			inst.EndDowntime(topologyRecovery.SuccessorKey)
-			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
+			err = executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting for %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
@@ -2221,7 +2221,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 			err = startReplicationErr
 		}
 	}
-	executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)
+	err = executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)
 
 	return topologyRecovery, promotedMasterCoordinates, err
 }
