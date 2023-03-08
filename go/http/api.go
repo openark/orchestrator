@@ -1789,6 +1789,86 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 	this.ClusterInfo(params, r, req)
 }
 
+// ClusterMessages provides list of unacknowledged messages for given cluster
+func (this *HttpAPI) ClusterMessages(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := figureClusterName(getClusterHint(params))
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	messages, err := inst.ReadClusterUserMessage(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, messages)
+}
+
+// WriteClusterUserMessage adds a new user message for given cluster
+func (this *HttpAPI) WriteClusterUserMessage(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	clusterName, err := figureClusterName(getClusterHint(params))
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	level := req.URL.Query().Get("level")
+	if level == "" {
+		level = "info"
+	}
+	text := req.URL.Query().Get("text")
+	message := inst.ClusterUserMessage{
+		ClusterName: clusterName,
+		Level:       level,
+		Message:     text,
+	}
+	if orcraft.IsRaftEnabled() {
+		_, err = orcraft.PublishCommand("write-cluster-user-message", message)
+	} else {
+		err = inst.WriteClusterUserMessage(message)
+	}
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, &APIResponse{Code: OK, Message: fmt.Sprintf("New message saved for cluster %s", clusterName)})
+}
+
+// AckClusterUserMessage removes cluster message with given ID
+func (this *HttpAPI) AckClusterUserMessage(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	messageId, err := strconv.ParseInt(params["messageId"], 10, 0)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	if orcraft.IsRaftEnabled() {
+		_, err = orcraft.PublishCommand("ack-cluster-user-message", messageId)
+	} else {
+		err = inst.AckClusterUserMessage(messageId)
+	}
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, &APIResponse{Code: OK, Message: "Message has been acknowledged"})
+}
+
 // ClusterOSCReplicas returns heuristic list of OSC replicas
 func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, req *http.Request) {
 	clusterName, err := figureClusterName(getClusterHint(params))
@@ -3782,6 +3862,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "cluster/instance/:host/:port", this.ClusterByInstance)
 	this.registerAPIRequest(m, "cluster-info/:clusterHint", this.ClusterInfo)
 	this.registerAPIRequest(m, "cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
+	this.registerAPIRequest(m, "cluster-messages/:clusterHint", this.ClusterMessages)
+	this.registerAPIRequest(m, "add-cluster-message/:clusterHint", this.WriteClusterUserMessage)
+	this.registerAPIRequest(m, "ack-cluster-message/:messageId", this.AckClusterUserMessage)
 	this.registerAPIRequest(m, "cluster-osc-slaves/:clusterHint", this.ClusterOSCReplicas)
 	this.registerAPIRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerAPIRequest(m, "clusters", this.Clusters)
