@@ -721,6 +721,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
 				if replicaErr != nil && movedReplica != nil {
 					replica = movedReplica
+					log.Errorf("moveReplicasViaGTID(): error on moveInstanceBelowViaGTID(). replica: %v; error: %v", replica.Key, replicaErr)
 				}
 
 				// After having moved replicas, update local shared variables:
