@@ -176,6 +176,7 @@ type Configuration struct {
 	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
 	AuthUserHeader                             string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
+	AuthGroupHeader                            string            // HTTP header indicating auth group, when AuthenticationMethod is "proxy"
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	PowerAuthGroups                            []string          // list of unix groups the authenticated user must be a member of to make changes.
 	AccessTokenUseExpirySeconds                uint              // Time by which an issued token must be used
@@ -359,6 +360,7 @@ func newConfiguration() *Configuration {
 		HTTPAuthUser:                               "",
 		HTTPAuthPassword:                           "",
 		AuthUserHeader:                             "X-Forwarded-User",
+		AuthGroupHeader:                            "X-Forwarded-Group",
 		PowerAuthUsers:                             []string{"*"},
 		PowerAuthGroups:                            []string{},
 		AccessTokenUseExpirySeconds:                60,
