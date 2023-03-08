@@ -187,7 +187,7 @@ test_single() {
   fi
 
   # test steps:
-  find "$tests_path/$test_name" ! -path . -type d -mindepth 1 -maxdepth 1 | sort | cut -d "/" -f 5 | while read test_step_name ; do
+  find "$tests_path/$test_name" -mindepth 1 -maxdepth 1 ! -path . -type d | sort | cut -d "/" -f 5 | while read test_step_name ; do
     [ "$test_step_name" == "." ] && continue
     test_step "$tests_path/$test_name/$test_step_name" "$test_name" "$test_step_name"
     if [ $? -ne 0 ] ; then
@@ -301,7 +301,7 @@ test_all() {
   while [ -s $tests_todo_file ] ; do
     echo -n > $tests_todo_file
 
-    find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+    find $tests_path -mindepth 1 -maxdepth 1 ! -path . -type d | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
       if ! test_listed_as_attempted "$test_name" ; then
         echo "$test_name" >> $tests_todo_file
       fi
@@ -318,7 +318,7 @@ test_all() {
       fi
     done || return 1
   done
-  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+  find $tests_path -mindepth 1 -maxdepth 1 ! -path . -type d | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     if ! test_listed_as_attempted "$test_name" ; then
       echo "# ERROR: tests completed by $test_name seems to have been skipped"
       exit 1
