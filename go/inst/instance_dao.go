@@ -2852,7 +2852,7 @@ func InstanceIsForgotten(instanceKey *InstanceKey) bool {
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
 	if instanceKey == nil {
-		return log.Errorf("ForgetInstance(): nil instanceKey")
+		return errors.New("ForgetInstance: nil instanceKey")
 	}
 	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
 	sqlResult, err := db.ExecOrchestrator(`
@@ -2864,14 +2864,14 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return fmt.Errorf("ForgetInstance: failed to delete instance %v from database_instance: %s", *instanceKey, err)
 	}
 	rows, err := sqlResult.RowsAffected()
 	if err != nil {
-		return log.Errore(err)
+		return fmt.Errorf("ForgetInstance: RowsAffected failed after deleting instance %v: %s", *instanceKey, err)
 	}
 	if rows == 0 {
-		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
+		return fmt.Errorf("ForgetInstance: instance %v not found", *instanceKey)
 	}
 	AuditOperation("forget", instanceKey, "")
 	return nil
