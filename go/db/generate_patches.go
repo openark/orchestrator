@@ -537,9 +537,24 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-		database_instance_tags /* sqlite3-skip */
-		DROP PRIMARY KEY,
-		ADD PRIMARY KEY (hostname, port, tag_name)
+			database_instance_tags /* sqlite3-skip */
+			DROP PRIMARY KEY,
+			ADD PRIMARY KEY (hostname, port, tag_name)
+	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
+			ADD COLUMN disabled_time timestamp not null default current_timestamp
+	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
+			ADD COLUMN expire_time timestamp null
+	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
+			ADD COLUMN disabled_reason text CHARACTER SET utf8 NOT NULL default ''
 	`,
 	`
 		ALTER TABLE

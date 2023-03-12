@@ -117,7 +117,7 @@ func computeLeaderURI() (uri string, err error) {
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
-func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier, thisHostname string) error {
+func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier, thisHostname string, leaderStateChan chan<- bool) error {
 	log.Debugf("Setting up raft")
 	ThisHostname = thisHostname
 	raftBind, err := normalizeRaftNode(config.Config.RaftBind)
@@ -150,12 +150,14 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 	if err != nil {
 		return FatalRaftError(err)
 	}
-
 	leaderCh := store.raft.LeaderCh()
 	go func() {
 		for isTurnedLeader := range leaderCh {
 			if isTurnedLeader {
 				PublishCommand("leader-uri", thisLeaderURI)
+			}
+			if leaderStateChan != nil {
+				go func() { leaderStateChan <- isTurnedLeader }()
 			}
 		}
 	}()
