@@ -10,4 +10,4 @@ orchestrator-client -c enable-semi-sync-replica -i 127.0.0.1:10112
 sleep 2
 
 orchestrator-client -c disable-semi-sync-replica -i 127.0.0.1:10112
-sleep 2
+sleep 7
