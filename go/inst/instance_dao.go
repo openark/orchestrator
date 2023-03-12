@@ -973,6 +973,9 @@ Cleanup:
 	latency.Start("backend")
 	_ = UpdateInstanceLastChecked(&instance.Key, partialSuccess)
 	latency.Stop("backend")
+	if err == nil {
+		err = fmt.Errorf("Unable to read topology instance %+v. Error is unknown", *instanceKey)
+	}
 	return nil, err
 }
 
