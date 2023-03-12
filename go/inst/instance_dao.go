@@ -58,6 +58,7 @@ const (
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
+var spacesRegexp = regexp.MustCompile(`[ \t\n\r]+`)
 
 // InstancesByCountReplicas is a sortable type for Instance
 type InstancesByCountReplicas [](*Instance)
@@ -115,6 +116,11 @@ func init() {
 	writeBufferLatency.Start("wait")
 
 	go initializeInstanceDao()
+}
+
+func stripSpaces(s string) string {
+	s = spacesRegexp.ReplaceAllString(s, "")
+	return s
 }
 
 func initializeInstanceDao() {
@@ -311,6 +317,26 @@ func expectReplicationThreadsState(instanceKey *InstanceKey, expectedState Repli
 		return nil
 	})
 	return expectationMet, err
+}
+
+// applyLeyValueLookup applies a change on origValue based on a comma separated list
+// of key:value pairs.
+// - spaces are removed from kvString
+// - A key of "*" in kvString matches any value.
+// - returns after first match
+// returns the resulting string or the original string if htere is no match
+func applyKeyValueLookup(origValue, kvString string) string {
+	if kvString != "" {
+		lookupValues := strings.Split(stripSpaces(kvString), ",")
+		for _, oneValue := range lookupValues {
+			kv := strings.Split(oneValue, ":")
+			if len(kv) == 2 && (kv[0] == origValue || kv[0] == "*") {
+				origValue = kv[1]
+				return origValue
+			}
+		}
+	}
+	return origValue
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
@@ -540,6 +566,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				instance.DataCenter = match[1]
 			}
 		}
+		// Handle possible replacement of the retrieved instance.DataCenter from a lookup list.
+		instance.DataCenter = applyKeyValueLookup(instance.DataCenter, config.Config.DataCenterLookupValues)
 		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
 	if config.Config.RegionPattern != "" {
