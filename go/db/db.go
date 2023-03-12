@@ -100,14 +100,24 @@ func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error
 			return nil, err
 		}
 	}
-	if db, _, err = sqlutils.GetDB(mysql_uri); err != nil {
+	var fromCache bool
+	if db, fromCache, err = sqlutils.GetDB(mysql_uri); err != nil {
 		return nil, err
 	}
-	if config.Config.MySQLConnectionLifetimeSeconds > 0 {
-		db.SetConnMaxLifetime(time.Duration(config.Config.MySQLConnectionLifetimeSeconds) * time.Second)
+	if !fromCache {
+		mySQLConnectionLifetimeSeconds := config.Config.MySQLConnectionLifetimeSeconds
+		if mySQLConnectionLifetimeSeconds == 0 {
+			var waitTimeout int
+			if err = db.QueryRow(`select @@session.wait_timeout`).Scan(&waitTimeout); err == nil {
+				mySQLConnectionLifetimeSeconds = waitTimeout - 5
+			}
+		}
+		if mySQLConnectionLifetimeSeconds > 0 {
+			db.SetConnMaxLifetime(time.Duration(mySQLConnectionLifetimeSeconds) * time.Second)
+		}
+		db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
+		db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
 	}
-	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
-	db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
