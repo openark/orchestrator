@@ -1,3 +1,6 @@
+# I am taking time off from maintaining this repo. I will not be reviewing issues.
+# Details in https://code.openark.org/blog/mysql/reducing-my-oss-involvement-and-how-it-affects-orchestrator-gh-ost
+
 <!--
  This is the place to report a bug, ask a question, or suggest an enhancement.
 
