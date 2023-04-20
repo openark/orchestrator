@@ -1,3 +1,6 @@
+# I am taking time off from maintaining this repo. I will not be reviewing pull requests.
+# Details in https://code.openark.org/blog/mysql/reducing-my-oss-involvement-and-how-it-affects-orchestrator-gh-ost
+
 <!--
 ## A Pull Request should be associated with an Issue.
 
