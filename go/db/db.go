@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -100,7 +101,8 @@ func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error
 			return nil, err
 		}
 	}
-	if db, _, err = sqlutils.GetDB(mysql_uri); err != nil {
+	sqlUtilsLogger := SqlUtilsLogger{client_context: host + ":" + strconv.Itoa(port)}
+	if db, _, err = sqlutils.GetDB(mysql_uri, sqlUtilsLogger); err != nil {
 		return nil, err
 	}
 	if config.Config.MySQLConnectionLifetimeSeconds > 0 {
@@ -123,7 +125,8 @@ func openOrchestratorMySQLGeneric() (db *sql.DB, fromCache bool, err error) {
 	if config.Config.MySQLOrchestratorUseMutualTLS {
 		uri, _ = SetupMySQLOrchestratorTLS(uri)
 	}
-	return sqlutils.GetDB(uri)
+	sqlUtilsLogger := SqlUtilsLogger{client_context: config.Config.MySQLOrchestratorHost + ":" + config.Config.MySQLOrchestratorHost}
+	return sqlutils.GetDB(uri, sqlUtilsLogger)
 }
 
 func IsSQLite() bool {
@@ -174,7 +177,7 @@ func safeMySQLURI(dsn string) string {
 func OpenOrchestrator() (db *sql.DB, err error) {
 	var fromCache bool
 	if IsSQLite() {
-		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
+		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile, nil)
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 		}
@@ -191,7 +194,8 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			}
 		}
 		dsn := getMySQLURI()
-		db, fromCache, err = sqlutils.GetDB(dsn)
+		sqlUtilsLogger := SqlUtilsLogger{client_context: dsn}
+		db, fromCache, err = sqlutils.GetDB(dsn, sqlUtilsLogger)
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: %v", safeMySQLURI(dsn))
 
