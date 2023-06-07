@@ -19,6 +19,7 @@ package db
 import (
 	"crypto/tls"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,6 +56,23 @@ func init() {
 	metrics.Register("instance_tls.write_cache", writeInstanceTLSCacheCounter)
 }
 
+type SqlUtilsLogger struct {
+	client_context string
+}
+
+func (logger SqlUtilsLogger) OnError(caller_context string, query string, err error) error {
+	query = strings.Join(strings.Fields(query), " ")  // trim whitespaces
+	query = strings.Replace(query, "%", "%%", -1)  // escape %
+
+	msg := fmt.Sprintf("%+v(%+v) %+v: %+v",
+						caller_context,
+						logger.client_context,
+						query,
+						err)
+
+	return log.Errorf(msg)
+}
+
 func requiresTLS(host string, port int, mysql_uri string) bool {
 	cacheKey := fmt.Sprintf("%s:%d", host, port)
 
@@ -64,7 +82,8 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 	}
 
 	required := false
-	db, _, _ := sqlutils.GetDB(mysql_uri)
+	sqlUtilsLogger := SqlUtilsLogger{client_context: host + ":" + strconv.Itoa(port)}
+	db, _, _ := sqlutils.GetDB(mysql_uri, sqlUtilsLogger)
 	if err := db.Ping(); err != nil && (strings.Contains(err.Error(), Error3159) || strings.Contains(err.Error(), Error1045)) {
 		required = true
 	}
