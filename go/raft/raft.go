@@ -120,18 +120,19 @@ func computeLeaderURI() (uri string, err error) {
 func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier, thisHostname string) error {
 	log.Debugf("Setting up raft")
 	ThisHostname = thisHostname
-	raftBind, err := normalizeRaftNode(config.Config.RaftBind)
+	raftDisableDNSLookup := config.Config.RaftDisableDNSLookup
+	raftBind, err := normalizeRaftNode(config.Config.RaftBind, raftDisableDNSLookup)
 	if err != nil {
 		return err
 	}
-	raftAdvertise, err := normalizeRaftNode(config.Config.RaftAdvertise)
+	raftAdvertise, err := normalizeRaftNode(config.Config.RaftAdvertise, raftDisableDNSLookup)
 	if err != nil {
 		return err
 	}
-	store = NewStore(config.Config.RaftDataDir, raftBind, raftAdvertise, applier, snapshotCreatorApplier)
+	store = NewStore(config.Config.RaftDataDir, raftBind, raftAdvertise, raftDisableDNSLookup, applier, snapshotCreatorApplier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
-		peerNode, err := normalizeRaftNode(raftNode)
+		peerNode, err := normalizeRaftNode(raftNode, raftDisableDNSLookup)
 		if err != nil {
 			return err
 		}
@@ -195,11 +196,14 @@ func normalizeRaftHostnameIP(host string) (string, error) {
 
 // normalizeRaftNode attempts to make sure there's a port to the given node.
 // It consults the DefaultRaftPort when there isn't
-func normalizeRaftNode(node string) (string, error) {
+func normalizeRaftNode(node string, disableLookup bool) (string, error) {
 	hostPort := strings.Split(node, ":")
-	host, err := normalizeRaftHostnameIP(hostPort[0])
-	if err != nil {
-		return host, err
+	host := hostPort[0]
+	if !disableLookup {
+		host, err := normalizeRaftHostnameIP(hostPort[0])
+		if err != nil {
+			return host, err
+		}
 	}
 	if len(hostPort) > 1 {
 		return fmt.Sprintf("%s:%s", host, hostPort[1]), nil
@@ -319,7 +323,7 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 }
 
 func AddPeer(addr string) (response interface{}, err error) {
-	addr, err = normalizeRaftNode(addr)
+	addr, err = normalizeRaftNode(addr, store.raftDisableDNSLookup)
 	if err != nil {
 		return "", err
 	}
@@ -328,7 +332,7 @@ func AddPeer(addr string) (response interface{}, err error) {
 }
 
 func RemovePeer(addr string) (response interface{}, err error) {
-	addr, err = normalizeRaftNode(addr)
+	addr, err = normalizeRaftNode(addr, store.raftDisableDNSLookup)
 	if err != nil {
 		return "", err
 	}
@@ -337,7 +341,7 @@ func RemovePeer(addr string) (response interface{}, err error) {
 }
 
 func PublishYield(toPeer string) (response interface{}, err error) {
-	toPeer, err = normalizeRaftNode(toPeer)
+	toPeer, err = normalizeRaftNode(toPeer, store.raftDisableDNSLookup)
 	if err != nil {
 		return "", err
 	}
