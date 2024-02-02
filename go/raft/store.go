@@ -14,9 +14,10 @@ import (
 )
 
 type Store struct {
-	raftDir       string
-	raftBind      string
-	raftAdvertise string
+	raftDir              string
+	raftBind             string
+	raftAdvertise        string
+	raftDisableDNSLookup bool
 
 	raft      *raft.Raft // The consensus mechanism
 	peerStore raft.PeerStore
@@ -31,11 +32,12 @@ type storeCommand struct {
 }
 
 // NewStore inits and returns a new store
-func NewStore(raftDir string, raftBind string, raftAdvertise string, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
+func NewStore(raftDir string, raftBind string, raftAdvertise string, raftDisableDNSLookup bool, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
 	return &Store{
 		raftDir:                raftDir,
 		raftBind:               raftBind,
 		raftAdvertise:          raftAdvertise,
+		raftDisableDNSLookup:   raftDisableDNSLookup,
 		applier:                applier,
 		snapshotCreatorApplier: snapshotCreatorApplier,
 	}
