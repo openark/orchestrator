@@ -21,7 +21,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/go-sql-driver/mysql"
 	"regexp"
 	"runtime"
 	"sort"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
@@ -626,7 +627,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// comparing UUIDs. We could instead resolve the MEMBER_HOST and MEMBER_PORT columns into an InstanceKey and compare
 	// those instead, but this could require external calls for name resolving, whereas comparing UUIDs does not.
 	serverUuidWaitGroup.Wait()
-	if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("8.0") {
+	if instance.IsOracleMySQL() && instance.IsPercona() {
 		err := PopulateGroupReplicationInformation(instance, db)
 		if err != nil {
 			goto Cleanup
@@ -1120,9 +1121,9 @@ func (this byNamePort) Less(i, j int) bool {
 }
 
 // BulkReadInstance returns a list of all instances from the database
-// - I only need the Hostname and Port fields.
-// - I must use readInstancesByCondition to ensure all column
-//   settings are correct.
+//   - I only need the Hostname and Port fields.
+//   - I must use readInstancesByCondition to ensure all column
+//     settings are correct.
 func BulkReadInstance() ([](*InstanceKey), error) {
 	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
 	const (
@@ -3205,20 +3206,24 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 func PopulateGroupReplicationInformation(instance *Instance, db *sql.DB) error {
 	// We exclude below hosts with state OFFLINE because they have joined no group yet, so there is no point in getting
 	// any group replication information from them
-	q := `
+	var member_role string
+	if instance.IsSmallerMajorVersionByString("8.0") {
+		member_role = "IF((SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'group_replication_primary_member')=MEMBER_ID, 'PRIMARY', 'SECONDARY') AS"
+	}
+	q := fmt.Sprintf(`
 	SELECT
 		MEMBER_ID,
 		MEMBER_HOST,
 		MEMBER_PORT,
 		MEMBER_STATE,
-		MEMBER_ROLE,
+	 %s MEMBER_ROLE,
 		@@global.group_replication_group_name,
 		@@global.group_replication_single_primary_mode
 	FROM
 		performance_schema.replication_group_members
 	WHERE
 		MEMBER_STATE != 'OFFLINE'
-	`
+	`, member_role)
 	rows, err := db.Query(q)
 	if err != nil {
 		_, grNotSupported := GroupReplicationNotSupportedErrors[err.(*mysql.MySQLError).Number]
