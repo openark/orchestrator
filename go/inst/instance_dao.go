@@ -627,7 +627,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// comparing UUIDs. We could instead resolve the MEMBER_HOST and MEMBER_PORT columns into an InstanceKey and compare
 	// those instead, but this could require external calls for name resolving, whereas comparing UUIDs does not.
 	serverUuidWaitGroup.Wait()
-	if instance.IsOracleMySQL() && instance.IsPercona() {
+	if instance.IsOracleMySQL() || instance.IsPercona() {
 		err := PopulateGroupReplicationInformation(instance, db)
 		if err != nil {
 			goto Cleanup
