@@ -1,0 +1,135 @@
+* {
+    box-sizing: border-box;
+}
+
+html {
+    height: 100%;
+}
+
+body {
+    background-color: #354152;
+    color: #7e8ba3;
+    font: 300 1rem/1.5 Helvetica Neue, sans-serif;
+    margin: 0;
+    min-height: 100%;
+}
+
+.align {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+}
+
+.align__item--start {
+    align-self: flex-start;
+}
+
+.align__item--end {
+    align-self: flex-end;
+}
+
+.auth__logo,
+.auth__title {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 2rem;
+}
+
+.auth__logo {
+    animation: rotation 6s infinite linear;
+}
+
+@keyframes rotation {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.grid {
+    margin: 0 auto;
+    max-width: 25rem;
+    width: 100%;
+}
+
+svg {
+    height: auto;
+    max-width: 100%;
+    vertical-align: middle;
+}
+
+a {
+    color: #7e8ba3;
+}
+
+.register {
+    background-color: #1b3041;
+    box-shadow: 0 0 250px #000;
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+p.error {
+    background-color: rgba(255, 0, 0, .6);
+    border: 1px solid white;
+    color: white;
+    font-weight: bold;
+    border-radius: 5px;
+    margin: 0 2em;
+    padding: 5px 0;
+}
+
+.log-form {
+    width: 40%;
+    min-width: 320px;
+    max-width: 475px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    -moz-transform: translate(-50%, -50%);
+    -o-transform: translate(-50%, -50%);
+    -ms-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+.form {
+    display: block;
+    width: 100%;
+}
+
+.form__group {
+    position: relative;
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+.form__control {
+    background: none;
+    border: 2px solid #3498db;
+    padding: 10px;
+    width: 90%;
+    outline: none;
+    color: white;
+    font-size: 1rem;
+    font-family: "Montserrat", sans-serif;
+    border-radius: 24px;
+    transition: 0.25s;
+    margin-bottom: 10px;
+}
+
+.form__control:focus,
+.form__control:valid {
+    border-color: #2ecc71;
+}
+
+.btn {
+    display: inline-block;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 0.5em 2em;
+    margin-right: 0.5em;
+}

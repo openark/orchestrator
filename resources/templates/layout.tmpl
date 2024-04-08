@@ -118,8 +118,13 @@
 				<li data-nav-page="read-only" style="display: none;">
 					<a name="read-only" title="read only mode"><span class="glyphicon glyphicon-eye-open"></span></a>
 				</li>
-				<li data-nav-page="user-id" style="display: none;">
-					<a name="user-id"></a>
+				<li class="dropdown" data-nav-page="user-id" style="display: none;">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown" name="user-id"></a>
+					<ul class="dropdown-menu">
+						<li id="user-role" class="nav-header"></li>
+						<li class="divider"></li>
+						<li><a href="{{.prefix}}/web/logout">Logout</a></li>
+					</ul>
 				</li>
 				<li data-nav-page="refreshCountdown">
 					<a href="#" id="refreshCountdown" class="small"></a>

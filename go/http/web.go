@@ -22,14 +22,18 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strconv"
+	"strings"
 	"text/template"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
+	"github.com/martini-contrib/sessions"
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/go-metrics/exp"
 
+	"github.com/openark/golib/log"
+	"github.com/openark/orchestrator/go/azure"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/inst"
 )
@@ -51,6 +55,13 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return instanceKey, err
 }
 
+func (this *HttpWeb) redirectOnAzureAuthentication(r render.Render, session sessions.Session) {
+	// If we are using Azure Authentication, we need to check is user in connected or not.
+	if config.Config.AuthenticationMethod == "azure" && !azure.IsUserLogged(session) {
+		r.Redirect(this.URLPrefix + "/web/auth")
+	}
+}
+
 func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *http.Request, resp http.ResponseWriter, user auth.User) {
 	publicToken := template.JSEscapeString(req.URL.Query().Get("publicToken"))
 	err := authenticateToken(publicToken, resp)
@@ -61,40 +72,48 @@ func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *ht
 	r.Redirect(this.URLPrefix + "/")
 }
 
-func (this *HttpWeb) Index(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Index(params martini.Params, r render.Render, req *http.Request, user auth.User, session sessions.Session) {
 	// Redirect index so that all web URLs begin with "/web/".
+	this.redirectOnAzureAuthentication(r, session)
+
 	// We also redirect /web/ to /web/clusters so that
 	// the Clusters page has a single canonical URL.
 	r.Redirect(this.URLPrefix + "/web/clusters")
 }
 
-func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User, session sessions.Session) {
+	this.redirectOnAzureAuthentication(r, session)
+
 	r.HTML(200, "templates/clusters", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "clusters",
 		"autoshow_problems":             false,
-		"authorizedForAction":           isAuthorizedForAction(req, user),
-		"userId":                        getUserId(req, user),
+		"authorizedForAction":           isAuthorizedForAction(req, user, session),
+		"userId":                        getUserId(req, user, session),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
 		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, req *http.Request, user auth.User, session sessions.Session) {
+	this.redirectOnAzureAuthentication(r, session)
+
 	r.HTML(200, "templates/clusters_analysis", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "clusters",
 		"autoshow_problems":             false,
-		"authorizedForAction":           isAuthorizedForAction(req, user),
-		"userId":                        getUserId(req, user),
+		"authorizedForAction":           isAuthorizedForAction(req, user, session),
+		"userId":                        getUserId(req, user, session),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
 		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	clusterName, _ := figureClusterName(params["clusterName"])
 
 	r.HTML(200, "templates/cluster", map[string]interface{}{
@@ -104,8 +123,8 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 		"autoshow_problems":             true,
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
-		"authorizedForAction":           isAuthorizedForAction(req, user),
-		"userId":                        getUserId(req, user),
+		"authorizedForAction":           isAuthorizedForAction(req, user, s),
+		"userId":                        getUserId(req, user, s),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
@@ -113,7 +132,9 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 	})
 }
 
-func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	clusterName, err := inst.GetClusterByAlias(params["clusterAlias"])
 	// Willing to accept the case of multiple clusters; we just present one
 	if clusterName == "" && err != nil {
@@ -122,10 +143,12 @@ func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req 
 	}
 
 	params["clusterName"] = clusterName
-	this.Cluster(params, r, req, user)
+	this.Cluster(params, r, req, user, s)
 }
 
-func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -144,10 +167,12 @@ func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, r
 	}
 
 	params["clusterName"] = instance.ClusterName
-	this.Cluster(params, r, req, user)
+	this.Cluster(params, r, req, user, s)
 }
 
-func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
@@ -156,8 +181,8 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 		"autoshow_problems":             false, // because pool screen by default expands all hosts
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
-		"authorizedForAction":           isAuthorizedForAction(req, user),
-		"userId":                        getUserId(req, user),
+		"authorizedForAction":           isAuthorizedForAction(req, user, s),
+		"userId":                        getUserId(req, user, s),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
@@ -165,7 +190,9 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 	})
 }
 
-func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	searchString := params["searchString"]
 	if searchString == "" {
 		searchString = req.URL.Query().Get("s")
@@ -175,28 +202,31 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "search",
 		"searchString":        searchString,
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "discover",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
@@ -205,8 +235,8 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 	r.HTML(200, "templates/audit", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"page":                page,
 		"auditHostname":       params["host"],
@@ -216,7 +246,9 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 	})
 }
 
-func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
@@ -232,8 +264,8 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit-recovery",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"page":                page,
 		"clusterName":         clusterName,
@@ -245,7 +277,9 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	})
 }
 
-func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
@@ -259,8 +293,8 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 	r.HTML(200, "templates/audit_failure_detection", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit-failure-detection",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"page":                page,
 		"detectionId":         detectionId,
@@ -270,24 +304,28 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 	})
 }
 
-func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	r.HTML(200, "templates/agents", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "agents",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	r.HTML(200, "templates/agent", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "agent",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"agentHost":           params["host"],
 		"prefix":              this.URLPrefix,
@@ -295,12 +333,14 @@ func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Req
 	})
 }
 
-func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	r.HTML(200, "templates/agent_seed_details", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "agent seed details",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"seedId":              params["seedId"],
 		"prefix":              this.URLPrefix,
@@ -308,81 +348,156 @@ func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, re
 	})
 }
 
-func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
+
 	r.HTML(200, "templates/seeds", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "seeds",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/home", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "home",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/about", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "about",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/keep-calm", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "Keep Calm",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "FAQ",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
 }
 
-func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.redirectOnAzureAuthentication(r, s)
 
 	r.HTML(200, "templates/status", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "status",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
+		"authorizedForAction": isAuthorizedForAction(req, user, s),
+		"userId":              getUserId(req, user, s),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
 		"webMessage":          config.Config.WebMessage,
 	})
+}
+
+func (this *HttpWeb) AuthPage(params martini.Params, r render.Render, req *http.Request, session sessions.Session) {
+	if azure.IsUserLogged(session) {
+		r.Redirect(this.URLPrefix + "/")
+	}
+
+	// Get query parameter 'error' in case of redirect error
+	errorParam := req.URL.Query().Get("error")
+
+	r.HTML(200, "templates/auth", map[string]interface{}{
+		"title":  "Azure Authentication",
+		"prefix": this.URLPrefix,
+		"error":  errorParam,
+	}, render.HTMLOptions{Layout: ""})
+}
+
+func (this *HttpWeb) Login(params martini.Params, r render.Render, req *http.Request, user auth.User, session sessions.Session) {
+	// Get credentials from form
+	email := req.FormValue("email")
+	pwd := req.FormValue("password")
+
+	// Connect to Azure
+	graphHelper := azure.NewGraphHelper()
+	err := graphHelper.InitializeGraphForAppAuth(email, pwd)
+	if err != nil {
+		log.Fatal("Error initializing Graph for app auth: ", err)
+	}
+	fmt.Println("Success Login to Azure Application")
+
+	guser := azure.GetAzureUser(&graphHelper)
+
+	if guser != nil {
+		userRole := azure.GetAzureUserAppRoleAssignments(guser, &graphHelper)
+
+		// Everything is good, we have all the needed information.
+		// We can now disconnect from azure to be sure
+		graphHelper.Clear()
+
+		if *guser.GetDisplayName() != "" && userRole != "" {
+			session.Set("Username", *guser.GetDisplayName())
+			session.Set("Role", userRole)
+
+			r.Redirect(this.URLPrefix + "/")
+		} else {
+			r.Redirect(this.URLPrefix + "/web/auth?error=login")
+		}
+	} else {
+		// There was an error. Disconnect from azure
+		graphHelper.Clear()
+		r.Redirect(this.URLPrefix + "/web/auth?error=login")
+	}
+}
+
+func (this *HttpWeb) Logout(params martini.Params, r render.Render, req *http.Request, user auth.User, res http.ResponseWriter, session sessions.Session) {
+	// Need to find a way to redirect to "/" if not logged
+	if res.Header().Get("Authorization") == "" {
+		switch strings.ToLower(config.Config.AuthenticationMethod) {
+		case "azure":
+			session.Clear()
+			r.Redirect(this.URLPrefix + "/")
+		default:
+			res.Header().Set("WWW-Authenticate", "Basic realm=\""+auth.BasicRealm+"\"")
+			http.Error(res, "Not Authorized", http.StatusUnauthorized)
+		}
+	} else {
+		r.Redirect(this.URLPrefix + "/")
+	}
 }
 
 func (this *HttpWeb) registerWebRequest(m *martini.ClassicMartini, path string, handler martini.Handler) {
@@ -395,6 +510,19 @@ func (this *HttpWeb) registerWebRequest(m *martini.ClassicMartini, path string, 
 		m.Get(fullPath, raftReverseProxy, handler)
 	} else {
 		m.Get(fullPath, handler)
+	}
+}
+
+func (this *HttpWeb) registerPostWebRequest(m *martini.ClassicMartini, path string, handler martini.Handler) {
+	fullPath := fmt.Sprintf("%s/web/%s", this.URLPrefix, path)
+	if path == "/" {
+		fullPath = fmt.Sprintf("%s/", this.URLPrefix)
+	}
+
+	if config.Config.RaftEnabled {
+		m.Post(fullPath, raftReverseProxy, handler)
+	} else {
+		m.Post(fullPath, handler)
 	}
 }
 
@@ -439,6 +567,9 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerWebRequest(m, "agent/:host", this.Agent)
 	this.registerWebRequest(m, "seed-details/:seedId", this.AgentSeedDetails)
 	this.registerWebRequest(m, "seeds", this.Seeds)
+	this.registerWebRequest(m, "logout", this.Logout)
+	this.registerWebRequest(m, "auth", this.AuthPage)
+	this.registerPostWebRequest(m, "login/azure", this.Login)
 
 	this.RegisterDebug(m)
 }

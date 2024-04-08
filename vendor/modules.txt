@@ -1,58 +1,149 @@
+# github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.1
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/azcore
+github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/exported
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/log
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/async
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/body
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/loc
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/pollers/op
+github.com/Azure/azure-sdk-for-go/sdk/azcore/internal/shared
+github.com/Azure/azure-sdk-for-go/sdk/azcore/log
+github.com/Azure/azure-sdk-for-go/sdk/azcore/policy
+github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime
+github.com/Azure/azure-sdk-for-go/sdk/azcore/streaming
+github.com/Azure/azure-sdk-for-go/sdk/azcore/tracing
+# github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.1
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/azidentity
+# github.com/Azure/azure-sdk-for-go/sdk/internal v1.1.2
+## explicit; go 1.18
+github.com/Azure/azure-sdk-for-go/sdk/internal/diag
+github.com/Azure/azure-sdk-for-go/sdk/internal/errorinfo
+github.com/Azure/azure-sdk-for-go/sdk/internal/log
+github.com/Azure/azure-sdk-for-go/sdk/internal/temporal
+github.com/Azure/azure-sdk-for-go/sdk/internal/uuid
+# github.com/AzureAD/microsoft-authentication-library-for-go v0.8.1
+## explicit; go 1.18
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/cache
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/base
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/base/internal/storage
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/exported
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/json
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/json/types/time
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/local
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/accesstokens
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/authority
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/internal/comm
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/internal/grant
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/wstrust
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/oauth/ops/wstrust/defs
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/options
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/shared
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/internal/version
+github.com/AzureAD/microsoft-authentication-library-for-go/apps/public
 # github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6
 ## explicit
 github.com/armon/consul-api
 # github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
+## explicit
 github.com/armon/go-metrics
+# github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff
+## explicit
+github.com/boj/redistore
+# github.com/cjlapao/common-go v0.0.37
+## explicit; go 1.19
+github.com/cjlapao/common-go/duration
 # github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0
 ## explicit
 github.com/codegangsta/inject
 # github.com/cyberdelia/go-metrics-graphite v0.0.0-20161219230853-39f87cc3b432
 ## explicit
 github.com/cyberdelia/go-metrics-graphite
-# github.com/fatih/color v1.10.0
+# github.com/davecgh/go-spew v1.1.1
 ## explicit
+github.com/davecgh/go-spew/spew
+# github.com/fatih/color v1.13.0
+## explicit; go 1.13
 github.com/fatih/color
+# github.com/go-logr/logr v1.2.3
+## explicit; go 1.16
+github.com/go-logr/logr
+github.com/go-logr/logr/funcr
+# github.com/go-logr/stdr v1.2.2
+## explicit; go 1.16
+github.com/go-logr/stdr
 # github.com/go-martini/martini v0.0.0-20170121215854-22fa46961aab
 ## explicit
 github.com/go-martini/martini
 # github.com/go-sql-driver/mysql v1.6.0
-## explicit
+## explicit; go 1.10
 github.com/go-sql-driver/mysql
+# github.com/golang-jwt/jwt/v4 v4.4.2
+## explicit; go 1.16
+github.com/golang-jwt/jwt/v4
+# github.com/gomodule/redigo v2.0.0+incompatible
+## explicit
+github.com/gomodule/redigo/internal
+github.com/gomodule/redigo/redis
 # github.com/google/btree v1.0.0
 ## explicit
-# github.com/hashicorp/consul/api v1.7.0
+# github.com/google/uuid v1.3.0
 ## explicit
+github.com/google/uuid
+# github.com/gorilla/context v1.1.1
+## explicit
+github.com/gorilla/context
+# github.com/gorilla/securecookie v1.1.1
+## explicit
+github.com/gorilla/securecookie
+# github.com/gorilla/sessions v1.2.1
+## explicit
+github.com/gorilla/sessions
+# github.com/hashicorp/consul/api v1.7.0
+## explicit; go 1.12
 github.com/hashicorp/consul/api
 # github.com/hashicorp/go-cleanhttp v0.5.2-0.20190406162018-d3fcbee8e181
 ## explicit
 github.com/hashicorp/go-cleanhttp
 # github.com/hashicorp/go-hclog v0.15.1-0.20201116205511-59fbd7b93270
-## explicit
+## explicit; go 1.13
 github.com/hashicorp/go-hclog
 # github.com/hashicorp/go-immutable-radix v1.3.0
 ## explicit
 github.com/hashicorp/go-immutable-radix
 # github.com/hashicorp/go-msgpack v0.5.3
+## explicit
 github.com/hashicorp/go-msgpack/codec
 # github.com/hashicorp/go-rootcerts v1.0.3-0.20191216101743-c8a9a31cbd76
-## explicit
+## explicit; go 1.12
 github.com/hashicorp/go-rootcerts
 # github.com/hashicorp/go-sockaddr v1.0.2
 ## explicit
 # github.com/hashicorp/go-uuid v1.0.2
 ## explicit
 # github.com/hashicorp/golang-lru v0.5.4
-## explicit
+## explicit; go 1.12
 github.com/hashicorp/golang-lru/simplelru
 # github.com/hashicorp/raft v0.0.0-00010101000000-000000000000 => github.com/openark/raft v0.0.0-20170918052300-fba9f909f7fe
 ## explicit
 github.com/hashicorp/raft
 # github.com/hashicorp/serf v0.9.5
-## explicit
+## explicit; go 1.12
 github.com/hashicorp/serf/coordinate
 # github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
 ## explicit
 github.com/howeyc/gopass
+# github.com/kylelemons/godebug v1.1.0
+## explicit; go 1.11
+github.com/kylelemons/godebug/diff
+github.com/kylelemons/godebug/pretty
 # github.com/martini-contrib/auth v0.0.0-20150219114609-fa62c19b7ae8
 ## explicit
 github.com/martini-contrib/auth
@@ -62,27 +153,134 @@ github.com/martini-contrib/gzip
 # github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11
 ## explicit
 github.com/martini-contrib/render
-# github.com/mattn/go-colorable v0.1.8
-github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.13-0.20200128103942-cb30d6282491
+# github.com/martini-contrib/sessions v0.0.0-20140630231722-fa13114fbcf0
 ## explicit
+github.com/martini-contrib/sessions
+# github.com/mattn/go-colorable v0.1.13
+## explicit; go 1.15
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.16
+## explicit; go 1.15
 github.com/mattn/go-isatty
 # github.com/mattn/go-sqlite3 v1.14.7
+## explicit; go 1.12
 github.com/mattn/go-sqlite3
+# github.com/microsoft/kiota-abstractions-go v0.17.0
+## explicit; go 1.18
+github.com/microsoft/kiota-abstractions-go
+github.com/microsoft/kiota-abstractions-go/authentication
+github.com/microsoft/kiota-abstractions-go/serialization
+github.com/microsoft/kiota-abstractions-go/store
+# github.com/microsoft/kiota-authentication-azure-go v0.6.0
+## explicit; go 1.18
+github.com/microsoft/kiota-authentication-azure-go
+# github.com/microsoft/kiota-http-go v0.14.0
+## explicit; go 1.18
+github.com/microsoft/kiota-http-go
+# github.com/microsoft/kiota-serialization-form-go v0.3.0
+## explicit; go 1.19
+github.com/microsoft/kiota-serialization-form-go
+# github.com/microsoft/kiota-serialization-json-go v0.8.1
+## explicit; go 1.18
+github.com/microsoft/kiota-serialization-json-go
+# github.com/microsoft/kiota-serialization-text-go v0.7.0
+## explicit; go 1.18
+github.com/microsoft/kiota-serialization-text-go
+# github.com/microsoftgraph/msgraph-sdk-go v0.55.0
+## explicit; go 1.18
+github.com/microsoftgraph/msgraph-sdk-go
+github.com/microsoftgraph/msgraph-sdk-go/admin
+github.com/microsoftgraph/msgraph-sdk-go/agreementacceptances
+github.com/microsoftgraph/msgraph-sdk-go/agreements
+github.com/microsoftgraph/msgraph-sdk-go/appcatalogs
+github.com/microsoftgraph/msgraph-sdk-go/applications
+github.com/microsoftgraph/msgraph-sdk-go/applicationtemplates
+github.com/microsoftgraph/msgraph-sdk-go/auditlogs
+github.com/microsoftgraph/msgraph-sdk-go/authenticationmethodconfigurations
+github.com/microsoftgraph/msgraph-sdk-go/authenticationmethodspolicy
+github.com/microsoftgraph/msgraph-sdk-go/branding
+github.com/microsoftgraph/msgraph-sdk-go/certificatebasedauthconfiguration
+github.com/microsoftgraph/msgraph-sdk-go/chats
+github.com/microsoftgraph/msgraph-sdk-go/communications
+github.com/microsoftgraph/msgraph-sdk-go/compliance
+github.com/microsoftgraph/msgraph-sdk-go/connections
+github.com/microsoftgraph/msgraph-sdk-go/contacts
+github.com/microsoftgraph/msgraph-sdk-go/contracts
+github.com/microsoftgraph/msgraph-sdk-go/datapolicyoperations
+github.com/microsoftgraph/msgraph-sdk-go/deviceappmanagement
+github.com/microsoftgraph/msgraph-sdk-go/devicemanagement
+github.com/microsoftgraph/msgraph-sdk-go/devices
+github.com/microsoftgraph/msgraph-sdk-go/directory
+github.com/microsoftgraph/msgraph-sdk-go/directoryobjects
+github.com/microsoftgraph/msgraph-sdk-go/directoryroles
+github.com/microsoftgraph/msgraph-sdk-go/directoryroletemplates
+github.com/microsoftgraph/msgraph-sdk-go/domaindnsrecords
+github.com/microsoftgraph/msgraph-sdk-go/domains
+github.com/microsoftgraph/msgraph-sdk-go/drives
+github.com/microsoftgraph/msgraph-sdk-go/education
+github.com/microsoftgraph/msgraph-sdk-go/external
+github.com/microsoftgraph/msgraph-sdk-go/grouplifecyclepolicies
+github.com/microsoftgraph/msgraph-sdk-go/groups
+github.com/microsoftgraph/msgraph-sdk-go/groupsettings
+github.com/microsoftgraph/msgraph-sdk-go/groupsettingtemplates
+github.com/microsoftgraph/msgraph-sdk-go/identity
+github.com/microsoftgraph/msgraph-sdk-go/identitygovernance
+github.com/microsoftgraph/msgraph-sdk-go/identityprotection
+github.com/microsoftgraph/msgraph-sdk-go/identityproviders
+github.com/microsoftgraph/msgraph-sdk-go/informationprotection
+github.com/microsoftgraph/msgraph-sdk-go/invitations
+github.com/microsoftgraph/msgraph-sdk-go/localizations
+github.com/microsoftgraph/msgraph-sdk-go/me
+github.com/microsoftgraph/msgraph-sdk-go/models
+github.com/microsoftgraph/msgraph-sdk-go/models/callrecords
+github.com/microsoftgraph/msgraph-sdk-go/models/externalconnectors
+github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors
+github.com/microsoftgraph/msgraph-sdk-go/models/security
+github.com/microsoftgraph/msgraph-sdk-go/models/termstore
+github.com/microsoftgraph/msgraph-sdk-go/oauth2permissiongrants
+github.com/microsoftgraph/msgraph-sdk-go/organization
+github.com/microsoftgraph/msgraph-sdk-go/permissiongrants
+github.com/microsoftgraph/msgraph-sdk-go/places
+github.com/microsoftgraph/msgraph-sdk-go/planner
+github.com/microsoftgraph/msgraph-sdk-go/policies
+github.com/microsoftgraph/msgraph-sdk-go/print
+github.com/microsoftgraph/msgraph-sdk-go/privacy
+github.com/microsoftgraph/msgraph-sdk-go/reports
+github.com/microsoftgraph/msgraph-sdk-go/rolemanagement
+github.com/microsoftgraph/msgraph-sdk-go/schemaextensions
+github.com/microsoftgraph/msgraph-sdk-go/scopedrolememberships
+github.com/microsoftgraph/msgraph-sdk-go/search
+github.com/microsoftgraph/msgraph-sdk-go/security
+github.com/microsoftgraph/msgraph-sdk-go/serviceprincipals
+github.com/microsoftgraph/msgraph-sdk-go/shares
+github.com/microsoftgraph/msgraph-sdk-go/sites
+github.com/microsoftgraph/msgraph-sdk-go/solutions
+github.com/microsoftgraph/msgraph-sdk-go/subscribedskus
+github.com/microsoftgraph/msgraph-sdk-go/subscriptions
+github.com/microsoftgraph/msgraph-sdk-go/teams
+github.com/microsoftgraph/msgraph-sdk-go/teamstemplates
+github.com/microsoftgraph/msgraph-sdk-go/teamwork
+github.com/microsoftgraph/msgraph-sdk-go/tenantrelationships
+github.com/microsoftgraph/msgraph-sdk-go/users
+# github.com/microsoftgraph/msgraph-sdk-go-core v0.33.1
+## explicit; go 1.18
+github.com/microsoftgraph/msgraph-sdk-go-core
+github.com/microsoftgraph/msgraph-sdk-go-core/authentication
 # github.com/miekg/dns v1.1.31
-## explicit
+## explicit; go 1.12
 # github.com/mitchellh/go-homedir v1.1.0
+## explicit
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/go-testing-interface v1.14.0
-## explicit
+## explicit; go 1.14
 # github.com/mitchellh/mapstructure v1.3.3
-## explicit
+## explicit; go 1.14
 github.com/mitchellh/mapstructure
-# github.com/montanaflynn/stats v0.0.0-20161102194025-f8cd06f93c6c
-## explicit
+# github.com/montanaflynn/stats v0.6.6
+## explicit; go 1.13
 github.com/montanaflynn/stats
 # github.com/openark/golib v0.0.0-20210520103621-827f3ea62180
-## explicit
+## explicit; go 1.16
 github.com/openark/golib/log
 github.com/openark/golib/math
 github.com/openark/golib/sqlutils
@@ -95,11 +293,17 @@ github.com/outbrain/golib/log
 ## explicit
 github.com/outbrain/zookeepercli/go/zk
 # github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
-## explicit
+## explicit; go 1.12
 github.com/oxtoacart/bpool
 # github.com/patrickmn/go-cache v2.1.0+incompatible
 ## explicit
 github.com/patrickmn/go-cache
+# github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4
+## explicit; go 1.14
+github.com/pkg/browser
+# github.com/pmezard/go-difflib v1.0.0
+## explicit
+github.com/pmezard/go-difflib/difflib
 # github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 ## explicit
 github.com/rcrowley/go-metrics
@@ -110,18 +314,50 @@ github.com/samuel/go-zookeeper/zk
 # github.com/sjmudd/stopwatch v0.0.0-20170103085848-637ef30077b7
 ## explicit
 github.com/sjmudd/stopwatch
-# github.com/stretchr/testify v1.6.1
-## explicit
-# golang.org/x/crypto v0.0.0-20200930160638-afb6bcd081ae
-## explicit
+# github.com/stretchr/testify v1.8.1
+## explicit; go 1.13
+github.com/stretchr/testify/assert
+# github.com/yosida95/uritemplate/v3 v3.0.2
+## explicit; go 1.14
+github.com/yosida95/uritemplate/v3
+# go.opentelemetry.io/otel v1.11.2
+## explicit; go 1.18
+go.opentelemetry.io/otel
+go.opentelemetry.io/otel/attribute
+go.opentelemetry.io/otel/baggage
+go.opentelemetry.io/otel/codes
+go.opentelemetry.io/otel/internal
+go.opentelemetry.io/otel/internal/attribute
+go.opentelemetry.io/otel/internal/baggage
+go.opentelemetry.io/otel/internal/global
+go.opentelemetry.io/otel/propagation
+# go.opentelemetry.io/otel/trace v1.11.2
+## explicit; go 1.18
+go.opentelemetry.io/otel/trace
+# golang.org/x/crypto v0.0.0-20220511200225-c6db032c6c88
+## explicit; go 1.17
+golang.org/x/crypto/pkcs12
+golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20200930145003-4acb6c075d10
-## explicit
-# golang.org/x/sys v0.0.0-20201126233918-771906719818
-## explicit
+# golang.org/x/net v0.5.0
+## explicit; go 1.17
+golang.org/x/net/http/httpguts
+golang.org/x/net/idna
+# golang.org/x/sys v0.4.0
+## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.4.0
+## explicit; go 1.17
+golang.org/x/term
+# golang.org/x/text v0.6.0
+## explicit; go 1.17
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
 # gopkg.in/gcfg.v1 v1.2.3
 ## explicit
 gopkg.in/gcfg.v1
@@ -131,4 +367,7 @@ gopkg.in/gcfg.v1/types
 # gopkg.in/warnings.v0 v0.1.2
 ## explicit
 gopkg.in/warnings.v0
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
 # github.com/hashicorp/raft => github.com/openark/raft v0.0.0-20170918052300-fba9f909f7fe

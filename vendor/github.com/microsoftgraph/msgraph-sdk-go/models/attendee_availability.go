@@ -1,0 +1,124 @@
+package models
+
+import (
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+)
+
+// AttendeeAvailability 
+type AttendeeAvailability struct {
+    // Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.
+    additionalData map[string]any
+    // The email address and type of attendee - whether it's a person or a resource, and whether required or optional if it's a person.
+    attendee AttendeeBaseable
+    // The availability status of the attendee. The possible values are: free, tentative, busy, oof, workingElsewhere, unknown.
+    availability *FreeBusyStatus
+    // The OdataType property
+    odataType *string
+}
+// NewAttendeeAvailability instantiates a new attendeeAvailability and sets the default values.
+func NewAttendeeAvailability()(*AttendeeAvailability) {
+    m := &AttendeeAvailability{
+    }
+    m.SetAdditionalData(make(map[string]any))
+    return m
+}
+// CreateAttendeeAvailabilityFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
+func CreateAttendeeAvailabilityFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+    return NewAttendeeAvailability(), nil
+}
+// GetAdditionalData gets the additionalData property value. Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.
+func (m *AttendeeAvailability) GetAdditionalData()(map[string]any) {
+    return m.additionalData
+}
+// GetAttendee gets the attendee property value. The email address and type of attendee - whether it's a person or a resource, and whether required or optional if it's a person.
+func (m *AttendeeAvailability) GetAttendee()(AttendeeBaseable) {
+    return m.attendee
+}
+// GetAvailability gets the availability property value. The availability status of the attendee. The possible values are: free, tentative, busy, oof, workingElsewhere, unknown.
+func (m *AttendeeAvailability) GetAvailability()(*FreeBusyStatus) {
+    return m.availability
+}
+// GetFieldDeserializers the deserialization information for the current model
+func (m *AttendeeAvailability) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error)) {
+    res := make(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error))
+    res["attendee"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+        val, err := n.GetObjectValue(CreateAttendeeBaseFromDiscriminatorValue)
+        if err != nil {
+            return err
+        }
+        if val != nil {
+            m.SetAttendee(val.(AttendeeBaseable))
+        }
+        return nil
+    }
+    res["availability"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+        val, err := n.GetEnumValue(ParseFreeBusyStatus)
+        if err != nil {
+            return err
+        }
+        if val != nil {
+            m.SetAvailability(val.(*FreeBusyStatus))
+        }
+        return nil
+    }
+    res["@odata.type"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+        val, err := n.GetStringValue()
+        if err != nil {
+            return err
+        }
+        if val != nil {
+            m.SetOdataType(val)
+        }
+        return nil
+    }
+    return res
+}
+// GetOdataType gets the @odata.type property value. The OdataType property
+func (m *AttendeeAvailability) GetOdataType()(*string) {
+    return m.odataType
+}
+// Serialize serializes information the current object
+func (m *AttendeeAvailability) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter)(error) {
+    {
+        err := writer.WriteObjectValue("attendee", m.GetAttendee())
+        if err != nil {
+            return err
+        }
+    }
+    if m.GetAvailability() != nil {
+        cast := (*m.GetAvailability()).String()
+        err := writer.WriteStringValue("availability", &cast)
+        if err != nil {
+            return err
+        }
+    }
+    {
+        err := writer.WriteStringValue("@odata.type", m.GetOdataType())
+        if err != nil {
+            return err
+        }
+    }
+    {
+        err := writer.WriteAdditionalData(m.GetAdditionalData())
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+// SetAdditionalData sets the additionalData property value. Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.
+func (m *AttendeeAvailability) SetAdditionalData(value map[string]any)() {
+    m.additionalData = value
+}
+// SetAttendee sets the attendee property value. The email address and type of attendee - whether it's a person or a resource, and whether required or optional if it's a person.
+func (m *AttendeeAvailability) SetAttendee(value AttendeeBaseable)() {
+    m.attendee = value
+}
+// SetAvailability sets the availability property value. The availability status of the attendee. The possible values are: free, tentative, busy, oof, workingElsewhere, unknown.
+func (m *AttendeeAvailability) SetAvailability(value *FreeBusyStatus)() {
+    m.availability = value
+}
+// SetOdataType sets the @odata.type property value. The OdataType property
+func (m *AttendeeAvailability) SetOdataType(value *string)() {
+    m.odataType = value
+}

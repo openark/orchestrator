@@ -28,6 +28,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
+	"github.com/martini-contrib/sessions"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
@@ -208,8 +209,8 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 // AsyncDiscover issues an asynchronous read on an instance. This is
 // useful for bulk loads of a new set of instances and will not block
 // if the instance is slow to respond or not reachable.
-func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -218,14 +219,14 @@ func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	go this.Discover(params, r, req, user)
+	go this.Discover(params, r, req, user, s)
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronous discovery initiated for Instance: %+v", instanceKey)})
 }
 
 // Discover issues a synchronous read on an instance
-func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -250,8 +251,8 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 }
 
 // Refresh synchronuously re-reads a topology instance
-func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -272,8 +273,8 @@ func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.R
 }
 
 // Forget removes an instance entry fro backend database
-func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -296,8 +297,8 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 }
 
 // ForgetCluster forgets all instacnes of a cluster
-func (this *HttpAPI) ForgetCluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ForgetCluster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -335,8 +336,8 @@ func (this *HttpAPI) Resolve(params martini.Params, r render.Render, req *http.R
 }
 
 // BeginMaintenance begins maintenance mode for given instance
-func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -356,8 +357,8 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, re
 }
 
 // EndMaintenance terminates maintenance mode
-func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -376,8 +377,8 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req 
 }
 
 // EndMaintenanceByInstanceKey terminates maintenance mode for given instance
-func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -428,8 +429,8 @@ func (this *HttpAPI) Maintenance(params martini.Params, r render.Render, req *ht
 }
 
 // BeginDowntime sets a downtime flag with default duration
-func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -468,8 +469,8 @@ func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *
 }
 
 // EndDowntime terminates downtime (removes downtime flag) for an instance
-func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -493,8 +494,8 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 }
 
 // MoveUp attempts to move an instance up the topology
-func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -514,8 +515,8 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 }
 
 // MoveUpReplicas attempts to move up all replicas of an instance
-func (this *HttpAPI) MoveUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -536,8 +537,8 @@ func (this *HttpAPI) MoveUpReplicas(params martini.Params, r render.Render, req 
 
 // Repoint positiones a replica under another (or same) master with exact same coordinates.
 // Useful for binlog servers
-func (this *HttpAPI) Repoint(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Repoint(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -562,8 +563,8 @@ func (this *HttpAPI) Repoint(params martini.Params, r render.Render, req *http.R
 }
 
 // MoveUpReplicas attempts to move up all replicas of an instance
-func (this *HttpAPI) RepointReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RepointReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -583,8 +584,8 @@ func (this *HttpAPI) RepointReplicas(params martini.Params, r render.Render, req
 }
 
 // MakeCoMaster attempts to make an instance co-master with its own master
-func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -604,8 +605,8 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 }
 
 // ResetReplication makes a replica forget about its master, effectively breaking the replication
-func (this *HttpAPI) ResetReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ResetReplication(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -626,8 +627,8 @@ func (this *HttpAPI) ResetReplication(params martini.Params, r render.Render, re
 
 // DetachReplicaMasterHost detaches a replica from its master by setting an invalid
 // (yet revertible) host name
-func (this *HttpAPI) DetachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) DetachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -648,8 +649,8 @@ func (this *HttpAPI) DetachReplicaMasterHost(params martini.Params, r render.Ren
 
 // ReattachReplicaMasterHost reverts a detachReplicaMasterHost command
 // by resoting the original master hostname in CHANGE MASTER TO
-func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -669,8 +670,8 @@ func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.R
 }
 
 // EnableGTID attempts to enable GTID on a replica
-func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -690,8 +691,8 @@ func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *htt
 }
 
 // DisableGTID attempts to disable GTID on a replica, and revert to binlog file:pos
-func (this *HttpAPI) DisableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) DisableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -727,8 +728,8 @@ func (this *HttpAPI) LocateErrantGTID(params martini.Params, r render.Render, re
 }
 
 // ErrantGTIDResetMaster removes errant transactions on a server by way of RESET MASTER
-func (this *HttpAPI) ErrantGTIDResetMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ErrantGTIDResetMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -748,8 +749,8 @@ func (this *HttpAPI) ErrantGTIDResetMaster(params martini.Params, r render.Rende
 }
 
 // ErrantGTIDInjectEmpty removes errant transactions by injecting and empty transaction on the cluster's master
-func (this *HttpAPI) ErrantGTIDInjectEmpty(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ErrantGTIDInjectEmpty(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -769,8 +770,8 @@ func (this *HttpAPI) ErrantGTIDInjectEmpty(params martini.Params, r render.Rende
 }
 
 // MoveBelow attempts to move an instance below its supposed sibling
-func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -795,8 +796,8 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http
 }
 
 // MoveBelowGTID attempts to move an instance below another, via GTID
-func (this *HttpAPI) MoveBelowGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveBelowGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -821,8 +822,8 @@ func (this *HttpAPI) MoveBelowGTID(params martini.Params, r render.Render, req *
 }
 
 // MoveReplicasGTID attempts to move an instance below another, via GTID
-func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -847,8 +848,8 @@ func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, re
 }
 
 // TakeSiblings
-func (this *HttpAPI) TakeSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) TakeSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -868,8 +869,8 @@ func (this *HttpAPI) TakeSiblings(params martini.Params, r render.Render, req *h
 }
 
 // TakeMaster
-func (this *HttpAPI) TakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) TakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -890,8 +891,8 @@ func (this *HttpAPI) TakeMaster(params martini.Params, r render.Render, req *htt
 
 // RelocateBelow attempts to move an instance below another, orchestrator choosing the best (potentially multi-step)
 // relocation method
-func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -916,8 +917,8 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 }
 
 // Relocates attempts to smartly relocate replicas of a given instance below another
-func (this *HttpAPI) RelocateReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RelocateReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -942,8 +943,8 @@ func (this *HttpAPI) RelocateReplicas(params martini.Params, r render.Render, re
 }
 
 // MoveEquivalent attempts to move an instance below another, baseed on known equivalence master coordinates
-func (this *HttpAPI) MoveEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MoveEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -968,8 +969,8 @@ func (this *HttpAPI) MoveEquivalent(params martini.Params, r render.Render, req 
 }
 
 // LastPseudoGTID attempts to find the last pseugo-gtid entry in an instance
-func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1003,8 +1004,8 @@ func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req 
 }
 
 // MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
-func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1029,8 +1030,8 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 }
 
 // MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
-func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1050,8 +1051,8 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 }
 
 // MultiMatchReplicas attempts to match all replicas of a given instance below another, efficiently
-func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1076,8 +1077,8 @@ func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, 
 }
 
 // MatchUpReplicas attempts to match up all replicas of an instance
-func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1098,8 +1099,8 @@ func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req
 
 // RegroupReplicas attempts to pick a replica of a given instance and make it take its siblings, using any
 // method possible (GTID, Pseudo-GTID, binlog servers)
-func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1122,8 +1123,8 @@ func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req
 
 // RegroupReplicas attempts to pick a replica of a given instance and make it take its siblings, efficiently,
 // using pseudo-gtid if necessary
-func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1146,8 +1147,8 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 }
 
 // RegroupReplicasGTID attempts to pick a replica of a given instance and make it take its siblings, efficiently, using GTID
-func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1170,8 +1171,8 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 }
 
 // RegroupReplicasBinlogServers attempts to pick a replica of a given instance and make it take its siblings, efficiently, using GTID
-func (this *HttpAPI) RegroupReplicasBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegroupReplicasBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1193,8 +1194,8 @@ func (this *HttpAPI) RegroupReplicasBinlogServers(params martini.Params, r rende
 }
 
 // MakeMaster attempts to make the given instance a master, and match its siblings to be its replicas
-func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1215,8 +1216,8 @@ func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *htt
 
 // MakeLocalMaster attempts to make the given instance a local master: take over its master by
 // enslaving its siblings and replicating from its grandparent.
-func (this *HttpAPI) MakeLocalMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MakeLocalMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1236,8 +1237,8 @@ func (this *HttpAPI) MakeLocalMaster(params martini.Params, r render.Render, req
 }
 
 // SkipQuery skips a single query on a failed replication instance
-func (this *HttpAPI) SkipQuery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) SkipQuery(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1257,8 +1258,8 @@ func (this *HttpAPI) SkipQuery(params martini.Params, r render.Render, req *http
 }
 
 // StartReplication starts replication on given instance
-func (this *HttpAPI) StartReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) StartReplication(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1278,8 +1279,8 @@ func (this *HttpAPI) StartReplication(params martini.Params, r render.Render, re
 }
 
 // RestartReplication stops & starts replication on given instance
-func (this *HttpAPI) RestartReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RestartReplication(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1299,8 +1300,8 @@ func (this *HttpAPI) RestartReplication(params martini.Params, r render.Render, 
 }
 
 // StopReplication stops replication on given instance
-func (this *HttpAPI) StopReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) StopReplication(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1320,8 +1321,8 @@ func (this *HttpAPI) StopReplication(params martini.Params, r render.Render, req
 }
 
 // StopReplicationNicely stops replication on given instance, such that sql thead is aligned with IO thread
-func (this *HttpAPI) StopReplicationNicely(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) StopReplicationNicely(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1341,8 +1342,8 @@ func (this *HttpAPI) StopReplicationNicely(params martini.Params, r render.Rende
 }
 
 // FlushBinaryLogs runs a single FLUSH BINARY LOGS
-func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1362,8 +1363,8 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 }
 
 // PurgeBinaryLogs purges binary logs up to given binlog file
-func (this *HttpAPI) PurgeBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) PurgeBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1396,8 +1397,8 @@ func (this *HttpAPI) PurgeBinaryLogs(params martini.Params, r render.Render, req
 // RestartReplicationStatements receives a query to execute that requires a replication restart to apply.
 // As an example, this may be `set global rpl_semi_sync_slave_enabled=1`. orchestrator will check
 // replication status on given host and will wrap with appropriate stop/start statements, if need be.
-func (this *HttpAPI) RestartReplicationStatements(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RestartReplicationStatements(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1420,8 +1421,8 @@ func (this *HttpAPI) RestartReplicationStatements(params martini.Params, r rende
 }
 
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
-func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1521,8 +1522,8 @@ func (this *HttpAPI) CanReplicateFromGTID(params martini.Params, r render.Render
 }
 
 // setSemiSyncMaster
-func (this *HttpAPI) setSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) setSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1541,16 +1542,16 @@ func (this *HttpAPI) setSemiSyncMaster(params martini.Params, r render.Render, r
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("master semi-sync set to %t", enable), Details: instance})
 }
 
-func (this *HttpAPI) EnableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.setSemiSyncMaster(params, r, req, user, true)
+func (this *HttpAPI) EnableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.setSemiSyncMaster(params, r, req, user, true, s)
 }
-func (this *HttpAPI) DisableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.setSemiSyncMaster(params, r, req, user, false)
+func (this *HttpAPI) DisableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.setSemiSyncMaster(params, r, req, user, false, s)
 }
 
 // setSemiSyncMaster
-func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1569,17 +1570,17 @@ func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("replica semi-sync set to %t", enable), Details: instance})
 }
 
-func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.setSemiSyncReplica(params, r, req, user, true)
+func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.setSemiSyncReplica(params, r, req, user, true, s)
 }
 
-func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.setSemiSyncReplica(params, r, req, user, false)
+func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.setSemiSyncReplica(params, r, req, user, false, s)
 }
 
 // DelayReplication delays replication on given instance with given seconds
-func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1603,8 +1604,8 @@ func (this *HttpAPI) DelayReplication(params martini.Params, r render.Render, re
 }
 
 // SetReadOnly sets the global read_only variable
-func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1624,8 +1625,8 @@ func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *ht
 }
 
 // SetWriteable clear the global read_only variable
-func (this *HttpAPI) SetWriteable(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) SetWriteable(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1645,8 +1646,8 @@ func (this *HttpAPI) SetWriteable(params martini.Params, r render.Render, req *h
 }
 
 // KillQuery kills a query running on a server
-func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -1807,8 +1808,8 @@ func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, 
 }
 
 // SetClusterAlias will change an alias for a given clustername
-func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2115,8 +2116,8 @@ func (this *HttpAPI) HostnameResolveCache(params martini.Params, r render.Render
 }
 
 // ResetHostnameResolveCache clears in-memory hostname resovle cache
-func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2131,8 +2132,8 @@ func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.R
 }
 
 // DeregisterHostnameUnresolve deregisters the unresolve name used previously
-func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2157,8 +2158,8 @@ func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render
 }
 
 // RegisterHostnameUnresolve registers the unresolve name to use
-func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2184,8 +2185,8 @@ func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.R
 }
 
 // SubmitPoolInstances (re-)applies the list of hostnames for a given pool
-func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2208,8 +2209,8 @@ func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render,
 }
 
 // SubmitPoolHostnames (re-)applies the list of hostnames for a given pool
-func (this *HttpAPI) ReadClusterPoolInstancesMap(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ReadClusterPoolInstancesMap(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2226,8 +2227,8 @@ func (this *HttpAPI) ReadClusterPoolInstancesMap(params martini.Params, r render
 }
 
 // GetHeuristicClusterPoolInstances returns instances belonging to a cluster's pool
-func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2248,8 +2249,8 @@ func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r r
 }
 
 // GetHeuristicClusterPoolInstances returns instances belonging to a cluster's pool
-func (this *HttpAPI) GetHeuristicClusterPoolInstancesLag(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) GetHeuristicClusterPoolInstancesLag(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2270,8 +2271,8 @@ func (this *HttpAPI) GetHeuristicClusterPoolInstancesLag(params martini.Params, 
 }
 
 // ReloadClusterAlias clears in-memory hostname resovle cache
-func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2280,8 +2281,8 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 }
 
 // BulkPromotionRules returns a list of the known promotion rules for each instance
-func (this *HttpAPI) BulkPromotionRules(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) BulkPromotionRules(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2296,8 +2297,8 @@ func (this *HttpAPI) BulkPromotionRules(params martini.Params, r render.Render, 
 }
 
 // BulkInstances returns a list of all known instances
-func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2454,8 +2455,8 @@ func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r rende
 }
 
 // Agents provides complete list of registered agents (See https://github.com/openark/orchestrator-agent)
-func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2475,8 +2476,8 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 }
 
 // Agent returns complete information of a given agent
-func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2496,8 +2497,8 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 }
 
 // AgentUnmount instructs an agent to unmount the designated mount point
-func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2517,8 +2518,8 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 }
 
 // AgentMountLV instructs an agent to mount a given volume on the designated mount point
-func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2538,8 +2539,8 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 }
 
 // AgentCreateSnapshot instructs an agent to create a new snapshot. Agent's DIY implementation.
-func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2559,8 +2560,8 @@ func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render,
 }
 
 // AgentRemoveLV instructs an agent to remove a logical volume
-func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2580,8 +2581,8 @@ func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *
 }
 
 // AgentMySQLStop stops MySQL service on agent
-func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2601,8 +2602,8 @@ func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req 
 }
 
 // AgentMySQLStart starts MySQL service on agent
-func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2621,8 +2622,8 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 	r.JSON(http.StatusOK, output)
 }
 
-func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2643,8 +2644,8 @@ func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, 
 
 // AgentSeed completely seeds a host with another host's snapshots. This is a complex operation
 // governed by orchestrator and executed by the two agents involved.
-func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2664,8 +2665,8 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 }
 
 // AgentActiveSeeds lists active seeds and their state
-func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2685,8 +2686,8 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 }
 
 // AgentRecentSeeds lists recent seeds of a given agent
-func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2706,8 +2707,8 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 }
 
 // AgentSeedDetails provides details of a given seed
-func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2728,8 +2729,8 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 }
 
 // AgentSeedStates returns the breakdown of states (steps) of a given seed
-func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2750,8 +2751,8 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 }
 
 // Seeds retruns all recent seeds
-func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2771,8 +2772,8 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 }
 
 // AbortSeed instructs agents to abort an active seed
-func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2843,8 +2844,8 @@ func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *ht
 }
 
 // GrabElection forcibly grabs leadership. Use with care!!
-func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2858,8 +2859,8 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 }
 
 // Reelect causes re-elections for an active node
-func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2873,8 +2874,8 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 }
 
 // RaftAddPeer adds a new node to the raft cluster
-func (this *HttpAPI) RaftAddPeer(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RaftAddPeer(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2893,8 +2894,8 @@ func (this *HttpAPI) RaftAddPeer(params martini.Params, r render.Render, req *ht
 }
 
 // RaftAddPeer removes a node fro the raft cluster
-func (this *HttpAPI) RaftRemovePeer(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RaftRemovePeer(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2913,8 +2914,8 @@ func (this *HttpAPI) RaftRemovePeer(params martini.Params, r render.Render, req 
 }
 
 // RaftYield yields to a specified host
-func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -2927,8 +2928,8 @@ func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http
 }
 
 // RaftYieldHint yields to a host whose name contains given hint (e.g. DC)
-func (this *HttpAPI) RaftYieldHint(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RaftYieldHint(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3055,8 +3056,8 @@ func (this *HttpAPI) RaftSnapshot(params martini.Params, r render.Render, req *h
 }
 
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
-func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3124,14 +3125,14 @@ func (this *HttpAPI) ReplicationAnalysisForKey(params martini.Params, r render.R
 }
 
 // RecoverLite attempts recovery on a given instance, without executing external processes
-func (this *HttpAPI) RecoverLite(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) RecoverLite(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
 	params["skipProcesses"] = "true"
-	this.Recover(params, r, req, user)
+	this.Recover(params, r, req, user, s)
 }
 
 // Recover attempts recovery on a given instance
-func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3163,8 +3164,8 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 }
 
 // GracefulMasterTakeover gracefully fails over a master onto its single replica.
-func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, auto bool) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, auto bool, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3190,18 +3191,18 @@ func (this *HttpAPI) gracefulMasterTakeover(params martini.Params, r render.Rend
 // GracefulMasterTakeover gracefully fails over a master, either:
 // - onto its single replica, or
 // - onto a replica indicated by the user
-func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.gracefulMasterTakeover(params, r, req, user, false)
+func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.gracefulMasterTakeover(params, r, req, user, false, s)
 }
 
 // GracefulMasterTakeoverAuto gracefully fails over a master onto a replica of orchestrator's choosing
-func (this *HttpAPI) GracefulMasterTakeoverAuto(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	this.gracefulMasterTakeover(params, r, req, user, true)
+func (this *HttpAPI) GracefulMasterTakeoverAuto(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	this.gracefulMasterTakeover(params, r, req, user, true, s)
 }
 
 // ForceMasterFailover fails over a master (even if there's no particular problem with the master)
-func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3223,8 +3224,8 @@ func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render,
 }
 
 // ForceMasterTakeover fails over a master (even if there's no particular problem with the master)
-func (this *HttpAPI) ForceMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) ForceMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3257,8 +3258,8 @@ func (this *HttpAPI) ForceMasterTakeover(params martini.Params, r render.Render,
 }
 
 // Registers promotion preference for given instance
-func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3418,8 +3419,8 @@ func (this *HttpAPI) RecentlyActiveInstanceRecovery(params martini.Params, r ren
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3442,7 +3443,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
 	}
-	userId := getUserId(req, user)
+	userId := getUserId(req, user, s)
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
@@ -3462,8 +3463,8 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3479,7 +3480,7 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
 	}
-	userId := getUserId(req, user)
+	userId := getUserId(req, user, s)
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
@@ -3499,8 +3500,8 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3525,7 +3526,7 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
 	}
-	userId := getUserId(req, user)
+	userId := getUserId(req, user, s)
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
@@ -3551,8 +3552,8 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3562,7 +3563,7 @@ func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Re
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
 	}
-	userId := getUserId(req, user)
+	userId := getUserId(req, user, s)
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
@@ -3595,8 +3596,8 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 }
 
 // DisableGlobalRecoveries globally disables recoveries
-func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
@@ -3617,8 +3618,8 @@ func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Ren
 }
 
 // EnableGlobalRecoveries globally enables recoveries
-func (this *HttpAPI) EnableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
+func (this *HttpAPI) EnableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User, s sessions.Session) {
+	if !isAuthorizedForAction(req, user, s) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}

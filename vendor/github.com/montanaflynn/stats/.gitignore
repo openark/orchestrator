@@ -1,2 +1,5 @@
 coverage.out
+release-notes.txt
 .directory
+.chglog
+.vscode

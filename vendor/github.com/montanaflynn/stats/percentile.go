@@ -1,12 +1,22 @@
 package stats
 
-import "math"
+import (
+	"math"
+)
 
 // Percentile finds the relative standing in a slice of floats
 func Percentile(input Float64Data, percent float64) (percentile float64, err error) {
+	length := input.Len()
+	if length == 0 {
+		return math.NaN(), EmptyInputErr
+	}
 
-	if input.Len() == 0 || percent == 0 {
-		return math.NaN(), EmptyInput
+	if length == 1 {
+		return input[0], nil
+	}
+
+	if percent <= 0 || percent > 100 {
+		return math.NaN(), BoundsErr
 	}
 
 	// Start by sorting a copy of the slice
@@ -19,18 +29,18 @@ func Percentile(input Float64Data, percent float64) (percentile float64, err err
 	if index == float64(int64(index)) {
 
 		// Convert float to int
-		i := float64ToInt(index)
-
-		// Find the average of the index and following values
-		percentile, _ = Mean(Float64Data{c[i-1], c[i]})
-
-	} else if index >= 1 {
-
-		// Convert float to int
-		i := float64ToInt(index)
+		i := int(index)
 
 		// Find the value at the index
 		percentile = c[i-1]
+
+	} else if index > 1 {
+
+		// Convert float to int via truncation
+		i := int(index)
+
+		// Find the average of the index and following values
+		percentile, _ = Mean(Float64Data{c[i-1], c[i]})
 
 	} else {
 		return math.NaN(), BoundsErr
@@ -48,7 +58,7 @@ func PercentileNearestRank(input Float64Data, percent float64) (percentile float
 
 	// Return an error for empty slices
 	if il == 0 {
-		return math.NaN(), EmptyInput
+		return math.NaN(), EmptyInputErr
 	}
 
 	// Return error for less than 0 or greater than 100 percentages
