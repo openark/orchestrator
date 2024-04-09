@@ -1143,8 +1143,10 @@ $(document).ready(function() {
     $("[data-nav-page=read-only]").css('display', 'inline-block');
   }
   if (getUserId() != "" && !isAnonymized()) {
+    var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
     $("[data-nav-page=user-id]").css('display', 'inline-block');
-    $("[data-nav-page=user-id] a").html(" " + getUserId());
+    $("[data-nav-page=user-id] a:first").html(" " + getUserId() + " <b class=\"caret\"></b>");
+    $("[data-nav-page=user-id] li#user-role").html(userStatus);
   }
   var orchestratorMsg = sanitizeHTML(getParameterByName("orchestrator-msg"))
   if (orchestratorMsg) {
