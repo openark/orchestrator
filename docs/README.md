@@ -42,6 +42,7 @@
 
 #### Various
 - [Security](security.md)
+    - [Azure](azure.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Pseudo GTID](pseudo-gtid.md): refactoring and high availability without using GTID.
 - [Agents](agents.md)

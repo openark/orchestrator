@@ -35,6 +35,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
+	"github.com/martini-contrib/sessions"
 	"github.com/openark/golib/log"
 )
 
@@ -99,12 +100,42 @@ func standardHttp(continuousDiscovery bool) {
 				return auth.SecureCompare(username, config.Config.HTTPAuthUser) && auth.SecureCompare(password, config.Config.HTTPAuthPassword)
 			}))
 		}
+	case "azure":
+		{
+			if config.Config.AzureClientID == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureClientID undefined")
+			}
+			if config.Config.AzureGraphUserScope == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureGraphUserScope undefined")
+			}
+			if config.Config.AzureRedirectURL == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureRedirectURL undefined")
+			}
+			if config.Config.AzureTenantID == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureTenantID undefined")
+			}
+			if config.Config.AzureApplicationName == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureApplicationName undefined")
+			}
+			if config.Config.AzureApplicationID == "" {
+				log.Fatal("AuthenticationMethod is configured as 'azure' but AzureApplicationID undefined")
+			}
+			if config.Config.AzureAdminRole == "" {
+				log.Warning("AuthenticationMethod is configured as 'azure' but AzureAdminRole undefined. Default value will be set to 'admin'")
+			}
+
+			// We inject a dummy User object because we have function signatures with User argument in api.go
+			m.Map(auth.User(""))
+		}
 	default:
 		{
 			// We inject a dummy User object because we have function signatures with User argument in api.go
 			m.Map(auth.User(""))
 		}
 	}
+
+	store := sessions.NewCookieStore([]byte(config.Config.SessionSecretKey))
+	m.Use(sessions.Sessions("go_session", store))
 
 	m.Use(gzip.All())
 	// Render html templates from templates directory

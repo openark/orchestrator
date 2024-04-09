@@ -22,12 +22,14 @@ import (
 	"strings"
 
 	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/sessions"
 
+	"github.com/openark/orchestrator/go/azure"
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/inst"
 	"github.com/openark/orchestrator/go/os"
 	"github.com/openark/orchestrator/go/process"
-	"github.com/openark/orchestrator/go/raft"
+	orcraft "github.com/openark/orchestrator/go/raft"
 )
 
 func getProxyAuthUser(req *http.Request) string {
@@ -39,7 +41,7 @@ func getProxyAuthUser(req *http.Request) string {
 
 // isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
 // This depends on configured authentication method.
-func isAuthorizedForAction(req *http.Request, user auth.User) bool {
+func isAuthorizedForAction(req *http.Request, user auth.User, session sessions.Session) bool {
 	if config.Config.ReadOnly {
 		return false
 	}
@@ -63,6 +65,18 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 			}
 			// passed authentication ==> writeable
 			return true
+		}
+	case "azure":
+		{
+			if azure.IsUserLogged(session) &&
+				((config.Config.AzureAdminRole != "" &&
+					azure.GetUserRole(session) == config.Config.AzureAdminRole) ||
+					config.Config.AzureAdminRole == "" && azure.GetUserRole(session) == "admin") {
+				// passed authentication ==> writeable
+				return true
+			}
+			// read only
+			return false
 		}
 	case "proxy":
 		{
@@ -114,7 +128,7 @@ func authenticateToken(publicToken string, resp http.ResponseWriter) error {
 }
 
 // getUserId returns the authenticated user id, if available, depending on authertication method.
-func getUserId(req *http.Request, user auth.User) string {
+func getUserId(req *http.Request, user auth.User, session sessions.Session) string {
 	if config.Config.ReadOnly {
 		return ""
 	}
@@ -127,6 +141,14 @@ func getUserId(req *http.Request, user auth.User) string {
 	case "multi":
 		{
 			return string(user)
+		}
+	case "azure":
+		{
+			if azure.IsUserLogged(session) {
+				return azure.GetUsername(session)
+			} else {
+				return ""
+			}
 		}
 	case "proxy":
 		{

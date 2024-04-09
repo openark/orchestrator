@@ -54,6 +54,11 @@ When operating in HTTP mode (API or Web), access to `orchestrator` may be restri
             "wallace", "gromit", "shaun"
             ],
 
+*  _Microsoft Azure AD authentication_
+
+   Check the specific documentation: [Azure](azure.md)
+
+
 Or, regardless, you may turn the entire `orchestrator` process to be read only via:
 
 
