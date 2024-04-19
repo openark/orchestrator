@@ -15,7 +15,7 @@
 # ORC_PASSWORD (default: orc_server_password): password used to login to orchestrator backend MySQL server
 ARG GO_VERSION=1.16.6-alpine3.14
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as build
+FROM golang:${GO_VERSION} as build
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -31,7 +31,7 @@ RUN rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator -maxde
 RUN rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator-client -maxdepth 2)/ /
 RUN cp conf/orchestrator-sample-sqlite.conf.json /etc/orchestrator.conf.json
 
-FROM --platform=${BUILDPLATFORM} alpine:3.14 as dist
+FROM alpine:3.14 as dist
 
 RUN apk --no-cache add bash curl jq
 
