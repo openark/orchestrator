@@ -639,6 +639,7 @@ func read(fileName string) (*Configuration, error) {
 	if err != nil {
 		return Config, err
 	}
+	defer file.Close()
 	decoder := json.NewDecoder(file)
 	err = decoder.Decode(Config)
 	if err == nil {
