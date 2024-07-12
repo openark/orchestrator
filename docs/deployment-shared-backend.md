@@ -54,7 +54,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
 - The [orchestrator command line](executing-via-command-line.md).
   - Deploy the `orchestrator` binary (you may use the `orchestrator-cli` distributed package) on any box from which you wish to interact with `orchestrator`.
   - Create `/etc/orchestrator.conf.json` on those boxes, populate with credentials. This file should generally be the same as for the `orchestrator` service boxes. If you're unsure, use exact same file content.
-  - The `orchestrator` binary will access the shared backend DB. Make sure to give it access. Typicaly this will be port `3306`.
+  - The `orchestrator` binary will access the shared backend DB. Make sure to give it access. Typically this will be port `3306`.
 
 It is OK to run `orchestrator` CLI even while the `orchestrator` service is operating, since they will all coordinate on the same backend DB.
 

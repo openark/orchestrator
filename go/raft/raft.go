@@ -213,7 +213,7 @@ func normalizeRaftNode(node string) (string, error) {
 
 // IsPartOfQuorum returns `true` when this node is part of the raft quorum, meaning its
 // data and opinion are trustworthy.
-// Comapre that to a node which has left (or has not yet joined) the quorum: it has stale data.
+// Compare that to a node which has left (or has not yet joined) the quorum: it has stale data.
 func IsPartOfQuorum() bool {
 	if GetLeader() == "" {
 		return false

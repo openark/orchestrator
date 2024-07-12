@@ -181,7 +181,7 @@ func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *
 func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in relay logs:
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
-	// relay log (indiciated by Relay_log_file) and walk backwards.
+	// relay log (indicated by Relay_log_file) and walk backwards.
 	// Eventually we will hit a relay log name which does not exist.
 	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
 	if err != nil {
@@ -287,7 +287,7 @@ func getLastExecutedEntryInRelaylog(instanceKey *InstanceKey, binlog string, min
 func GetLastExecutedEntryInRelayLogs(instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates) (binlogEvent *BinlogEvent, err error) {
 	// Look for last GTID in relay logs:
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
-	// relay log (indiciated by Relay_log_file) and walk backwards.
+	// relay log (indicated by Relay_log_file) and walk backwards.
 
 	currentRelayLog := recordedInstanceRelayLogCoordinates
 	for err == nil {
@@ -303,7 +303,7 @@ func GetLastExecutedEntryInRelayLogs(instance *Instance, minBinlogCoordinates *B
 			// and continue with exhaustive search.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
-			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
+			// And we do NOT iterate to previous log file: we scan same log failed again, with no heuristic
 		} else {
 			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 		}
@@ -379,7 +379,7 @@ func searchEventInRelaylog(instanceKey *InstanceKey, binlog string, searchEvent 
 
 func SearchEventInRelayLogs(searchEvent *BinlogEvent, instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates) (binlogCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
-	// relay log (indiciated by Relay_log_file) and walk backwards.
+	// relay log (indicated by Relay_log_file) and walk backwards.
 	log.Debugf("will search for event %+v", *searchEvent)
 	if minBinlogCoordinates != nil {
 		log.Debugf("Starting with coordinates: %+v", *minBinlogCoordinates)
@@ -398,7 +398,7 @@ func SearchEventInRelayLogs(searchEvent *BinlogEvent, instance *Instance, minBin
 			// and continue with exhaustive search.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
-			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
+			// And we do NOT iterate to previous log file: we scan same log failed again, with no heuristic
 		} else {
 			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 		}

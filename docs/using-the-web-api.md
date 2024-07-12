@@ -139,11 +139,11 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `ReplicationLagSeconds`: when `ReplicationLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `Replicas`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
-* `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable
-* `PhysicalEnvironment`: (metadata) name of environment, infered by `PhysicalEnvironmentPattern` config variable
+* `DataCenter`: (metadata) name of data center, inferred by `DataCenterPattern` config variable
+* `PhysicalEnvironment`: (metadata) name of environment, inferred by `PhysicalEnvironmentPattern` config variable
 * `ReplicationDepth`: distance from the master (master is `0`, direct replica is `1` and so on)
 * `IsCoMaster`: true when this instanceis part of a master-master pair
-* `IsLastCheckValid`: whether last attempt at reading this instane succeeeded
+* `IsLastCheckValid`: whether last attempt at reading this instance succeeeded
 * `IsUpToDate`: whether this data is up to date
 * `IsRecentlyChecked`: whether a read attempt on this instance has been recently made
 * `SecondsSinceLastSeen`: time elapsed since last successfully accessed this instance

@@ -7,7 +7,7 @@ Most of the time `orchestrator` only reads status from your topologies. Default 
 You may use `orchestrator` to refactor your topologies: move replicas around and change the replication tree. `orchestrator` will do its best to:
 
 1. Make sure you only move an instance to a location where it is valid for it to replicate (e.g. that you don't put a 5.5 server below a 5.6 server)
-2. Make sure you move an instance at the right time (ie the instance and whichever affected servers are not lagging badly, so that operation can compeletely in a timely manner).
+2. Make sure you move an instance at the right time (ie the instance and whichever affected servers are not lagging badly, so that operation can completely in a timely manner).
 3. Do the math correctly: stop the replica at the right time, roll it forward to the right position, `CHANGE MASTER` to the correct location & position.
 
 The above is well tested.
