@@ -938,7 +938,7 @@
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "dead master recovery - sucess",
+          "title": "dead master recovery - success",
           "tooltip": {
             "shared": true,
             "value_type": "cumulative"
@@ -1127,7 +1127,7 @@
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "dead intermediate master recovery - sucess",
+          "title": "dead intermediate master recovery - success",
           "tooltip": {
             "shared": true,
             "value_type": "cumulative"
@@ -1316,7 +1316,7 @@
           ],
           "timeFrom": null,
           "timeShift": null,
-          "title": "dead co master recovery - sucess",
+          "title": "dead co master recovery - success",
           "tooltip": {
             "shared": true,
             "value_type": "cumulative"

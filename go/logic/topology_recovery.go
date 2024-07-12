@@ -1370,7 +1370,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	// Maybe future me is a smarter person and finds a simple solution. Unlikely. I'm getting dumber.
 	//
 	// ...
-	// Now that we're convinved, take a look at what we can be left with:
+	// Now that we're convinced, take a look at what we can be left with:
 	// Say we started with M1<->M2<-S1, with M2 failing, and we promoted S1.
 	// We now have M1->S1 (because S1 is promoted), S1->M2 (because that's what it remembers), M2->M1 (because that's what it remembers)
 	// !! This is an evil 3-node circle that must be broken.
@@ -1923,7 +1923,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 		}
 
 		if specificInstance != nil {
-			// force mode. Keep it synchronuous
+			// force mode. Keep it synchronous
 			var topologyRecovery *TopologyRecovery
 			recoveryAttempted, topologyRecovery, err = executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
 			log.Errore(err)

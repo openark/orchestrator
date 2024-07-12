@@ -159,7 +159,7 @@ func ReadPEMData(pemFile string, pemPass []byte) ([]byte, error) {
 		var newBlock pem.Block
 		newBlock.Type = pemBlock.Type
 		newBlock.Bytes = pemData
-		// This is now like reading in an uncrypted key from a file and stuffing it
+		// This is now like reading in an unencrypted key from a file and stuffing it
 		// into a byte stream
 		pemData = pem.EncodeToMemory(&newBlock)
 	}
