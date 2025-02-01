@@ -1,10 +1,13 @@
-![](https://github.com/openark/orchestrator/workflows/CI/badge.svg)
-![](https://github.com/openark/orchestrator/workflows/upgrade/badge.svg)
-![](https://github.com/openark/orchestrator/workflows/system%20tests/badge.svg)
-[![downloads](https://img.shields.io/github/downloads/openark/orchestrator/total.svg)](https://github.com/openark/orchestrator/releases) [![release](https://img.shields.io/github/release/openark/orchestrator.svg)](https://github.com/openark/orchestrator/releases)
+## Repository archived
+
+> [!IMPORTANT]
+> **This repository has been archived.** If you are using Orchestrator for MySQL and want to collaborate with other users in maintaining the code base, please fork https://github.com/percona/orchestrator and send pull requests there.
+
+---
 
 # orchestrator [[Documentation]](https://github.com/openark/orchestrator/tree/master/docs)
 
+[![downloads](https://img.shields.io/github/downloads/openark/orchestrator/total.svg)](https://github.com/openark/orchestrator/releases) [![release](https://img.shields.io/github/release/openark/orchestrator.svg)](https://github.com/openark/orchestrator/releases)
 
 ![Orchestrator logo](https://github.com/openark/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
