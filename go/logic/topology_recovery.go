@@ -2199,6 +2199,12 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey,
 	if topologyRecovery.RecoveryType == MasterRecoveryGTID {
 		gtidHint = inst.GTIDHintForce
 	}
+
+	_, err = inst.ExecInstance(&clusterMaster.Key, "set global gtid_slave_pos=@@gtid_current_pos")
+	if err != nil {
+		log.Errorf("GracefulMasterTakeover: set global gtid_slave_pos=@@gtid_current_pos; %s", err.Error())
+	}
+
 	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, gtidHint)
 	if !clusterMaster.SelfBinlogCoordinates.Equals(demotedMasterSelfBinlogCoordinates) {
 		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", *demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
