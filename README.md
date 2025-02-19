@@ -11,7 +11,7 @@
 
 ![Orchestrator logo](https://github.com/openark/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
-`orchestrator` is a MySQL high availability and replication management tool, runs as a service and provides command line access, HTTP API and Web interface. `orchestrator` supports:
+`orchestrator` is a MySQL and MariaDB high availability and replication management tool, runs as a service and provides command line access, HTTP API and Web interface. `orchestrator` supports:
 
 #### Discovery
 
