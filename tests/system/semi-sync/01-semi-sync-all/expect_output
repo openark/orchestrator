@@ -1,0 +1,4 @@
+127.0.0.1:10111   [0s,ok,VERSION,rw,ROW,>>,GTID,semi:master]
++ 127.0.0.1:10112 [0s,ok,VERSION,ro,ROW,>>,GTID,semi:replica]
++ 127.0.0.1:10113 [0s,ok,VERSION,ro,ROW,>>,GTID,semi:replica]
++ 127.0.0.1:10114 [0s,ok,VERSION,ro,ROW,>>,GTID,semi:replica]
