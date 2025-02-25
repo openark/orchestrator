@@ -32,6 +32,8 @@ import (
 
 	"github.com/openark/orchestrator/go/config"
 	"github.com/openark/orchestrator/go/inst"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // HttpWeb is the web requests server, mapping each request to a web page
@@ -473,4 +475,9 @@ func (this *HttpWeb) RegisterDebug(m *martini.ClassicMartini) {
 
 	// go-metrics
 	m.Get(this.URLPrefix+"/debug/metrics", exp.ExpHandler(metrics.DefaultRegistry))
+
+	// prom-metrics
+	if config.Config.EnablePrometheusMetrics {
+		m.Get(this.URLPrefix+"/debug/prom-metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{DisableCompression: true}))
+	}
 }
