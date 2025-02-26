@@ -64,7 +64,7 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 	}
 
 	required := false
-	db, _, _ := sqlutils.GetDB(mysql_uri)
+	db, _, _ := sqlutils.GetDBNoCache(mysql_uri)
 	if err := db.Ping(); err != nil && (strings.Contains(err.Error(), Error3159) || strings.Contains(err.Error(), Error1045)) {
 		required = true
 	}
