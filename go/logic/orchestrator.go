@@ -279,6 +279,22 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
+	if instance.InstanceAlias != "" &&
+		inst.FiltersMatchInstanceKey(&inst.InstanceKey{Hostname: instance.InstanceAlias, Port: instanceKey.Port}, config.Config.DiscoveryIgnoreHostnameFilters) {
+
+		log.Debugf("discoverInstance: skipping discovery of %+v (alias) because it matches DiscoveryIgnoreHostnameFilters", instance.InstanceAlias)
+
+		var ignoreInstanceKey = &inst.InstanceKey{Hostname: instanceKey.Hostname, Port: instanceKey.Port}
+
+		if !inst.InstanceIsForgotten(ignoreInstanceKey) {
+			err := inst.ForgetInstance(ignoreInstanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+		return
+	}
+
 	// Investigate replicas and members of the same replication group:
 	for _, replicaKey := range append(instance.ReplicationGroupMembers.GetInstanceKeys(), instance.Replicas.GetInstanceKeys()...) {
 		replicaKey := replicaKey // not needed? no concurrency here?
