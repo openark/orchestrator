@@ -1949,7 +1949,7 @@ class Systemctl:
                         service_result = "failed"
                         break
             if service_result in [ "success" ] and mainpid:
-                logg.debug("okay, wating on socket for %ss", timeout)
+                logg.debug("okay, waiting on socket for %ss", timeout)
                 results = self.wait_notify_socket(notify, timeout, mainpid)
                 if "MAINPID" in results:
                     new_pid = results["MAINPID"]
@@ -2756,7 +2756,7 @@ class Systemctl:
         else:
             return "dead"
     def is_failed_modules(self, *modules):
-        """ [UNIT]... -- check if these units are in failes state
+        """ [UNIT]... -- check if these units are in failed state
         implements True if any is-active = True """
         units = []
         results = []
@@ -3618,7 +3618,7 @@ class Systemctl:
               + "\n\t\t\tUse ' ; ' for multiple commands (ExecReloadPost or ExedReloadPre do not exist)", unit)
         if len(usedExecReload) > 0 and "/bin/kill " in usedExecReload[0]:
             logg.warning(" %s: the use of /bin/kill is not recommended for ExecReload as it is asychronous."
-              + "\n\t\t\tThat means all the dependencies will perform the reload simultanously / out of order.", unit)
+              + "\n\t\t\tThat means all the dependencies will perform the reload simultaneously / out of order.", unit)
         if conf.getlist("Service", "ExecRestart", []): #pragma: no cover
             logg.error(" %s: there no such thing as an ExecRestart (ignored)", unit)
         if conf.getlist("Service", "ExecRestartPre", []): #pragma: no cover
@@ -3854,7 +3854,7 @@ class Systemctl:
                         default_services.append(unit)
         for folder in [ self.rc3_root_folder() ]:
             if not os.path.isdir(folder):
-                logg.warning("non-existant %s", folder)
+                logg.warning("non-existent %s", folder)
                 continue
             for unit in sorted(os.listdir(folder)):
                 path = os.path.join(folder, unit)
@@ -3960,7 +3960,7 @@ class Systemctl:
         it was never enabled in the system.
         /// SPECIAL: when using --now then only the init-loop is started, 
         with the reap-zombies function and waiting for an interrupt.
-        (and no unit is started/stoppped wether given or not).
+        (and no unit is started/stopped wether given or not).
         """
         if self._now:
             return self.init_loop_until_stop([])
@@ -4387,7 +4387,7 @@ if __name__ == "__main__":
     _o.add_option("--reverse", action="store_true",
         help="Show reverse dependencies with 'list-dependencies' (ignored)")
     _o.add_option("--job-mode", metavar="MODE",
-        help="Specifiy how to deal with already queued jobs, when queuing a new job (ignored)")    
+        help="Specify how to deal with already queued jobs, when queuing a new job (ignored)")
     _o.add_option("--show-types", action="store_true",
         help="When showing sockets, explicitly show their type (ignored)")
     _o.add_option("-i","--ignore-inhibitors", action="store_true",

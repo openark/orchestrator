@@ -283,7 +283,7 @@ func deployStatements(db *sql.DB, queries []string) error {
 	// where in NO_ZERO_IN_DATE,NO_ZERO_DATE sql_mode are invalid (since default is implicitly "0")
 	// This means installation of orchestrator fails on such configured servers, and in particular on 5.7
 	// where this setting is the dfault.
-	// For purpose of backwards compatability, what we do is force sql_mode to be more relaxed, create the schemas
+	// For purpose of backwards compatibility, what we do is force sql_mode to be more relaxed, create the schemas
 	// along with the "invalid" definition, and then go ahead and fix those definitions via following ALTER statements.
 	// My bad.
 	originalSqlMode := ""

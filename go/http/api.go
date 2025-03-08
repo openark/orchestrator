@@ -2749,7 +2749,7 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 	r.JSON(http.StatusOK, output)
 }
 
-// Seeds retruns all recent seeds
+// Seeds returns all recent seeds
 func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -2809,12 +2809,12 @@ func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Re
 
 }
 
-// LBCheck returns a constant respnse, and this can be used by load balancers that expect a given string.
+// LBCheck returns a constant response, and this can be used by load balancers that expect a given string.
 func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.Request) {
 	r.JSON(http.StatusOK, "OK")
 }
 
-// LBCheck returns a constant respnse, and this can be used by load balancers that expect a given string.
+// LBCheck returns a constant response, and this can be used by load balancers that expect a given string.
 func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *http.Request) {
 	respondStatus, err := strconv.Atoi(params["errorStatusCode"])
 	if err != nil || respondStatus < 0 {

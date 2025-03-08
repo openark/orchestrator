@@ -267,7 +267,7 @@ func ClearActiveRecoveries() error {
 }
 
 // RegisterBlockedRecoveries writes down currently blocked recoveries, and indicates what recovery they are blocked on.
-// Recoveries are blocked thru the in_active_period flag, which comes to avoid flapping.
+// Recoveries are blocked through the in_active_period flag, which comes to avoid flapping.
 func RegisterBlockedRecoveries(analysisEntry *inst.ReplicationAnalysis, blockingRecoveries []*TopologyRecovery) error {
 	for _, recovery := range blockingRecoveries {
 		_, err := db.ExecOrchestrator(`
@@ -438,7 +438,7 @@ func AcknowledgeClusterRecoveries(clusterName string, owner string, comment stri
 	return countAcknowledgedEntries, nil
 }
 
-// AcknowledgeInstanceRecoveries marks active recoveries for given instane as acknowledged.
+// AcknowledgeInstanceRecoveries marks active recoveries for given instance as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
 	whereClause := `
@@ -450,7 +450,7 @@ func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, 
 	return acknowledgeRecoveries(owner, comment, false, whereClause, args)
 }
 
-// AcknowledgeInstanceCompletedRecoveries marks active and COMPLETED recoveries for given instane as acknowledged.
+// AcknowledgeInstanceCompletedRecoveries marks active and COMPLETED recoveries for given instance as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeInstanceCompletedRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
 	whereClause := `

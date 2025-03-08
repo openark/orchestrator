@@ -63,7 +63,7 @@ func InitHttpClient() {
 	httpClient = &http.Client{Transport: httpTransport}
 }
 
-// httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
+// httpGet is a convenience method for getting http response from URL, optionally skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
 	return httpClient.Get(url)
 }
@@ -683,7 +683,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Checking MySQL status on target %s", targetHostname), "")
 	if targetAgent.MySQLRunning {
-		return updateSeedStateEntry(seedStateId, errors.New("MySQL is running on target host. Cowardly refusing to proceeed. Please stop the MySQL service"))
+		return updateSeedStateEntry(seedStateId, errors.New("MySQL is running on target host. Cowardly refusing to proceed. Please stop the MySQL service"))
 	}
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Looking up available snapshots on source %s", sourceHostname), "")
@@ -711,7 +711,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Aquiring target host datadir free space on %s", targetHostname), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Acquiring target host datadir free space on %s", targetHostname), "")
 	targetAgent, err = GetAgent(targetHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)

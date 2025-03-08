@@ -35,7 +35,7 @@ type HttpAgentsAPI struct {
 
 var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
-// SubmitAgent registeres an agent. It is initiated by an agent to register itself.
+// SubmitAgent registers an agent. It is initiated by an agent to register itself.
 func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
 	port, err := strconv.Atoi(params["port"])
 	if err != nil {

@@ -44,7 +44,7 @@ This setup provides semi HA for `orchestrator`. Two variations available:
   - The proxy always directs to same server (e.g. `first` algorithm for `HAProxy`) unless that server is dead.
   - Death of the active master causes `orchestrator` to talk to other master, which may be somewhat behind. `orchestrator` will typically self reapply the missing changes by nature of its continuous discovery.
   - `orchestrator` queries guarantee `STATEMENT` based replication will not cause duplicate errors, and master-master setup will always achieve consistency.
-  - `orchestrator` will be able to recover the death of a backend master even if in the middle of runnign a recovery (recovery will re-initiate on alternate master)
+  - `orchestrator` will be able to recover the death of a backend master even if in the middle of running a recovery (recovery will re-initiate on alternate master)
   - **Split brain is possible**. Depending on your setup, physical locations, type of proxy, there can be different `orchestrator` service nodes speaking to different backend `MySQL` servers. This scenario can lead two two `orchestrator` services which consider themselves as "active", both of which will run failovers independently, which would lead to topology corruption.
 
 To access your `orchestrator` service you may speak to any healthy node.

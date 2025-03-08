@@ -440,7 +440,7 @@ func (this *Instance) IsDescendantOf(other *Instance) bool {
 	return false
 }
 
-// CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
+// CanReplicateFrom uses heuristics to decide whether this instacne can practically replicate from other instance.
 // Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.Key.Equals(&other.Key) {

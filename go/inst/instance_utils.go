@@ -181,7 +181,7 @@ func RemoveInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Insta
 	return instances
 }
 
-// removeBinlogServerInstances will remove all binlog servers from given lsit
+// removeBinlogServerInstances will remove all binlog servers from given list
 func RemoveBinlogServerInstances(instances [](*Instance)) [](*Instance) {
 	for i := len(instances) - 1; i >= 0; i-- {
 		if instances[i].IsBinlogServer() {

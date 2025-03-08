@@ -2721,7 +2721,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		instance, _, err := MatchBelow(&instance.Key, &other.Key, true)
 		return instance, err
 	}
-	// No Pseudo-GTID; cehck simple binlog file/pos operations:
+	// No Pseudo-GTID; check simple binlog file/pos operations:
 	if InstancesAreSiblings(instance, other) {
 		// If comastering, only move below if it's read-only
 		if !other.IsCoMaster || other.ReadOnly {

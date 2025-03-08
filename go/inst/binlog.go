@@ -178,7 +178,7 @@ func (this *BinlogCoordinates) NextFileCoordinates() (BinlogCoordinates, error) 
 	return result, nil
 }
 
-// Detach returns a detahced form of coordinates
+// Detach returns a detached form of coordinates
 func (this *BinlogCoordinates) Detach() (detachedCoordinates BinlogCoordinates) {
 	detachedCoordinates = BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", this.LogFile, this.LogPos), LogPos: this.LogPos}
 	return detachedCoordinates

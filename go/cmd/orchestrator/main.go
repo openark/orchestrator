@@ -32,7 +32,7 @@ import (
 
 var AppVersion, GitCommit string
 
-// main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
+// main is the application's entry point. It will either spawn a CLI or HTTP interfaces.
 func main() {
 	configFile := flag.String("config", "", "config file name")
 	command := flag.String("c", "", "command, required. See full list of commands via 'orchestrator -c help'")

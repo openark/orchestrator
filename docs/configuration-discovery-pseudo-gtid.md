@@ -12,7 +12,7 @@ See [Pseudo GTID](pseudo-gtid.md)
   "AutoPseudoGTID": true,
 }
 ```
-And you may ignore any other Pseudo-GTID related configuration (they will all be implicitly overriden by `orchestrator`).
+And you may ignore any other Pseudo-GTID related configuration (they will all be implicitly overridden by `orchestrator`).
 
 You will further need to grant the following on your MySQL servers:
 ```sql
