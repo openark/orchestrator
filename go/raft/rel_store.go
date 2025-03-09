@@ -75,7 +75,7 @@ func (relStore *RelationalStore) openDB() (*sql.DB, error) {
 
 	if relStore.backend == nil {
 		relStoreFile := filepath.Join(relStore.dataDir, raftStoreFile)
-		sqliteDB, _, err := sqlutils.GetSQLiteDB(relStoreFile)
+		sqliteDB, _, err := sqlutils.GetSQLiteDB(relStoreFile, nil)
 		if err != nil {
 			return nil, err
 		}
