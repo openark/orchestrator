@@ -3,7 +3,6 @@ package inst
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -16,20 +15,11 @@ var (
 	i730k = InstanceKey{Hostname: "i730", Port: 3306}
 )
 
-var (
-	spacesRegexp = regexp.MustCompile(`[ \t\n\r]+`)
-)
-
 func normalizeQuery(name string) string {
 	name = strings.Replace(name, "`", "", -1)
 	name = spacesRegexp.ReplaceAllString(name, " ")
 	name = strings.TrimSpace(name)
 	return name
-}
-
-func stripSpaces(s string) string {
-	s = spacesRegexp.ReplaceAllString(s, "")
-	return s
 }
 
 func mkTestInstances() []*Instance {
@@ -114,4 +104,23 @@ func fmtArgs(args []interface{}) string {
 		fmt.Fprint(b, ", ")
 	}
 	return b.String()
+}
+
+func TestApplyKeyValueLookup(t *testing.T) {
+	kvLookup := "key1:value-a, key2: value-a,key3:value-b,key4:value-b,*:unknown"
+
+	tests := [][]string{
+		{"key1", "value-a"},
+		{"key2", "value-a"},
+		{"key3", "value-b"},
+		{"key4", "value-b"},
+		{"key5", "unknown"},
+	}
+
+	for i := range tests {
+		v := applyKeyValueLookup(tests[i][0], kvLookup)
+		if v != tests[i][1] {
+			t.Errorf("applyKeyValueLookup(%v,%v) returned %v, expected: %v", tests[i][0], kvLookup, v, tests[i][1])
+		}
+	}
 }
