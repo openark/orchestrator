@@ -208,6 +208,10 @@ package_linux() {
       fi
   fi
 
+  if [[ ! -x "$( which rpmbuild )" ]]; then
+    do_rpm=0
+  fi
+
   cd $tmp_build_path
 
   debug "Creating Linux Tar package"
