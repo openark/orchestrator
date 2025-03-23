@@ -839,6 +839,19 @@ var generateSQLBase = []string{
 		CREATE INDEX tag_name_idx_database_instance_tags ON database_instance_tags (tag_name)
 	`,
 	`
+		CREATE TABLE IF NOT EXISTS cluster_user_messages (
+			message_id int(10) unsigned NOT NULL auto_increment,
+			cluster_name varchar(128) NOT NULL,
+			level varchar(20) DEFAULT 'info' NOT NULL,
+			message text CHARACTER SET utf8 NOT NULL,
+			created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (message_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX cluster_name_idx_cluster_user_messages ON cluster_user_messages (cluster_name)
+	`,
+	`
 		CREATE TABLE IF NOT EXISTS database_instance_stale_binlog_coordinates (
 			hostname varchar(128) CHARACTER SET ascii NOT NULL,
 			port smallint(5) unsigned NOT NULL,

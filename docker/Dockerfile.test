@@ -8,9 +8,13 @@ RUN rm -rf /var/lib/apt/lists/*
 ENV WORKPATH /go/src/github.com/openark/orchestrator
 WORKDIR $WORKPATH
 
-RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/bin/linux/dbdeployer.gz"
+ENV DBDEPLOYER_VERSION 1.55.0
+ENV DBDEPLOYER_OS linux
+
+RUN wget "https://github.com/datacharmer/dbdeployer/releases/download/v$DBDEPLOYER_VERSION/dbdeployer-$DBDEPLOYER_VERSION.$DBDEPLOYER_OS.tar.gz"
 RUN curl -O "https://raw.githubusercontent.com/openark/orchestrator-ci-env/master/mysql-tarballs/mysql-5.7.26.tar.xz"
-RUN gunzip ./dbdeployer.gz
+RUN tar -xzf dbdeployer-$DBDEPLOYER_VERSION.$DBDEPLOYER_OS.tar.gz -C .
+RUN mv ./dbdeployer-$DBDEPLOYER_VERSION.$DBDEPLOYER_OS ./dbdeployer
 RUN chmod +x ./dbdeployer
 RUN mkdir -p ./sandbox/binary
 
