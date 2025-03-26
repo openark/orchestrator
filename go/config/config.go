@@ -112,6 +112,7 @@ type Configuration struct {
 	RaftBind                                   string
 	RaftAdvertise                              string
 	RaftDataDir                                string
+	RaftDisableDNSLookup                       bool
 	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
 	RaftNodes                                  []string // Raft nodes to make initial connection with
 	ExpectFailureAnalysisConcensus             bool

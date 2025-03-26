@@ -37,7 +37,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	}
 
 	if c.Op == YieldCommand {
-		toPeer, err := normalizeRaftNode(string(c.Value))
+		toPeer, err := normalizeRaftNode(string(c.Value), f.raftDisableDNSLookup)
 		if err != nil {
 			return log.Errore(err)
 		}
