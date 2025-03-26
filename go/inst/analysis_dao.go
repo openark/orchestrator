@@ -608,9 +608,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.Analysis = AllIntermediateMasterReplicasFailingToConnectOrDead
 				a.Description = "Intermediate master is reachable but all of its replicas are failing to connect"
 				//
-			} else if !a.IsMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
+			} else if !a.IsMaster && a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
 				a.Analysis = AllIntermediateMasterReplicasNotReplicating
-				a.Description = "Intermediate master is reachable but none of its replicas is replicating"
+				a.Description = "Intermediate master is reachable but none of its reachable replicas is replicating"
 				//
 			} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
 				a.Analysis = BinlogServerFailingToConnectToMaster
