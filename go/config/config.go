@@ -256,6 +256,7 @@ type Configuration struct {
 	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes        uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
+	GracefulMasterTakeoverSkipSiblingTakeover  bool              // When doing a graceful master switchover, do not relocate siblings to the new master
 	OSCIgnoreHostnameFilters                   []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                               string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                               string            // Prefix for graphite path. May include {hostname} magic placeholder
@@ -432,6 +433,7 @@ func newConfiguration() *Configuration {
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
 		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
+		GracefulMasterTakeoverSkipSiblingTakeover:  false,
 		OSCIgnoreHostnameFilters:                   []string{},
 		GraphiteAddr:                               "",
 		GraphitePath:                               "",
