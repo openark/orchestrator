@@ -341,12 +341,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	var resolveErr error
 
 	if !instanceKey.IsValid() {
-		latency.Start("backend")
-		if err := UpdateInstanceLastAttemptedCheck(instanceKey); err != nil {
-			log.Errorf("ReadTopologyInstanceBufferable: %+v: %v", instanceKey, err)
-		}
-		latency.Stop("backend")
-		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
+		return instance, fmt.Errorf("ReadTopologyInstanceBufferable: will not act on invalid instance key: %+v", *instanceKey)
 	}
 
 	lastAttemptedCheckTimer := time.AfterFunc(time.Second, func() {
