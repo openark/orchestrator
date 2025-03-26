@@ -23,7 +23,7 @@ $(document).ready(function() {
       info += "<li>" + audit.AcknowledgedComment + "</li>";
       info += '</ul></div>';
     } else {
-      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.Id+'">Acknowledge</button>';
+      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.ID+'">Acknowledge</button>';
       info += ' This recovery is unacknowledged.';
       info += '</div>';
     }
