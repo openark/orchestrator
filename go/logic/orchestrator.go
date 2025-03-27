@@ -72,6 +72,8 @@ var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 var kvFoundCache = cache.New(10*time.Minute, time.Minute)
 
+var leaderStateListener = make(chan bool)
+
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
 
@@ -302,7 +304,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 
 // onHealthTick handles the actions to take to discover/poll instances
 func onHealthTick() {
-	wasAlreadyElected := IsLeader()
+	wasPreviouslyLeader := IsLeader()
 
 	if orcraft.IsRaftEnabled() {
 		if orcraft.IsLeader() {
@@ -319,21 +321,25 @@ func onHealthTick() {
 		}
 	}
 	if !orcraft.IsRaftEnabled() {
-		myIsElectedNode, err := process.AttemptElection()
+		isNowLeader, err := process.AttemptElection()
 		if err != nil {
 			log.Errore(err)
 		}
-		if myIsElectedNode {
+		if isNowLeader {
 			atomic.StoreInt64(&isElectedNode, 1)
 		} else {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
-		if !myIsElectedNode {
+		if !isNowLeader {
 			if electedNode, _, err := process.ElectedNode(); err == nil {
 				log.Infof("Not elected as active node; active node: %v; polling", electedNode.Hostname)
 			} else {
 				log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
 			}
+		}
+		if isNowLeader != wasPreviouslyLeader {
+			// state changed
+			go func() { leaderStateListener <- isNowLeader }()
 		}
 	}
 	if !IsLeaderOrActive() {
@@ -344,7 +350,7 @@ func onHealthTick() {
 		log.Errore(err)
 	}
 
-	if !wasAlreadyElected {
+	if !wasPreviouslyLeader {
 		// Just turned to be leader!
 		go process.RegisterNode(process.ThisNodeHealth)
 		go inst.ExpireMaintenance()
@@ -485,8 +491,8 @@ func ContinuousDiscovery() {
 	log.Infof("continuous discovery: setting up")
 	continuousDiscoveryStartTime := time.Now()
 	checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
+	SetupLeaderStates(checkAndRecoverWaitPeriod)
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
-
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
@@ -513,11 +519,16 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 	go kv.InitKVStores()
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname, leaderStateListener); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()
 	}
+	go func() {
+		for isTurnedLeader := range leaderStateListener {
+			OnLeaderStateChange(isTurnedLeader)
+		}
+	}()
 
 	if *config.RuntimeCLIFlags.GrabElection {
 		process.GrabElection()
